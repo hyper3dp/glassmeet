@@ -4,6 +4,8 @@ services:
     runtime: node
     region: oregon
     plan: starter
+    domains:
+      - glassmeet.com
     buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /api/app/settings
