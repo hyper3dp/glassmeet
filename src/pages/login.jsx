@@ -35,8 +35,8 @@ export default function Login() {
   };
 
   const handleGoogle = () => {
-    const query = new URLSearchParams({ returnTo });
-    window.location.assign(`/api/auth/google/start?${query}`);
+    setError("");
+    api.auth.loginWithGoogle(returnTo).catch((err) => setError(err.message || "Could not start Google sign-in"));
   };
 
   return (

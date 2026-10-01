@@ -14,6 +14,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -25,8 +26,9 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await api.auth.register({ email, password });
-      window.location.assign(safeReturnTo());
+      const result = await api.auth.register({ email, password });
+      if (result.session) window.location.assign(safeReturnTo());
+      else setNotice("Check your email for a confirmation link before signing in.");
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
@@ -35,8 +37,8 @@ export default function Register() {
   };
 
   const handleGoogle = () => {
-    const query = new URLSearchParams({ returnTo: safeReturnTo() });
-    window.location.assign(`/api/auth/google/start?${query}`);
+    setError("");
+    api.auth.loginWithGoogle(safeReturnTo()).catch((err) => setError(err.message || "Could not start Google sign-in"));
   };
 
   return (
@@ -63,6 +65,7 @@ export default function Register() {
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
         <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">or create with email</span></div>
       </div>
+      {notice && <p role="status" className="mb-4 text-sm text-emerald-600">{notice}</p>}
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}

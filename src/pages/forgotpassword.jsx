@@ -11,16 +11,12 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [resetLink, setResetLink] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const result = await api.auth.resetPasswordRequest(email);
-      if (result.resetToken) {
-        setResetLink(`${window.location.origin}/reset-password?token=${encodeURIComponent(result.resetToken)}`);
-      }
+      await api.auth.resetPasswordRequest(email);
     } catch {
       // Always show success regardless
     } finally {
@@ -33,7 +29,7 @@ export default function ForgotPassword() {
     <AuthLayout
       icon={Mail}
       title="Reset password"
-      subtitle="Create a local password reset link"
+      subtitle="We will email you a secure password reset link"
       footer={
         <Link to="/login" className="text-primary font-medium hover:underline">
           <ArrowLeft className="w-3 h-3 inline mr-1" />Back to log in
@@ -41,12 +37,7 @@ export default function ForgotPassword() {
       }
     >
       {sent ? (
-        <div className="space-y-3 text-center">
-          <p className="text-sm text-foreground">
-            {resetLink ? "Use this one-time link to reset your password." : "No account was found for that email."}
-          </p>
-          {resetLink && <Link className="text-sm text-primary font-medium hover:underline break-all" to={resetLink}>Continue to password reset</Link>}
-        </div>
+        <p className="text-center text-sm text-foreground">If an account exists for that email, a password reset link has been sent.</p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -67,7 +58,7 @@ export default function ForgotPassword() {
             </div>
           </div>
           <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
-            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating link...</> : "Create reset link"}
+            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : "Send reset link"}
           </Button>
         </form>
       )}

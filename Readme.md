@@ -1,43 +1,45 @@
 # GlassMeet
 
-GlassMeet is a standalone scheduling app. The frontend and local API run in one Node process; account and booking data are stored in SQLite at `data/glassmeet.sqlite`.
+GlassMeet is a React scheduling app hosted as a static site on GitHub Pages. Supabase provides authentication, shared records, and a secure Edge Function for Google Calendar access.
 
-## Requirements
+## Local development
 
-- Node.js 22.12 or newer
-- npm
+1. Create a Supabase project.
+2. Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the Supabase project's API settings.
+3. Apply `supabase/migrations/20260927000000_initial.sql` in the Supabase SQL Editor.
+4. Enable Google as an Auth provider and enable manual identity linking in Supabase, then add the Supabase callback URL shown there to the Google OAuth web client.
+5. Set the Google OAuth client ID, client secret, and a random `GOOGLE_TOKEN_ENCRYPTION_KEY` as Supabase Edge Function secrets.
+6. Deploy `supabase/functions/google-calendar` to the project.
+7. Run `npm install` and `npm run dev`.
 
-## Run
+The Google client JSON in `authgoogle/` is for local reference only; that folder is gitignored. Do not commit the client secret. Supabase Auth and the Edge Function use the client credentials configured in Supabase.
 
-```bash
-npm install
-npm run dev
-```
+## GitHub Pages deployment
 
-Open `http://localhost:5173`, create a local account, and manage bookings. The SQLite file is created automatically on first start.
+The `Deploy GlassMeet to GitHub Pages` workflow builds and publishes the static app on pushes to `main`. In repository Settings, set Pages to **GitHub Actions**, and add:
 
-For a production build, run `npm run build` and then `npm start`.
+- Repository variable `VITE_SUPABASE_URL`
+- Repository secret `VITE_SUPABASE_ANON_KEY`
 
-## Google Accounts and Calendar
+The public anon key is intended for browser use; database row-level security is what protects records. Never add the Supabase service-role key, Google client secret, or Google token encryption key to Pages build variables.
 
-1. Enable the Google Calendar API and configure the OAuth web client in Google Cloud Console.
-2. Add `http://localhost:5173` as an authorized JavaScript origin and `http://localhost:5173/api/auth/google/callback` as an authorized redirect URI. The client JSON must belong to a web application OAuth client.
-3. Put the downloaded client JSON in `authgoogle/`. That folder is gitignored; do not commit or upload the JSON file.
-4. Restart `npm run dev`. The server reads the local client ID and secret from that folder. Confirmed bookings are created in the selected Google calendar.
+To deploy the Edge Function from the `Deploy Supabase backend` workflow, configure these GitHub repository values:
 
-For production, point `glassmeet.com` DNS at your hosting provider, enable HTTPS, and add `https://glassmeet.com` plus `https://glassmeet.com/api/auth/google/callback` to the Google OAuth client. Set `APP_PUBLIC_URL` and `GOOGLE_REDIRECT_URI` to those HTTPS URLs in the production environment. DNS and hosting cannot be configured from this source tree; do not expose the local development server directly to the public internet.
+- Variable `SUPABASE_PROJECT_REF`
+- Secrets `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY`
 
-Google refresh tokens are encrypted in the local SQLite database. Locally, the encryption key is derived from the private OAuth client secret; Render uses its generated `GOOGLE_TOKEN_ENCRYPTION_KEY`. Email delivery and WhatsApp messages still require their own provider credentials; local password-reset links are displayed in the browser.
+Then run the workflow manually from the Actions tab. It applies the database migration, sets server-side Google secrets, and deploys the Edge Function.
 
-## Deploy with GitHub and Render
+## Google OAuth
 
-GitHub stores the source; Render runs the Node server and persistent SQLite disk. GitHub Pages alone cannot run this app's API or database.
+In Google Cloud Console, enable the Google Calendar API. Add `https://glassmeet.is-a.dev` and `http://localhost:5173` as authorized JavaScript origins, and add the Supabase Auth callback URL as an authorized redirect URI. In Supabase Auth settings, set the site URL to `https://glassmeet.is-a.dev` and allow these redirects:
 
-1. Create a GitHub repository and push this project to its default branch.
-2. In Render, choose **New + → Blueprint**, connect the GitHub repository, and deploy the included `render.yaml`.
-3. Enter the client ID and secret from the local `authgoogle/` JSON into Render's secret fields when prompted. The blueprint generates the encryption key. Never upload the JSON file to GitHub or Render.
-4. In Render, add `glassmeet.com` and `www.glassmeet.com` as custom domains and follow the DNS records it shows.
-5. At the current domain DNS provider, replace the existing Gname parking record with Render's requested apex and `www` records. Keep DNS-only changes; do not point the domain at this computer.
-6. In Google Cloud Console, add `https://glassmeet.com` as an authorized JavaScript origin and `https://glassmeet.com/api/auth/google/callback` as an authorized redirect URI.
+- `https://glassmeet.is-a.dev/**`
+- `https://hyper3dp.github.io/glassmeet/**`
+- `http://localhost:5173/**`
 
-The server redirects `www.glassmeet.com` to `https://glassmeet.com`. A persistent Render disk is required because SQLite stores account, booking, and encrypted Google token data.
+The app uses the Google Calendar token only in the Edge Function. It stores refresh tokens encrypted in `google_credentials`, a table with row-level security enabled and no browser access.
+
+## Domain
+
+The Pages build includes `public/CNAME` for `glassmeet.is-a.dev`. The domain must be registered in the is-a.dev registry, and its DNS record must point to `hyper3dp.github.io`. GitHub Pages must also have the custom domain enabled and verified. The CNAME file alone does not register or configure DNS for the domain.

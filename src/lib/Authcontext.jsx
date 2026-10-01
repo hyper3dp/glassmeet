@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { api } from '@/lib/localApi';
+import { api, persistGoogleProviderToken } from '@/lib/localApi';
 
 const AuthContext = createContext();
 
@@ -47,6 +47,29 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     checkAppState();
   }, [checkAppState]);
+
+  useEffect(() => {
+    const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
+      window.setTimeout(async () => {
+        if (event === 'SIGNED_OUT' || !session) {
+          setUser(null);
+          setIsAuthenticated(false);
+        } else {
+          try {
+            const currentUser = await api.auth.me();
+            setUser(currentUser);
+            setIsAuthenticated(Boolean(currentUser));
+            await persistGoogleProviderToken(session);
+          } catch (error) {
+            setAuthError({ type: 'unknown', message: error.message });
+          }
+        }
+        setAuthChecked(true);
+        setIsLoadingAuth(false);
+      }, 0);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const logout = async (shouldRedirect = true) => {
     await api.auth.logout();

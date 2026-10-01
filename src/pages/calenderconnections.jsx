@@ -76,8 +76,7 @@ export default function CalendarConnections() {
   useEffect(() => { refreshGoogle(); }, []);
 
   const handleConnectGoogle = () => {
-    const query = new URLSearchParams({ flow: 'calendar', returnTo: '/calendar-connections' });
-    window.location.assign(`/api/auth/google/start?${query}`);
+    api.auth.loginWithGoogle('/calendar-connections').catch((error) => setGoogleError(error.message));
   };
 
   const handleDisconnectGoogle = async () => {
