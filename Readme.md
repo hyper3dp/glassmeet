@@ -32,14 +32,13 @@ Then run the workflow manually from the Actions tab. It applies the database mig
 
 ## Google OAuth
 
-In Google Cloud Console, enable the Google Calendar API. Add `https://glassmeet.is-a.dev` and `http://localhost:5173` as authorized JavaScript origins, and add the Supabase Auth callback URL as an authorized redirect URI. In Supabase Auth settings, set the site URL to `https://glassmeet.is-a.dev` and allow these redirects:
+In Google Cloud Console, enable the Google Calendar API. Add `https://hyper3dp.github.io` and `http://localhost:5173` as authorized JavaScript origins, and add the Supabase Auth callback URL as an authorized redirect URI. In Supabase Auth settings, set the site URL to `https://hyper3dp.github.io/glassmeet/` and allow these redirects:
 
-- `https://glassmeet.is-a.dev/**`
 - `https://hyper3dp.github.io/glassmeet/**`
 - `http://localhost:5173/**`
 
 The app uses the Google Calendar token only in the Edge Function. It stores refresh tokens encrypted in `google_credentials`, a table with row-level security enabled and no browser access.
 
-## Domain
+## Public URL
 
-The Pages build includes `public/CNAME` for `glassmeet.is-a.dev`. The domain must be registered in the is-a.dev registry, and its DNS record must point to `hyper3dp.github.io`. GitHub Pages must also have the custom domain enabled and verified. The CNAME file alone does not register or configure DNS for the domain.
+The GitHub Pages project URL is `https://hyper3dp.github.io/glassmeet/`. The workflow builds assets and restores client-side routes under the `/glassmeet/` path. No custom domain is configured.

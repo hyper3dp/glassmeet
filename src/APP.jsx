@@ -8,11 +8,11 @@ import PageNotFound from './lib/Pagenotfound.jsx';
 import { AuthProvider, useAuth } from '@/lib/Authcontext.jsx';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './Components/scrolltotop.jsx';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/components/protectedroute.jsx';
 import { useProfile, AppContext, useApp } from '@/lib/useprofile.js';
 import Layout from '@/components/Layout';
 import CommandPalette from '@/components/commandpalatte.jsx';
-import LiquidGlassFilter from '@/components/LiquidGlassFilter';
+import LiquidGlassFilter from '@/components/liquidglassfilter.jsx';
 
 // Auth pages
 import Login from './pages/login.jsx';
@@ -138,7 +138,7 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
-          <Router>
+          <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <ScrollToTop />
             <LiquidGlassFilter />
             <AuthenticatedApp />

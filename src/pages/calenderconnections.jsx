@@ -9,8 +9,9 @@ import { api } from '@/lib/localApi';
 import { useApp } from '@/lib/useprofile.js';
 import { downloadIcs } from '@/lib/calendar';
 import { downloadICSFeed, generateSubscriptionToken } from '@/lib/calendarFeed';
-import OutlookIcon from '@/components/OutlookIcon';
-import { getCalendarPriority } from '@/lib/deviceDetect';
+import OutlookIcon from '@/components/outlookicon.jsx';
+import { getCalendarPriority } from '@/lib/devicedetect.js';
+import { appPath } from '@/lib/authReturnTo';
 
 const SAMPLE_BOOKING = {
   id: 'sample',
@@ -200,7 +201,7 @@ export default function CalendarConnections() {
   };
 
   const copySubscriptionUrl = (token) => {
-    const url = `${window.location.origin}/calendar-feed/${token}`;
+    const url = `${window.location.origin}${appPath(`/calendar-feed/${token}`)}`;
     navigator.clipboard.writeText(url);
     setCopiedSub(token);
     setTimeout(() => setCopiedSub(null), 2000);
@@ -499,7 +500,7 @@ export default function CalendarConnections() {
                   ) : (
                     <div className="flex items-center gap-2 mb-3">
                       <code className="flex-1 text-xs text-muted-foreground glass rounded-lg px-3 py-2 truncate">
-                        {window.location.origin}/calendar-feed/{sub.token.slice(0, 12)}…
+                        {window.location.origin}{appPath(`/calendar-feed/${sub.token.slice(0, 12)}…`)}
                       </code>
                     </div>
                   )}

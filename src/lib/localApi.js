@@ -1,4 +1,5 @@
 import { requireSupabase, supabase } from '@/lib/supabase';
+import { appPath } from '@/lib/authReturnTo';
 
 function profileFromUser(user) {
   if (!user) return null;
@@ -159,7 +160,7 @@ export const api = {
     loginWithGoogle: async (returnTo = '/') => {
       const { data: { user } } = await requireSupabase().auth.getUser();
       const options = {
-        redirectTo: new URL(returnTo, window.location.origin).toString(),
+        redirectTo: new URL(appPath(returnTo), window.location.origin).toString(),
         scopes: googleScopes,
         queryParams: { access_type: 'offline', prompt: 'consent' },
       };
@@ -175,7 +176,7 @@ export const api = {
     },
     resetPasswordRequest: async (email) => {
       const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}${appPath('/reset-password')}`,
       });
       if (error) throw error;
       return { sent: true };

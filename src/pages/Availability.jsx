@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/localApi';
 import { Clock, Plus, Trash2, CalendarOff, X } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassSelect, GlassLabel, EmptyState, Spinner } from '@/components/glass';
-import { formatDate } from '@/lib/availability';
+import { formatDate } from '@/lib/Availability.js';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

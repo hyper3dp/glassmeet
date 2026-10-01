@@ -8,6 +8,14 @@
 // /\evil.com parses same-origin but normalizes to a protocol-relative
 // //evil.com when assigned to location.href — an open redirect. So require the
 // resolved path to be exactly one leading slash (no "//" prefix, no backslash).
+export function appPath(path = '/') {
+  const configuredBase = import.meta.env.BASE_URL || '/';
+  const basePath = configuredBase.endsWith('/') ? configuredBase : `${configuredBase}/`;
+  const value = String(path || '/');
+  if (value.startsWith(basePath)) return value;
+  return `${basePath}${value.replace(/^\/+/, '')}`;
+}
+
 export function safeReturnTo() {
   const raw = new URLSearchParams(window.location.search).get("returnTo");
   if (!raw) return "/";

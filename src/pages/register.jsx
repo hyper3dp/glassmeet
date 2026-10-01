@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
-import AuthLayout from "@/components/AuthLayout";
+import AuthLayout from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
-import { safeReturnTo } from "@/lib/authReturnTo";
+import { appPath, safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -27,7 +27,7 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await api.auth.register({ email, password });
-      if (result.session) window.location.assign(safeReturnTo());
+      if (result.session) window.location.assign(appPath(safeReturnTo()));
       else setNotice("Check your email for a confirmation link before signing in.");
     } catch (err) {
       setError(err.message || "Registration failed");

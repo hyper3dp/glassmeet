@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import { useTheme } from 'next-themes';
-import { COMMON_TIMEZONES, detectTimezone } from '@/lib/availability';
+import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
+import { appPath } from '@/lib/authReturnTo';
 
 const COLORS = ['#0A84FF', '#30D158', '#FF9F0A', '#FF375F', '#BF5AF2', '#64D2FF', '#5E5CE6', '#8E8E93'];
 
@@ -58,7 +59,7 @@ export default function Settings({ profile, updateProfile }) {
     setSaving(false);
   };
 
-  const bookingLink = form.username ? `${window.location.origin}/u/${form.username}` : '';
+  const bookingLink = form.username ? `${window.location.origin}${appPath(`/u/${form.username}`)}` : '';
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">

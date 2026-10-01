@@ -1,3 +1,4 @@
+import { appPath } from '@/lib/authReturnTo';
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -8,7 +9,7 @@ import {
 import { api } from '@/lib/localApi';
 import { cn } from '@/lib/utils';
 import { GlassButton } from '@/components/glass';
-import NotificationCenter from '@/components/NotificationCenter';
+import NotificationCenter from '@/components/Notificationcenter.jsx';
 
 const DESKTOP_NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -52,7 +53,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
 
   const handleLogout = async () => {
     await api.auth.logout();
-    window.location.href = '/login';
+    window.location.href = appPath('/login');
   };
 
   const NavLinks = ({ nav }) => (

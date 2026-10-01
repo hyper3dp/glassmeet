@@ -3,8 +3,8 @@ import { api } from '@/lib/localApi';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalIcon, Zap } from 'lucide-react';
 import { GlassCard, GlassButton, Spinner, EmptyState } from '@/components/glass';
 import { formatMeetingDate, formatMeetingTime } from '@/lib/whatsapp';
-import { detectTimezone } from '@/lib/availability';
-import FindATime from '@/components/FindATime';
+import { detectTimezone } from '@/lib/Availability.js';
+import FindATime from '@/components/FindAtime.jsx';
 
 export default function CalendarPage({ profile }) {
   const [view, setView] = useState('month'); // month | week | day

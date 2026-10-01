@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
-import AuthLayout from "@/components/AuthLayout";
+import AuthLayout from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
-import { safeReturnTo } from "@/lib/authReturnTo";
+import { appPath, safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -26,7 +26,7 @@ export default function Login() {
     setLoading(true);
     try {
       await api.auth.loginViaEmailPassword(email, password);
-      window.location.href = returnTo;
+      window.location.href = appPath(returnTo);
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {

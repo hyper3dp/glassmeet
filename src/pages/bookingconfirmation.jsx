@@ -7,9 +7,10 @@ import {
 import { GlassButton } from '@/components/glass';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, DEFAULT_CONFIRMATION_TEMPLATE } from '@/lib/whatsapp';
 import { downloadIcs, openGoogleCalendar, openAppleCalendar, openOutlookCalendar } from '@/lib/calendar';
-import { getDevice, getCalendarPriority } from '@/lib/deviceDetect';
+import { getDevice, getCalendarPriority } from '@/lib/devicedetect.js';
 import { downloadICSFeed } from '@/lib/calendarFeed';
-import OutlookIcon from '@/components/OutlookIcon';
+import OutlookIcon from '@/components/outlookicon.jsx';
+import { appPath } from '@/lib/authReturnTo';
 
 export default function BookingConfirmation() {
   const location = useLocation();
@@ -47,7 +48,7 @@ export default function BookingConfirmation() {
 
   const device = getDevice();
   const calendarPriority = getCalendarPriority();
-  const bookingUrl = booking ? `${window.location.origin}/book/${booking.event_type_id}` : '';
+  const bookingUrl = booking ? `${window.location.origin}${appPath(`/book/${booking.event_type_id}`)}` : '';
 
   const calendarButtons = {
     apple: { icon: Apple, label: 'Apple Calendar', action: () => openAppleCalendar(booking, event, host), primary: true },

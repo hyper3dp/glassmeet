@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2 } from "lucide-react";
-import AuthLayout from "@/components/AuthLayout";
+import AuthLayout from "@/components/Authlayout.jsx";
+import { appPath } from "@/lib/authReturnTo";
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
@@ -24,7 +25,7 @@ export default function ResetPassword() {
     try {
       if (!(await api.auth.hasSession())) throw new Error('This reset link is invalid or has expired. Request a new one.');
       await api.auth.resetPassword({ newPassword });
-      window.location.href = "/login";
+      window.location.href = appPath('/login');
     } catch (err) {
       setError(err.message || "Failed to reset password");
     } finally {

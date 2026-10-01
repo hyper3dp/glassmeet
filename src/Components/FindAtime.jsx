@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { X, Clock, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { api } from '@/lib/localApi';
 import { GlassButton } from '@/components/glass';
-import { generateSlots, detectTimezone, formatDate } from '@/lib/availability';
+import { generateSlots, detectTimezone, formatDate } from '@/lib/Availability.js';
 
 const DAY_LABELS = ['Today', 'Tomorrow'];
 

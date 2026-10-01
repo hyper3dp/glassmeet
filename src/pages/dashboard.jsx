@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { GlassCard, GlassButton, EmptyState, Spinner } from '@/components/glass';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/lib/whatsapp';
-import { detectTimezone } from '@/lib/availability';
+import { detectTimezone } from '@/lib/Availability.js';
+import { appPath } from '@/lib/authReturnTo';
 
 export default function Dashboard({ profile }) {
   const [bookings, setBookings] = useState([]);
@@ -44,7 +45,7 @@ export default function Dashboard({ profile }) {
   const recent = useMemo(() => bookings.slice(0, 5), [bookings]);
 
   const firstEvent = eventTypes[0];
-  const bookingLink = firstEvent ? `${window.location.origin}/book/${firstEvent.id}` : '';
+  const bookingLink = firstEvent ? `${window.location.origin}${appPath(`/book/${firstEvent.id}`)}` : '';
 
   const shareOnWhatsApp = () => {
     const msg = firstEvent

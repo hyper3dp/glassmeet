@@ -9,7 +9,6 @@ const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
 
 const publicOrigins = new Set([
   'http://localhost:5173',
-  'https://glassmeet.is-a.dev',
   'https://hyper3dp.github.io',
 ]);
 
@@ -21,7 +20,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 function headersFor(origin: string | null) {
-  const allowedOrigin = origin && publicOrigins.has(origin) ? origin : 'https://glassmeet.is-a.dev';
+  const allowedOrigin = origin && publicOrigins.has(origin) ? origin : 'https://hyper3dp.github.io';
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

@@ -8,10 +8,11 @@ import {
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import {
   generateSlots, isPastDate, isWithinMaxFuture, formatDate, detectTimezone,
-} from '@/lib/availability';
+} from '@/lib/Availability.js';
 import { formatMeetingDate, formatMeetingTime } from '@/lib/whatsapp';
-import { getDevice } from '@/lib/deviceDetect';
-import QRCodeModal from '@/components/QRCodeModal';
+import { getDevice } from '@/lib/devicedetect.js';
+import QRCodeModal from '@/components/QrcodeModal.jsx';
+import { appPath } from '@/lib/authReturnTo';
 
 export default function BookingPage() {
   const { eventTypeId } = useParams();
@@ -34,7 +35,7 @@ export default function BookingPage() {
   const [showQR, setShowQR] = useState(false);
 
   const device = getDevice();
-  const bookingUrl = `${window.location.origin}/book/${eventTypeId}`;
+  const bookingUrl = `${window.location.origin}${appPath(`/book/${eventTypeId}`)}`;
 
   // Group meeting: count existing bookings for this event
   const groupBookings = bookedSlots.filter((b) => b.event_type_id === eventTypeId && b.status === 'confirmed');

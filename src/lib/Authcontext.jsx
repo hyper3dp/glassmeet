@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { api, persistGoogleProviderToken } from '@/lib/localApi';
+import { appPath } from '@/lib/authReturnTo';
 
 const AuthContext = createContext();
 
@@ -76,11 +77,11 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setAuthChecked(true);
-    if (shouldRedirect) window.location.assign('/login');
+    if (shouldRedirect) window.location.assign(appPath('/login'));
   };
 
   const navigateToLogin = () => {
-    window.location.assign(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`);
+    window.location.assign(`${appPath('/login')}?returnTo=${encodeURIComponent(window.location.pathname)}`);
   };
 
   return (

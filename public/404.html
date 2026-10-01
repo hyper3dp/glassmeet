@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GlassMeet</title>
     <script>
-      const route = `${location.pathname}${location.search}${location.hash}`;
-      location.replace(`/?__gh_pages_route=${encodeURIComponent(route)}`);
+      const basePath = '/glassmeet/';
+      const routePath = location.pathname.startsWith('/glassmeet')
+        ? location.pathname.slice('/glassmeet'.length)
+        : location.pathname;
+      const route = `${routePath}${location.search}${location.hash}`;
+      location.replace(`${basePath}?__gh_pages_route=${encodeURIComponent(route)}`);
     </script>
   </head>
   <body></body>
