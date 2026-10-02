@@ -2,6 +2,7 @@
   "name": "glassmeet",
   "private": true,
   "version": "0.0.0",
+  "homepage": "https://hyper3dp.github.io/glassmeet",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -9,7 +10,9 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -46,7 +49,6 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@stripe/react-stripe-js": "^3.0.0",
     "@stripe/stripe-js": "^5.2.0",
-    "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.84.1",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -55,8 +57,10 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.5.2",
     "framer-motion": "^11.16.4",
+    "google-auth-library": "^11.1.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
+    "jose": "^6.2.12",
     "jspdf": "^4.2.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
@@ -93,6 +97,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "eslint-plugin-unused-imports": "^4.3.0",
+    "gh-pages": "^6.3.0",
     "globals": "^15.14.0",
     "nitro": "^3.0.260610-beta",
     "postcss": "^8.5.3",

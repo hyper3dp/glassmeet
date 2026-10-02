@@ -1,212 +1,101 @@
-import { requireSupabase, supabase } from '@/lib/supabase';
 import { appPath } from '@/lib/authReturnTo';
 
-function profileFromUser(user) {
-  if (!user) return null;
-  return {
-    ...user.user_metadata,
-    id: user.id,
-    email: user.email,
-    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Host',
-    created_date: user.created_at,
-  };
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const TOKEN_KEY = 'glassmeet_session';
+
+function storeToken(token) {
+  if (token) window.localStorage.setItem(TOKEN_KEY, token);
 }
 
-function recordFromRow(row) {
-  return {
-    ...row.data,
-    id: row.id,
-    created_date: row.created_at,
-    updated_date: row.updated_at,
-  };
+function consumeGoogleCallbackToken() {
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const token = hashParams.get('glassmeet_token');
+  if (!token) return;
+  storeToken(token);
+  hashParams.delete('glassmeet_token');
+  const remainingHash = hashParams.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${remainingHash ? `#${remainingHash}` : ''}`);
 }
 
-function matchesFilter(record, filter) {
-  return Object.entries(filter).every(([key, expected]) => {
-    const actual = record[key];
-    if (Array.isArray(expected)) return expected.some((value) => String(value) === String(actual));
-    return String(actual) === String(expected);
-  });
-}
+consumeGoogleCallbackToken();
 
-async function currentUserId() {
-  const client = requireSupabase();
-  const { data, error } = await client.auth.getUser();
-  if (error?.name === 'AuthSessionMissingError') return null;
-  if (error) throw error;
-  return data.user?.id ?? null;
-}
-
-function cleanData(value) {
-  const data = { ...value };
-  delete data.id;
-  delete data.created_date;
-  delete data.updated_date;
-  return data;
-}
-
-async function createRecord(entityName, value) {
-  const client = requireSupabase();
-  const data = cleanData(value);
-  const userId = await currentUserId();
-  if (userId && !data.created_by_id && !data.host_id) data.created_by_id = userId;
-  const ownerId = data.created_by_id || data.host_id || userId;
-  const { data: row, error } = await client
-    .from('app_records')
-    .insert({ entity: String(entityName), owner_id: ownerId, data })
-    .select('*')
-    .single();
-  if (error) throw error;
-  const record = recordFromRow(row);
-  if (String(entityName) === 'Booking' && record.status === 'confirmed' && record.approval_status !== 'pending') {
-    invokeGoogle({ action: 'create-booking-event', bookingId: record.id })
-      .catch((googleError) => console.error('Google Calendar event creation failed:', googleError));
+async function request(path, options = {}) {
+  if (!API_URL) throw new Error('Google Cloud API is not configured. Add VITE_API_URL to the GitHub Pages build settings.');
+  const headers = new Headers(options.headers);
+  const token = window.localStorage.getItem(TOKEN_KEY);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  let body = options.body;
+  if (body !== undefined && typeof body !== 'string') {
+    headers.set('Content-Type', 'application/json');
+    body = JSON.stringify(body);
   }
-  return record;
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers, body });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 401 && path === '/api/auth/me') window.localStorage.removeItem(TOKEN_KEY);
+    throw new Error(payload.error || `Request failed (${response.status})`);
+  }
+  return payload;
 }
 
 const entities = new Proxy({}, {
   get: (_target, entityName) => ({
-    filter: async (where = {}, sort, limit) => {
-      const client = requireSupabase();
-      let query = client.from('app_records').select('*').eq('entity', String(entityName)).limit(1000);
-      const { data, error } = await query;
-      if (error) throw error;
-      let records = data.map(recordFromRow).filter((record) => matchesFilter(record, where));
-      if (sort) {
-        const descending = sort.startsWith('-');
-        const field = descending ? sort.slice(1) : sort;
-        records.sort((a, b) => {
-          const result = String(a[field] ?? '').localeCompare(String(b[field] ?? ''), undefined, { numeric: true });
-          return descending ? -result : result;
-        });
-      }
-      if (limit != null) records = records.slice(0, limit);
-      return records;
+    filter: (where = {}, sort, limit) => {
+      const params = new URLSearchParams({ where: JSON.stringify(where) });
+      if (sort) params.set('sort', sort);
+      if (limit != null) params.set('limit', String(limit));
+      return request(`/api/entities/${encodeURIComponent(entityName)}?${params}`);
     },
-    get: async (id) => {
-      const { data, error } = await requireSupabase()
-        .from('app_records').select('*').eq('entity', String(entityName)).eq('id', id).maybeSingle();
-      if (error) throw error;
-      return data ? recordFromRow(data) : null;
-    },
-    create: (value) => createRecord(entityName, value),
-    bulkCreate: async (values) => Promise.all(values.map((value) => createRecord(entityName, value))),
-    update: async (id, value) => {
-      const client = requireSupabase();
-      const existing = await entities[entityName].get(id);
-      if (!existing) throw new Error(`${String(entityName)} record not found`);
-      const { data, error } = await client.from('app_records')
-        .update({ data: { ...cleanData(existing), ...cleanData(value) }, updated_at: new Date().toISOString() })
-        .eq('entity', String(entityName)).eq('id', id).select('*').single();
-      if (error) throw error;
-      return recordFromRow(data);
-    },
-    bulkUpdate: async (values) => Promise.all(values.map(({ id, ...value }) => entities[entityName].update(id, value))),
-    delete: async (id) => {
-      const { error } = await requireSupabase().from('app_records')
-        .delete().eq('entity', String(entityName)).eq('id', id);
-      if (error) throw error;
-      return { success: true };
-    },
+    get: (id) => request(`/api/entities/${encodeURIComponent(entityName)}/${encodeURIComponent(id)}`),
+    create: (value) => request(`/api/entities/${encodeURIComponent(entityName)}`, { method: 'POST', body: value }),
+    bulkCreate: (values) => request(`/api/entities/${encodeURIComponent(entityName)}/bulk`, { method: 'POST', body: values }),
+    update: (id, value) => request(`/api/entities/${encodeURIComponent(entityName)}/${encodeURIComponent(id)}`, { method: 'PATCH', body: value }),
+    bulkUpdate: (values) => request(`/api/entities/${encodeURIComponent(entityName)}/bulk`, { method: 'PATCH', body: values }),
+    delete: (id) => request(`/api/entities/${encodeURIComponent(entityName)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   }),
 });
 
-async function invokeGoogle(body) {
-  const { data, error } = await requireSupabase().functions.invoke('google-calendar', { body });
-  if (error) throw error;
-  return data;
-}
-
-const googleScopes = [
-  'openid',
-  'email',
-  'profile',
-  'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
-].join(' ');
-
 export const api = {
   entities,
-  app: {
-    getPublicSettings: async () => ({ id: 'supabase', public_settings: { app_name: 'GlassMeet' } }),
-  },
+  app: { getPublicSettings: () => request('/api/app/settings') },
   auth: {
-    me: async () => {
-      const { data, error } = await requireSupabase().auth.getUser();
-      if (error?.name === 'AuthSessionMissingError') return null;
-      if (error) throw error;
-      return profileFromUser(data.user);
-    },
-    updateMe: async (value) => {
-      const { data, error } = await requireSupabase().auth.updateUser({ data: value });
-      if (error) throw error;
-      return profileFromUser(data.user);
-    },
+    me: () => request('/api/auth/me'),
+    updateMe: (value) => request('/api/auth/me', { method: 'PUT', body: value }),
     loginViaEmailPassword: async (email, password) => {
-      const { data, error } = await requireSupabase().auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      return { user: profileFromUser(data.user), session: data.session };
+      const result = await request('/api/auth/login', { method: 'POST', body: { email, password } });
+      storeToken(result.access_token);
+      return result;
     },
-    register: async ({ email, password }) => {
-      const { data, error } = await requireSupabase().auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: email.split('@')[0] } },
+    register: async (value) => {
+      const result = await request('/api/auth/register', { method: 'POST', body: value });
+      storeToken(result.access_token);
+      return result;
+    },
+    loginWithGoogle: async (returnTo = '/', flow = 'login') => {
+      const result = await request('/api/auth/google/start', {
+        method: 'POST',
+        body: { flow, returnTo: appPath(returnTo), frontendOrigin: window.location.origin },
       });
-      if (error) throw error;
-      return { user: profileFromUser(data.user), session: data.session };
-    },
-    loginWithGoogle: async (returnTo = '/') => {
-      const { data: { user } } = await requireSupabase().auth.getUser();
-      const options = {
-        redirectTo: new URL(appPath(returnTo), window.location.origin).toString(),
-        scopes: googleScopes,
-        queryParams: { access_type: 'offline', prompt: 'consent' },
-      };
-      const result = user
-        ? await requireSupabase().auth.linkIdentity({ provider: 'google', options })
-        : await requireSupabase().auth.signInWithOAuth({ provider: 'google', options });
-      if (result.error) throw result.error;
-      return result.data;
+      window.location.assign(result.url);
     },
     logout: async () => {
-      const { error } = await requireSupabase().auth.signOut({ scope: 'local' });
-      if (error) throw error;
+      try { await request('/api/auth/logout', { method: 'POST' }); }
+      finally { window.localStorage.removeItem(TOKEN_KEY); }
     },
-    resetPasswordRequest: async (email) => {
-      const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${appPath('/reset-password')}`,
-      });
-      if (error) throw error;
-      return { sent: true };
-    },
-    resetPassword: async ({ newPassword }) => {
-      const { data, error } = await requireSupabase().auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      return { user: profileFromUser(data.user) };
-    },
-    hasSession: async () => Boolean((await requireSupabase().auth.getSession()).data.session),
-    onAuthStateChange: (callback) => supabase
-      ? supabase.auth.onAuthStateChange(callback)
-      : { data: { subscription: { unsubscribe() {} } } },
+    resetPasswordRequest: (email) => request('/api/auth/password-reset', { method: 'POST', body: { email } }),
+    resetPassword: (value) => request('/api/auth/password-reset/confirm', { method: 'POST', body: value }),
+    hasSession: async () => Boolean(window.localStorage.getItem(TOKEN_KEY)),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
   },
   google: {
-    status: () => invokeGoogle({ action: 'status' }),
-    calendars: () => invokeGoogle({ action: 'calendars' }),
-    busy: (hostId, timeMin, timeMax) => invokeGoogle({ action: 'busy', hostId, timeMin, timeMax }),
-    saveSettings: (value) => invokeGoogle({ action: 'save-settings', ...value }),
-    sync: () => invokeGoogle({ action: 'sync' }),
-    disconnect: () => invokeGoogle({ action: 'disconnect' }),
-    saveProviderTokens: (refreshToken, email) => invokeGoogle({ action: 'store-token', refreshToken, email }),
+    status: () => request('/api/google/status'),
+    calendars: () => request('/api/google/calendars'),
+    busy: (hostId, timeMin, timeMax) => {
+      const params = new URLSearchParams({ timeMin, timeMax });
+      return request(`/api/google/busy/${encodeURIComponent(hostId)}?${params}`);
+    },
+    saveSettings: (value) => request('/api/google/settings', { method: 'POST', body: value }),
+    sync: () => request('/api/google/sync', { method: 'POST' }),
+    disconnect: () => request('/api/google', { method: 'DELETE' }),
   },
 };
-
-export function listenForAuthChanges(callback) {
-  return requireSupabase().auth.onAuthStateChange(callback);
-}
-
-export async function persistGoogleProviderToken(session) {
-  if (!session?.provider_refresh_token) return;
-  await api.google.saveProviderTokens(session.provider_refresh_token, session.user?.email || '');
-}

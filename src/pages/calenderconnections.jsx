@@ -1,3 +1,4 @@
+  api.auth.loginWithGoogle('/calendar-connections', 'calendar').catch((error) => setGoogleError(error.message));
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, CalendarCheck, RefreshCw, Plug, Unplug, CheckCircle2,
@@ -77,7 +78,7 @@ export default function CalendarConnections() {
   useEffect(() => { refreshGoogle(); }, []);
 
   const handleConnectGoogle = () => {
-    api.auth.loginWithGoogle('/calendar-connections').catch((error) => setGoogleError(error.message));
+    api.auth.loginWithGoogle('/calendar-connections', 'calendar').catch((error) => setGoogleError(error.message));
   };
 
   const handleDisconnectGoogle = async () => {

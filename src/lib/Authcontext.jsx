@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { api, persistGoogleProviderToken } from '@/lib/localApi';
+import { api } from '@/lib/localApi';
 import { appPath } from '@/lib/authReturnTo';
 
 const AuthContext = createContext();
@@ -60,7 +60,6 @@ export const AuthProvider = ({ children }) => {
             const currentUser = await api.auth.me();
             setUser(currentUser);
             setIsAuthenticated(Boolean(currentUser));
-            await persistGoogleProviderToken(session);
           } catch (error) {
             setAuthError({ type: 'unknown', message: error.message });
           }

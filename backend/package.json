@@ -1,0 +1,19 @@
+{
+  "name": "glassmeet-cloud-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.6",
+    "bcryptjs": "^3.0.2",
+    "express": "^5.1.0",
+    "google-auth-library": "^10.5.0",
+    "jose": "^6.1.0"
+  }
+}
