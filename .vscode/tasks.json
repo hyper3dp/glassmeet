@@ -1,0 +1,654 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "GlassMeet: Check target GitHub repository",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"ls-remote",
+				"https://github.com/hyper3dp/glassmeet.git",
+				"HEAD"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Git author config",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"config",
+				"--global",
+				"--get-regexp",
+				"^user\\.(name|email)$"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check ignore rules",
+			"type": "shell",
+			"command": "Select-String",
+			"args": [
+				"-Path",
+				".gitignore",
+				"-Pattern",
+				"authgoogle|data/|\\.sqlite"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Verify GitHub remote state",
+			"type": "shell",
+			"command": "git.exe ls-remote https://github.com/hyper3dp/glassmeet.git HEAD; Write-Output \"EXIT=$LASTEXITCODE\"",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Git author name",
+			"type": "shell",
+			"command": "git.exe config --global user.name",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Git author email",
+			"type": "shell",
+			"command": "git.exe config --global user.email",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Initialize and stage source",
+			"type": "shell",
+			"command": "git.exe init -b main; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; git.exe add -A; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; git.exe status --short; Write-Output \"AUTHGOOGLE_STAGED_COUNT=$((git.exe ls-files authgoogle | Measure-Object -Line).Lines)\"; Write-Output \"DATA_STAGED_COUNT=$((git.exe ls-files data | Measure-Object -Line).Lines)\"",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit and attach GitHub",
+			"type": "shell",
+			"command": "git.exe config user.name \"hyper3dp\"; git.exe config user.email \"hyper3dp@users.noreply.github.com\"; git.exe commit -m \"Prepare standalone GlassMeet deployment\"; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; git.exe remote add origin https://github.com/hyper3dp/glassmeet.git; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; git.exe remote -v",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Set local Git author",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"config",
+				"user.name",
+				"hyper3dp"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Set local Git email",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"config",
+				"user.email",
+				"hyper3dp@users.noreply.github.com"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit project files",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Prepare standalone GlassMeet deployment"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Add GitHub remote",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"remote",
+				"add",
+				"origin",
+				"https://github.com/hyper3dp/glassmeet.git"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Push to GitHub",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"push",
+				"-u",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit production domain",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"add",
+				"render.yaml"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit production domain",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Attach glassmeet.com to Render Blueprint"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit domain blueprint update",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Attach glassmeet.com to Render Blueprint"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Push domain update to GitHub",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"push",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Stop server on 5173",
+			"type": "shell",
+			"command": "$listeners = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue; if ($listeners) { $listeners | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Output 'Stopped local server.' } else { Write-Output 'No local server was running.' }",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Get Wi-Fi IP",
+			"type": "shell",
+			"command": "Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | Select-Object InterfaceAlias,@{Name='IPv4Address';Expression={$_.IPv4Address.IPAddress}},@{Name='Gateway';Expression={$_.IPv4DefaultGateway.NextHop}}",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Confirm Git remote",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"remote",
+				"-v"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Locate is-a.dev clone",
+			"type": "shell",
+			"command": "Get-ChildItem",
+			"args": [
+				"C:\\Users\\Hype\\Desktop",
+				"-Directory",
+				"-Force"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check requested subdomain",
+			"type": "shell",
+			"command": "Resolve-DnsName",
+			"args": [
+				"-Name",
+				"glassmeet.is-a.dev",
+				"-ErrorAction",
+				"SilentlyContinue"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check is-a.dev registration fork",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"ls-remote",
+				"https://github.com/hyper3dp/register.git",
+				"HEAD"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Add Supabase client",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"install",
+				"@supabase/supabase-js"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check branch status",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Inspect manifest edits",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"diff",
+				"--",
+				"Package.json",
+				"package-lock.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Read package manifest diff",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"diff",
+				"--no-ext-diff",
+				"--",
+				"Package.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Sync Pages dependencies",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"install"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Build Pages site",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Java and Git state",
+			"type": "shell",
+			"command": "java.exe",
+			"args": [
+				"-version"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check pending changes",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Locate Java backend clone",
+			"type": "shell",
+			"command": "Get-ChildItem -Directory 'C:\\Users\\Hype\\Desktop' | Select-Object -ExpandProperty Name",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Pages changes",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Build GitHub Pages site",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Review Pages change set",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Stage Pages site files",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"add",
+				"-A"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Inspect staged Pages files",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit Pages setup",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Set up GitHub Pages with Supabase backend"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Push Pages setup to GitHub",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"push",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Reproduce Pages install",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"ci"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Final Pages build",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Pages repair status",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit Pages CI repair",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"add",
+				".github/workflows/deploy-pages.yml",
+				"Package.json",
+				"package-lock.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit Pages CI repair",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Repair GitHub Pages dependency install"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit dependency repair",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Repair GitHub Pages dependency install"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Push dependency repair",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"push",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Normalize package manifest casing",
+			"type": "shell",
+			"command": "git.exe mv Package.json package.tmp; git.exe mv package.tmp package.json",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Validate lowercase package manifest",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"ls-files",
+				"*ackage.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Test Pages-prefixed build",
+			"type": "shell",
+			"command": "$env:VITE_BASE_PATH = '/glassmeet/'; npm.cmd run build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Recheck Pages build",
+			"type": "shell",
+			"command": "$env:VITE_BASE_PATH = '/glassmeet/'; npm.cmd run build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Verify project Pages paths",
+			"type": "shell",
+			"command": "$env:VITE_BASE_PATH = '/glassmeet/'; npm.cmd run build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check final Pages tree",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check package tracked case",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"ls-files",
+				"*ackage.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Stage Pages path fix",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"add",
+				"-A"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Inspect staged release",
+			"type": "shell",
+			"command": "git.exe status --short; Write-Output \"OAUTH_FILES_TRACKED=$((git.exe ls-files authgoogle | Measure-Object -Line).Lines)\"; Write-Output \"SQLITE_FILES_TRACKED=$((git.exe ls-files data | Measure-Object -Line).Lines)\"",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Commit GitHub Pages URL fix",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"commit",
+				"-m",
+				"Use default GitHub Pages project URL"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Push default Pages fix",
+			"type": "shell",
+			"command": "git.exe",
+			"args": [
+				"push",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Verify Pages route fallback build",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Check Google Cloud tooling",
+			"type": "shell",
+			"command": "Get-Command gcloud.exe,firebase.exe -ErrorAction SilentlyContinue | Select-Object Name,Source",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Read Google project metadata",
+			"type": "shell",
+			"command": "$key = Get-Content -Raw 'authgoogle/client_secret_842682596515-tfjs8bmhh6qhdnnuivb5d6qltbuq2u9c.apps.googleusercontent.com.json' | ConvertFrom-Json; $client = if ($key.web) { $key.web } else { $key.installed }; [PSCustomObject]@{ ProjectId = $client.project_id; HasClientId = [bool]$client.client_id; HasClientSecret = [bool]$client.client_secret }",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Build Cloud API frontend",
+			"type": "shell",
+			"command": "$env:VITE_BASE_PATH = '/glassmeet/'; npm.cmd run build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "GlassMeet: Rebuild Cloud API frontend",
+			"type": "shell",
+			"command": "$env:VITE_BASE_PATH = '/glassmeet/'; npm.cmd run build",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

@@ -1,5 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
+import dotenv from 'dotenv';
+import path from 'node:path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 import { Firestore } from '@google-cloud/firestore';
 import bcrypt from 'bcryptjs';
 import express from 'express';
@@ -11,6 +14,11 @@ const frontendOrigins = new Set((process.env.FRONTEND_ORIGINS || 'https://hyper3
   .split(',').map((origin) => origin.trim()).filter(Boolean));
 const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
+console.log('--- Backend Config Debug ---');
+console.log('GOOGLE_CLIENT_ID:', googleClientId ? 'LOADED' : 'MISSING');
+console.log('GOOGLE_CLIENT_SECRET:', googleClientSecret ? 'LOADED' : 'MISSING');
+console.log('PORT:', process.env.PORT || '8080');
+console.log('---------------------------');
 const tokenEncryptionKey = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY || '';
 const jwtSigningKey = process.env.JWT_SIGNING_KEY || '';
 const oauthClient = googleClientId && googleClientSecret ? new OAuth2Client(googleClientId, googleClientSecret) : null;
