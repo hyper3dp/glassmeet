@@ -1,7 +1,11 @@
-FROM node:22-slim
-WORKDIR /app
+FROM node:20-slim
+
+WORKDIR /usr/src/app
+
 COPY package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
-COPY server.js ./server.js
-ENV NODE_ENV=production
-CMD ["npm", "start"]
+
+RUN npm install --only=production
+
+COPY . .
+
+CMD [ "node", "server.js" ]

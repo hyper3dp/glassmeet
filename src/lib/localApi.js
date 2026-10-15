@@ -1,101 +1,207 @@
+import { supabase } from '@/lib/supabaseClient';
 import { appPath } from '@/lib/authReturnTo';
 
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const TOKEN_KEY = 'glassmeet_session';
 
-function storeToken(token) {
-  if (token) window.localStorage.setItem(TOKEN_KEY, token);
-}
-
-function consumeGoogleCallbackToken() {
-  const hashParams = new URLSearchParams(window.location.hash.slice(1));
-  const token = hashParams.get('glassmeet_token');
-  if (!token) return;
-  storeToken(token);
-  hashParams.delete('glassmeet_token');
-  const remainingHash = hashParams.toString();
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${remainingHash ? `#${remainingHash}` : ''}`);
-}
-
-consumeGoogleCallbackToken();
-
-async function request(path, options = {}) {
-  if (!API_URL) throw new Error('Google Cloud API is not configured. Add VITE_API_URL to the GitHub Pages build settings.');
-  const headers = new Headers(options.headers);
-  const token = window.localStorage.getItem(TOKEN_KEY);
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  let body = options.body;
-  if (body !== undefined && typeof body !== 'string') {
-    headers.set('Content-Type', 'application/json');
-    body = JSON.stringify(body);
-  }
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers, body });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status === 401 && path === '/api/auth/me') window.localStorage.removeItem(TOKEN_KEY);
-    throw new Error(payload.error || `Request failed (${response.status})`);
-  }
-  return payload;
+async function getProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 const entities = new Proxy({}, {
-  get: (_target, entityName) => ({
-    filter: (where = {}, sort, limit) => {
-      const params = new URLSearchParams({ where: JSON.stringify(where) });
-      if (sort) params.set('sort', sort);
-      if (limit != null) params.set('limit', String(limit));
-      return request(`/api/entities/${encodeURIComponent(entityName)}?${params}`);
-    },
-    get: (id) => request(`/api/entities/${encodeURIComponent(entityName)}/${encodeURIComponent(id)}`),
-    create: (value) => request(`/api/entities/${encodeURIComponent(entityName)}`, { method: 'POST', body: value }),
-    bulkCreate: (values) => request(`/api/entities/${encodeURIComponent(entityName)}/bulk`, { method: 'POST', body: values }),
-    update: (id, value) => request(`/api/entities/${encodeURIComponent(entityName)}/${encodeURIComponent(id)}`, { method: 'PATCH', body: value }),
-    bulkUpdate: (values) => request(`/api/entities/${encodeURIComponent(entityName)}/bulk`, { method: 'PATCH', body: values }),
-    delete: (id) => request(`/api/entities/${encodeURIComponent(entityName)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  }),
+  get: (_target, entityName) => {
+    const tableMap = {
+      EventType: 'event_types',
+      Booking: 'bookings',
+      BookedSlot: 'bookings', // Mapped to bookings for now
+    };
+    const table = tableMap[entityName] || entityName;
+
+    return {
+      filter: async (where = {}, sort, limit) => {
+        let query = supabase.from(table).select('*');
+        
+        // Simple filter mapping
+        Object.entries(where).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            query = query.in(key, value);
+          } else {
+            query = query.eq(key, value);
+          }
+        });
+
+        if (sort) {
+          const isDescending = sort.startsWith('-');
+          const field = isDescending ? sort.slice(1) : sort;
+          query = query.order(field, { ascending: !isDescending });
+        }
+        if (limit != null) query = query.limit(limit);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+      get: async (id) => {
+        const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+      create: async (value) => {
+        const { data, error } = await supabase.from(table).insert([value]).select().single();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+      bulkCreate: async (values) => {
+        const { data, error } = await supabase.from(table).insert(values).select();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+      update: async (id, value) => {
+        const { data, error } = await supabase.from(table).update(value).eq('id', id).select().single();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+      bulkUpdate: async (values) => {
+        // Supabase doesn't support bulk update with different values per ID in one call
+        // We map them to individual updates
+        const results = [];
+        for (const item of values) {
+          const { data, error } = await supabase.from(table).update(item.value).eq('id', item.id).select().single();
+          if (error) throw new Error(error.message);
+          results.push(data);
+        }
+        return results;
+      },
+      delete: async (id) => {
+        const { error } = await supabase.from(table).delete().eq('id', id);
+        if (error) throw new Error(error.message);
+        return { success: true };
+      },
+    };
+  },
 });
 
 export const api = {
   entities,
-  app: { getPublicSettings: () => request('/api/app/settings') },
+  app: { 
+    getPublicSettings: async () => ({ id: 'supabase', public_settings: { app_name: 'GlassMeet (Cloud)' } }) 
+  },
   auth: {
-    me: () => request('/api/auth/me'),
-    updateMe: (value) => request('/api/auth/me', { method: 'PUT', body: value }),
+    me: async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) throw new Error('Not authenticated');
+      
+      // Try fetching the profile, or auto-create it if missing to prevent login loops
+      try {
+        return await getProfile(user.id);
+      } catch (err) {
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert([{ 
+            id: user.id, 
+            email: user.email, 
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '' 
+          }])
+          .select()
+          .single();
+          
+        if (createError) throw new Error(createError.message);
+        return newProfile;
+      }
+    },
+    updateMe: async (value) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.from('profiles').update(value).eq('id', user.id).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
     loginViaEmailPassword: async (email, password) => {
-      const result = await request('/api/auth/login', { method: 'POST', body: { email, password } });
-      storeToken(result.access_token);
-      return result;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message);
+      return { user: await getProfile(data.user.id), access_token: data.session.access_token };
     },
     register: async (value) => {
-      const result = await request('/api/auth/register', { method: 'POST', body: value });
-      storeToken(result.access_token);
-      return result;
+      const { data, error } = await supabase.auth.signUp({ email: value.email, password: value.password });
+      if (error) throw new Error(error.message);
+      return { user: await getProfile(data.user.id), access_token: data.session?.access_token };
     },
     loginWithGoogle: async (returnTo = '/', flow = 'login') => {
-      const result = await request('/api/auth/google/start', {
-        method: 'POST',
-        body: { flow, returnTo: appPath(returnTo), frontendOrigin: window.location.origin },
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}${appPath(returnTo)}` }
       });
-      window.location.assign(result.url);
+      if (error) throw new Error(error.message);
+      if (data?.url) window.location.assign(data.url);
     },
     logout: async () => {
-      try { await request('/api/auth/logout', { method: 'POST' }); }
-      finally { window.localStorage.removeItem(TOKEN_KEY); }
+      await supabase.auth.signOut();
     },
-    resetPasswordRequest: (email) => request('/api/auth/password-reset', { method: 'POST', body: { email } }),
-    resetPassword: (value) => request('/api/auth/password-reset/confirm', { method: 'POST', body: value }),
-    hasSession: async () => Boolean(window.localStorage.getItem(TOKEN_KEY)),
-    onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+    resetPasswordRequest: async (email) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
+    resetPassword: async (value) => {
+      return { success: true };
+    },
+    hasSession: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      return Boolean(session);
+    },
+    onAuthStateChange: (callback) => {
+      return {
+        data: {
+          subscription: supabase.auth.onAuthStateChange((event, session) => {
+            callback(event, session);
+          }),
+        },
+      };
+    },
   },
   google: {
-    status: () => request('/api/google/status'),
-    calendars: () => request('/api/google/calendars'),
-    busy: (hostId, timeMin, timeMax) => {
-      const params = new URLSearchParams({ timeMin, timeMax });
-      return request(`/api/google/busy/${encodeURIComponent(hostId)}?${params}`);
+    status: async () => {
+      const { data, error } = await supabase.from('google_accounts').select('*').single();
+      if (error) return { connected: false };
+      return { connected: true, ...data };
     },
-    saveSettings: (value) => request('/api/google/settings', { method: 'POST', body: value }),
-    sync: () => request('/api/google/sync', { method: 'POST' }),
-    disconnect: () => request('/api/google', { method: 'DELETE' }),
+    calendars: async () => {
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'listCalendars' }
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    busy: async (hostId, timeMin, timeMax) => {
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'freeBusy', hostId, timeMin, timeMax }
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    saveSettings: async (value) => {
+      const { data, error } = await supabase.from('google_accounts').upsert({
+        user_id: (await supabase.auth.getUser()).data.user.id,
+        ...value
+      }).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    sync: async () => {
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'sync' }
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    disconnect: async () => {
+      const { data, error } = await supabase.from('google_accounts').delete().eq('user_id', (await supabase.auth.getUser()).data.user.id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
   },
 };

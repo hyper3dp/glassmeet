@@ -1,6 +1,6 @@
-import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClientInstance } from '@/lib/query-client'
+import { Toaster } from "@/components/ui/toaster";
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes, Outlet, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ThemeProvider } from 'next-themes';
@@ -33,7 +33,8 @@ import BookingPage from './pages/bookingpage.jsx';
 import BookingConfirmation from './pages/bookingconfirmation.jsx';
 import CalendarConnections from './pages/calenderconnections.jsx';
 import Analytics from './pages/Analytics.jsx';
-import Guests from './pages/guests.jsx';
+import Terms from '@/pages/terms.jsx';
+import Privacy from '@/pages/privacy.jsx';
 
 const FullScreenLoader = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -45,7 +46,6 @@ const FullScreenLoader = () => (
 function AppShell() {
   const { profile, whatsapp, setWhatsapp, loading, updateProfile, reload } = useProfile();
   const [cmdOpen, setCmdOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
 
   // Command palette keyboard shortcut: Ctrl+K / Cmd+K
   useEffect(() => {
@@ -59,11 +59,19 @@ function AppShell() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Show full screen loader while profile fetching is in progress
   if (loading) return <FullScreenLoader />;
+  
+  // If profile creation is still in progress for new users
   if (!profile) {
-    // Authenticated but profile couldn't load — sign back in to re-establish session.
-    return <Navigate to="/login" replace />;
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-4">
+        <div className="w-8 h-8 border-4 border-foreground/20 border-t-accent rounded-full animate-spin"></div>
+        <p className="text-sm text-muted-foreground">Setting up your profile...</p>
+      </div>
+    );
   }
+
   return (
     <AppContext.Provider value={{ profile, whatsapp, setWhatsapp, updateProfile, reload }}>
       <Layout profile={profile} onOpenCommandPalette={() => setCmdOpen(true)}>
@@ -82,9 +90,8 @@ const BookingsPage = () => { const { profile, whatsapp } = useApp(); return <Boo
 const AvailabilityPage = () => { const { profile } = useApp(); return <Availability profile={profile} />; };
 const WhatsAppPage = () => { const { profile, whatsapp, setWhatsapp } = useApp(); return <WhatsAppSettings profile={profile} whatsapp={whatsapp} setWhatsapp={setWhatsapp} />; };
 const SettingsPage = () => { const { profile, updateProfile } = useApp(); return <Settings profile={profile} updateProfile={updateProfile} />; };
-const CalendarConnectionsPage = () => { const { profile, updateProfile } = useApp(); return <CalendarConnections />; };
+const CalendarConnectionsPage = () => { return <CalendarConnections />; };
 const AnalyticsPage = () => { const { profile } = useApp(); return <Analytics profile={profile} />; };
-const GuestsPage = () => { const { profile } = useApp(); return <Guests profile={profile} />; };
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
@@ -111,6 +118,8 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       {/* Protected app routes */}
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
@@ -124,7 +133,6 @@ const AuthenticatedApp = () => {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/calendar-connections" element={<CalendarConnectionsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/guests" element={<GuestsPage />} />
         </Route>
       </Route>
 
@@ -150,4 +158,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

@@ -17,10 +17,16 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const currentUser = await api.auth.me();
-      setUser(currentUser);
-      setIsAuthenticated(Boolean(currentUser));
-      setAuthError(null);
-    } catch {
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+        setAuthError(null);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.warn('Auth check failed or session expired:', error);
       setUser(null);
       setIsAuthenticated(false);
       setAuthError(null);
@@ -33,12 +39,10 @@ export const AuthProvider = ({ children }) => {
   const checkAppState = useCallback(async () => {
     setIsLoadingPublicSettings(true);
     try {
-      setAppPublicSettings(await api.app.getPublicSettings());
+      const settings = await api.app.getPublicSettings();
+      setAppPublicSettings(settings);
     } catch (error) {
-      setAuthError({
-        type: 'unknown',
-        message: error.message || 'Could not connect to the local server',
-      });
+      console.error('Settings fetch failed:', error);
     } finally {
       setIsLoadingPublicSettings(false);
     }
@@ -50,33 +54,37 @@ export const AuthProvider = ({ children }) => {
   }, [checkAppState]);
 
   useEffect(() => {
-    const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
-      window.setTimeout(async () => {
-        if (event === 'SIGNED_OUT' || !session) {
-          setUser(null);
-          setIsAuthenticated(false);
-        } else {
-          try {
-            const currentUser = await api.auth.me();
-            setUser(currentUser);
-            setIsAuthenticated(Boolean(currentUser));
-          } catch (error) {
-            setAuthError({ type: 'unknown', message: error.message });
-          }
-        }
-        setAuthChecked(true);
-        setIsLoadingAuth(false);
-      }, 0);
+    const subscriptionResult = api.auth.onAuthStateChange?.((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setUser(null);
+        setIsAuthenticated(false);
+      } else if (session?.user || event === 'SIGNED_IN') {
+        checkUserAuth();
+      }
+      setAuthChecked(true);
+      setIsLoadingAuth(false);
     });
-    return () => subscription.unsubscribe();
-  }, []);
+
+    const unsubscribe = subscriptionResult?.data?.subscription?.unsubscribe || subscriptionResult?.unsubscribe;
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [checkUserAuth]);
 
   const logout = async (shouldRedirect = true) => {
-    await api.auth.logout();
-    setUser(null);
-    setIsAuthenticated(false);
-    setAuthChecked(true);
-    if (shouldRedirect) window.location.assign(appPath('/login'));
+    try {
+      await api.auth.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthChecked(true);
+      if (shouldRedirect) window.location.assign(appPath('/login'));
+    }
   };
 
   const navigateToLogin = () => {
@@ -84,9 +92,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,

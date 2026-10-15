@@ -15,14 +15,16 @@ const FEATURES = [
 ];
 
 export default function Landing() {
-  const { isAuthenticated, authChecked } = useAuth();
+  const { isAuthenticated, authChecked, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated && authChecked) {
+    // Only redirect to dashboard if user is fully authenticated 
+    // AND the user object is present (meaning profile load started/finished)
+    if (authChecked && isAuthenticated && user) {
       navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, authChecked, navigate]);
+  }, [isAuthenticated, authChecked, user, navigate]);
 
   return (
     <div className="min-h-screen">
