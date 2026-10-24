@@ -7,7 +7,7 @@ import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, EmptySta
 import {
   formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, buildBookingContext,
 } from '@/lib/whatsapp';
-import { detectTimezone } from '@/lib/availability';
+import { detectTimezone } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function Bookings({ profile, whatsapp }) {
