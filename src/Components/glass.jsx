@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function GlassCard({ className, children, hover = true, liquid: _liquid, ...props }) {
   return (
-    <Card className={cn('p-6', hover && 'hover:border-ring', className)} {...props}>
+    <Card className={cn('p-6', hover && 'hover:border-border-hover', className)} {...props}>
       {children}
     </Card>
   );
@@ -23,13 +23,16 @@ const BUTTON_VARIANTS = { default: 'outline', primary: 'default', ghost: 'ghost'
 const BUTTON_SIZES = { sm: 'sm', md: 'default', lg: 'lg' };
 
 export function GlassButton({ className, variant = 'default', size = 'md', liquid: _liquid, children, as, type, ...props }) {
-  const classes = cn(buttonVariants({ variant: BUTTON_VARIANTS[variant], size: BUTTON_SIZES[size] }), size === 'md' && 'px-5', className);
+  const shadcnVariant = BUTTON_VARIANTS[variant];
+  const shadcnSize = BUTTON_SIZES[size];
+  const extra = cn(size === 'md' && 'px-5', className);
   if (as) {
     const Comp = as;
-    return <Comp className={classes} {...props}>{children}</Comp>;
+    return <Comp className={cn(buttonVariants({ variant: shadcnVariant, size: shadcnSize }), extra)} {...props}>{children}</Comp>;
   }
-  // native <button> semantics: submits when inside a form unless a type is given
-  return <Button className={classes} type={type ?? 'submit'} {...props}>{children}</Button>;
+  // Pass variant/size through rather than pre-built classes, or Button layers its default (white) variant underneath.
+  // Native <button> semantics: submits when inside a form unless a type is given.
+  return <Button variant={shadcnVariant} size={shadcnSize} className={extra} type={type ?? 'submit'} {...props}>{children}</Button>;
 }
 
 export function GlassInput({ className, ...props }) {
@@ -65,7 +68,7 @@ export function GlassBadge({ className, children, color, ...props }) {
 export function GlassSelect({ className, children, ...props }) {
   return (
     <select
-      className={cn('flex h-11 w-full cursor-pointer rounded-xl border border-border bg-secondary px-4 text-sm text-foreground transition-all duration-200 hover:border-ring focus:border-ring focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50', className)}
+      className={cn('flex h-11 w-full cursor-pointer rounded-xl border border-border bg-secondary px-4 text-sm text-foreground transition-all duration-200 hover:border-border-hover focus:border-zinc-500 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50', className)}
       {...props}
     >
       {children}

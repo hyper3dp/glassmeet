@@ -212,7 +212,7 @@ function BookingRow({ booking, timezone, compact }) {
   const time = formatMeetingTime(booking.start_time, timezone);
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl glass">
-      <div className="w-10 h-10 rounded-xl accent-bg flex items-center justify-center text-white text-xs font-semibold shrink-0">
+      <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold shrink-0">
         {new Date(booking.start_time).getDate()}
       </div>
       <div className="min-w-0 flex-1">

@@ -1,84 +1,55 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
- * GlassMeet design system — shadcn preset b5cSpY31U (nova · mist · teal · Inter · large radius).
- * The colour tokens in :root / .dark are written by `shadcn apply`; see claude.md.
+ * GlassMeet design system — Hilos / modern Calendly dark aesthetic (see CLAUDE.md).
+ * Dark-only: :root and .dark share one palette.
+ *   #09090b base · #121214 surfaces · #18181b inputs · #27272a borders → #3f3f46 on hover
+ *   text #fafafa · labels #a1a1aa · hints #52525b · active = solid white with black text
  */
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.148 0.004 228.8);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.148 0.004 228.8);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.148 0.004 228.8);
-  --primary: oklch(0.511 0.096 186.391);
-  --primary-foreground: oklch(0.984 0.014 180.72);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.963 0.002 197.1);
-  --muted-foreground: oklch(0.56 0.021 213.5);
-  --accent: oklch(0.511 0.096 186.391);
-  --accent-foreground: oklch(0.984 0.014 180.72);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.925 0.005 214.3);
-  --input: oklch(0.925 0.005 214.3);
-  --ring: oklch(0.723 0.014 214.4);
-  --radius: 0.875rem;
-  /* user-chosen highlight colour (Settings → Accent color), an HSL triplet; defaults to the preset's teal */
-  --accent-color: 175 77% 26%;
-  --chart-1: oklch(0.855 0.138 181.071);
-  --chart-2: oklch(0.704 0.14 182.503);
-  --chart-3: oklch(0.6 0.118 184.704);
-  --chart-4: oklch(0.511 0.096 186.391);
-  --chart-5: oklch(0.437 0.078 188.216);
-  --sidebar: oklch(0.987 0.002 197.1);
-  --sidebar-foreground: oklch(0.148 0.004 228.8);
-  --sidebar-primary: oklch(0.6 0.118 184.704);
-  --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
-  --sidebar-accent: oklch(0.963 0.002 197.1);
-  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
-  --sidebar-border: oklch(0.925 0.005 214.3);
-  --sidebar-ring: oklch(0.723 0.014 214.4);
-}
-
+:root,
 .dark {
-  --background: oklch(0.148 0.004 228.8);
-  --foreground: oklch(0.987 0.002 197.1);
-  --card: oklch(0.218 0.008 223.9);
-  --card-foreground: oklch(0.987 0.002 197.1);
-  --popover: oklch(0.218 0.008 223.9);
-  --popover-foreground: oklch(0.987 0.002 197.1);
-  --primary: oklch(0.437 0.078 188.216);
-  --primary-foreground: oklch(0.984 0.014 180.72);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.275 0.011 216.9);
-  --muted-foreground: oklch(0.723 0.014 214.4);
-  --accent: oklch(0.437 0.078 188.216);
-  --accent-foreground: oklch(0.984 0.014 180.72);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.56 0.021 213.5);
-  --chart-1: oklch(0.855 0.138 181.071);
-  --chart-2: oklch(0.704 0.14 182.503);
-  --chart-3: oklch(0.6 0.118 184.704);
-  --chart-4: oklch(0.511 0.096 186.391);
-  --chart-5: oklch(0.437 0.078 188.216);
-  --sidebar: oklch(0.218 0.008 223.9);
-  --sidebar-foreground: oklch(0.987 0.002 197.1);
-  --sidebar-primary: oklch(0.704 0.14 182.503);
-  --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
-  --sidebar-accent: oklch(0.275 0.011 216.9);
-  --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.56 0.021 213.5);
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #121214;
+  --card-foreground: #fafafa;
+  --popover: #121214;
+  --popover-foreground: #fafafa;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #18181b;
+  --secondary-foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --hint: #52525b;
+  --accent: #18181b;
+  --accent-foreground: #fafafa;
+  --destructive: #f87171;
+  --border: #27272a;
+  --border-hover: #3f3f46;
+  --input: #27272a;
+  --ring: #71717a;
+  --radius: 0.75rem;
+  --chart-1: #fafafa;
+  --chart-2: #a1a1aa;
+  --chart-3: #71717a;
+  --chart-4: #52525b;
+  --chart-5: #3f3f46;
+  --sidebar: #121214;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #18181b;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #71717a;
+  /* user-chosen highlight colour (Settings → Accent color), an HSL triplet; used sparingly for icons */
+  --accent-color: 211 100% 50%;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -94,36 +65,35 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-hint: var(--hint);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* sm–lg follow --radius; xl (12px) and 2xl (16px) keep Tailwind's defaults */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-sans);
   --font-body: var(--font-sans);
   --font-display: var(--font-sans);
-  --font-sans: 'Inter Variable', sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 @layer base {
@@ -143,7 +113,7 @@
   }
 
   h1, h2, h3, h4 {
-    @apply tracking-tight;
+    @apply font-semibold tracking-tight;
   }
 
   button:not(:disabled),
@@ -151,16 +121,58 @@
     cursor: pointer;
   }
 
+  ::selection {
+    background: #fafafa;
+    color: #09090b;
+  }
+
+  /* native pickers and dropdown lists render dark to match */
+  input,
+  select,
+  textarea {
+    color-scheme: dark;
+  }
+
+  option {
+    background: var(--secondary);
+    color: var(--foreground);
+  }
+
+  /* ultra-thin, track-transparent scrollbars with rounded thumbs */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    scrollbar-color: var(--border-hover) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
   }
 }
 
 /*
  * The glass-* class names are kept so existing pages pick up the theme;
- * they render as plain card / input surfaces from the preset tokens.
+ * they render as flat matte surfaces with razor-thin borders.
  */
+/* very faint grain so #121214 surfaces read as matte rather than flat */
+@utility matte {
+  background-color: var(--card);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 @layer components {
   .glass {
     background: var(--card);
@@ -169,43 +181,46 @@
 
   .glass-panel,
   .liquid-glass {
-    background: var(--card);
+    @apply matte;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 1rem;
   }
 
   .glass-card {
-    background: var(--card);
+    @apply matte;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    transition: border-color 200ms ease;
+    border-radius: 1rem;
+    transition: all 200ms ease;
   }
 
   .glass-card:hover {
-    border-color: var(--ring);
+    border-color: var(--border-hover);
   }
 
   .glass-button {
-    background: var(--background);
+    background: var(--secondary);
     border: 1px solid var(--border);
-    border-radius: calc(var(--radius) - 2px);
+    border-radius: 0.75rem;
     transition: all 200ms ease;
   }
 
   .glass-button:hover {
-    background: var(--muted);
+    border-color: var(--border-hover);
   }
 
   .glass-input {
-    background: transparent;
-    border: 1px solid var(--input);
-    border-radius: calc(var(--radius) - 2px);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    transition: all 200ms ease;
+  }
+
+  .glass-input:hover {
+    border-color: var(--border-hover);
   }
 
   .glass-input:focus {
     border-color: var(--ring);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     outline: none;
   }
 
@@ -218,7 +233,7 @@
   }
 
   .accent-border {
-    border-color: var(--primary) !important;
+    border-color: var(--foreground) !important;
   }
 
   .glass-nav-item {
@@ -226,18 +241,18 @@
   }
 
   .glass-nav-item:hover {
-    background: var(--muted);
+    background: var(--secondary);
     color: var(--foreground);
   }
 
-  /* menuAccent: bold — the active item is a solid primary fill */
+  /* active states invert to solid white with black text */
   .glass-nav-item.active {
     background: var(--primary);
     color: var(--primary-foreground);
   }
 
   .meta-label {
-    @apply text-xs font-medium text-muted-foreground;
+    @apply text-xs font-medium uppercase tracking-wider text-muted-foreground;
   }
 }
 

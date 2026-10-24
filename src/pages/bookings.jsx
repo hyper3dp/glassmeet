@@ -53,7 +53,7 @@ export default function Bookings({ profile, whatsapp }) {
 
       <div className="flex gap-2 glass rounded-full p-1 w-fit">
         {['upcoming','past','cancelled'].map((f) => (
-          <button key={f} onClick={()=>setFilter(f)} className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition ${filter===f ? 'accent-bg text-white' : 'text-muted-foreground'}`}>{f}</button>
+          <button key={f} onClick={()=>setFilter(f)} className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition ${filter===f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
         ))}
       </div>
 
@@ -91,7 +91,7 @@ function BookingCard({ booking, timezone, whatsapp, onView, onCancel }) {
   return (
     <GlassCard className="flex flex-col sm:flex-row sm:items-center gap-4">
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 ${cancelled ? 'glass' : 'accent-bg text-white'}`}>
+        <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 ${cancelled ? 'glass' : 'bg-primary text-primary-foreground'}`}>
           <span className="text-[10px] uppercase">{new Date(booking.start_time).toLocaleString('en-US',{month:'short'})}</span>
           <span className="text-lg font-semibold leading-none">{new Date(booking.start_time).getDate()}</span>
         </div>

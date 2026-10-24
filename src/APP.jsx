@@ -149,7 +149,7 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false} disableTransitionOnChange>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>

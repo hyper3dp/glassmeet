@@ -32,8 +32,8 @@ export default function Landing() {
       <header className="fixed top-4 left-4 right-4 z-50">
         <div className="glass-panel max-w-6xl mx-auto flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl accent-bg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
             </div>
             <span className="font-semibold text-lg">GlassMeet</span>
           </div>
@@ -57,7 +57,7 @@ export default function Landing() {
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.05] mb-5 animate-slide-up">
             Schedule meetings.
             <br />
-            <span className="accent-text">Stay on WhatsApp.</span>
+            <span className="text-muted-foreground">Stay on WhatsApp.</span>
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-9 animate-slide-up" style={{ animationDelay: '0.05s' }}>
             Beautiful scheduling for people who actually use WhatsApp.
@@ -71,8 +71,7 @@ export default function Landing() {
         {/* Glass preview */}
         <div className="max-w-4xl mx-auto mt-16 animate-scale-in" style={{ animationDelay: '0.15s' }}>
           <div className="glass-panel p-5 sm:p-8 relative overflow-hidden">
-            <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full accent-bg opacity-10 blur-3xl" />
-            <div className="grid sm:grid-cols-2 gap-5 relative">
+                        <div className="grid sm:grid-cols-2 gap-5 relative">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl glass flex items-center justify-center">
@@ -89,7 +88,7 @@ export default function Landing() {
                       <div key={i} className="text-[10px] text-muted-foreground py-1">{d}</div>
                     ))}
                     {Array.from({length:21}).map((_,i)=>(
-                      <div key={i} className={cn(i===10?'accent-bg text-white':'glass','aspect-square rounded-lg flex items-center justify-center text-xs')}>{i+1}</div>
+                      <div key={i} className={cn(i===10?'bg-primary text-primary-foreground':'glass','aspect-square rounded-lg flex items-center justify-center text-xs')}>{i+1}</div>
                     ))}
                   </div>
                 </div>
@@ -97,11 +96,11 @@ export default function Landing() {
               <div className="space-y-2.5">
                 <div className="text-sm font-medium text-muted-foreground mb-1">Available times</div>
                 {['9:00 AM','9:30 AM','10:00 AM','11:30 AM','2:00 PM','3:30 PM'].map((t,i)=>(
-                  <div key={i} className={cn('glass-button rounded-xl px-4 py-3 text-sm font-medium text-center', i===2 && 'accent-bg text-white border-transparent')}>
+                  <div key={i} className={cn('glass-button rounded-xl px-4 py-3 text-sm font-medium text-center', i===2 && 'bg-primary text-primary-foreground border-transparent')}>
                     {t}
                   </div>
                 ))}
-                <div className="glass-button accent-bg text-white border-transparent rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 mt-3">
+                <div className="glass-button bg-primary text-primary-foreground border-transparent rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 mt-3">
                   <MessageCircle className="w-4 h-4" /> Confirm on WhatsApp
                 </div>
               </div>
@@ -134,8 +133,7 @@ export default function Landing() {
       {/* CTA */}
       <section className="px-4 py-20">
         <div className="max-w-3xl mx-auto text-center glass-card p-10 relative overflow-hidden">
-          <div className="absolute -top-24 -left-24 w-64 h-64 rounded-full accent-bg opacity-10 blur-3xl" />
-          <h2 className="text-3xl sm:text-4xl font-semibold mb-4 relative">You're one link away</h2>
+                    <h2 className="text-3xl sm:text-4xl font-semibold mb-4 relative">You're one link away</h2>
           <p className="text-muted-foreground mb-7 relative">Create your booking page in minutes. Share it on WhatsApp. Watch your calendar fill.</p>
           <Link to="/register"><GlassButton variant="primary" size="lg">Get Started — it's free</GlassButton></Link>
         </div>

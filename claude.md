@@ -48,16 +48,23 @@ This guide outlines the development environment, commands, and code styling rule
 * **Database Naming:** Table names and column names should be short and concise (PostgreSQL standard).
 * **Security:** Rely on Row Level Security (RLS) policies in Supabase to secure user data. Never bypass RLS in frontend clients.
 
-### UI Design System & Styling (Active - shadcn/ui preset `b5cSpY31U`)
+### UI Design System & Styling (Active - Hilos / Modern Calendly Dark Aesthetic)
 
-* **Source of truth:** shadcn/ui preset `b5cSpY31U` (https://ui.shadcn.com/create?preset=b5cSpY31U) — style `nova`, base color `mist`, theme & charts `teal`, font Inter, radius `large`, menu accent `bold`, icons `lucide`. Re-apply with `npx shadcn@latest apply b5cSpY31U`.
-* **Stack:** Tailwind CSS v4 (CSS-first config in `src/Index.css`, `@tailwindcss/vite` plugin; there is no `tailwind.config.js`). Components live in `src/Components/ui/` (aliased as `@/components/ui`); add more with `npx shadcn@latest add <name>`.
-* **Colors:** Use the semantic tokens only (`bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`, `bg-primary text-primary-foreground`, `border-border`, `ring-ring`). Never hardcode hex/zinc values — tokens switch between light and dark.
-* **Modes:** Light, dark and system (next-themes, `class` strategy); users switch in Settings → Appearance.
-* **Accent color:** Users may pick a personal accent in Settings; it sets `--accent-color` (HSL) and is used only via `.accent-text` / `.accent-bg` for icons and highlights. Default is the preset teal.
-* **Active / selected states:** Solid primary fill (`bg-primary text-primary-foreground`), per the preset's bold menu accent.
-* **Components:** Prefer shadcn components (`Button`, `Card`, `Input`, `Dialog`, `Switch`, ...). Page-level wrappers in `src/Components/glass.jsx` (`GlassCard`, `GlassButton`, ...) are built on them — use those for consistency on app pages.
-* **Typography:** Inter (`@fontsource-variable/inter`), `tracking-tight` headings.
+* **Goal:** Look like Calendly with a high-end dark SaaS aesthetic. Dark-only (next-themes is forced to `dark`; there is no light mode).
+* **Stack:** Tailwind CSS v4 (CSS-first config in `src/Index.css`, `@tailwindcss/vite` plugin; there is no `tailwind.config.js`). shadcn/ui components live in `src/Components/ui/` (aliased as `@/components/ui`), restyled to this guide; add more with `npx shadcn@latest add <name>` and restyle them to match.
+* **Palette (as tokens in `src/Index.css` — use the token classes, not raw hex):**
+  * Base background `#09090b` → `bg-background`
+  * Card & container surfaces `#121214` with a subtle matte grain → `bg-card` / the `matte` utility
+  * Inputs & secondary elements `#18181b` → `bg-secondary`
+  * Borders 1px `#27272a` → `border-border`, shifting to `#3f3f46` on hover → `hover:border-border-hover`
+  * Text: primary `#fafafa` → `text-foreground`; secondary labels `#a1a1aa` → `text-muted-foreground`; muted hints `#52525b` → `text-hint`
+* **Typography:** System sans-serif stack (`-apple-system`, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif), antialiased. Headings `tracking-tight`, medium–semibold. Labels & meta: uppercase `text-xs tracking-wider` in muted tones (`Label` / `.meta-label`).
+* **Geometry:** Generous container padding (`p-6`–`p-8`), cards `rounded-2xl` (16px), form controls and buttons `rounded-xl`.
+* **States:** All transitions `transition-all duration-200`. Active / selected pills and primary buttons invert to solid white with black text (`bg-primary text-primary-foreground`, i.e. `bg-white text-black`); inactive states stay matte dark with subtle borders.
+* **Inputs:** `rounded-xl`, `bg-secondary`, focus border `zinc-500` (no glow rings); native date/dropdown pickers render dark via `color-scheme: dark`.
+* **Scrollbars:** Ultra-thin, transparent track, rounded thumbs (global in `src/Index.css`).
+* **Accent color:** Users may pick a personal accent in Settings; it sets `--accent-color` (HSL) and is used sparingly via `.accent-text` / `.accent-bg` for small icons and dots — never for active states. Public booking pages use the event's own color.
+* **Components:** Prefer the shadcn components (`Button`, `Card`, `Input`, `Dialog`, `Switch`, ...). Page-level wrappers in `src/Components/glass.jsx` (`GlassCard`, `GlassButton`, ...) are built on them — use those for consistency on app pages.
 
 
 

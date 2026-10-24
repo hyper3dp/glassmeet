@@ -68,7 +68,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
 
       <GlassCard hover={false}>
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-11 h-11 rounded-2xl accent-bg flex items-center justify-center"><MessageCircle className="w-5 h-5 text-white" /></div>
+          <div className="w-11 h-11 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center"><MessageCircle className="w-5 h-5" /></div>
           <div>
             <h2 className="font-semibold">Connection</h2>
             <p className="text-xs text-muted-foreground">Your WhatsApp number and messaging mode.</p>

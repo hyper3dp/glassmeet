@@ -1,22 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/localApi';
 import {
-  User, Mail, Phone, Globe, Palette, Save, Check, Camera, Moon, Sun, Monitor, Link as LinkIcon, Copy, CalendarCheck, Unplug,
+  User, Mail, Phone, Globe, Palette, Save, Check, Camera, Link as LinkIcon, Copy, CalendarCheck, Unplug,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import { Switch } from '@/components/ui/switch';
-import { useTheme } from 'next-themes';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
 
-const COLORS = ['#0F766E', '#0A84FF', '#30D158', '#FF9F0A', '#FF375F', '#BF5AF2', '#64D2FF', '#5E5CE6', '#8E8E93'];
+const COLORS = ['#0A84FF', '#30D158', '#FF9F0A', '#FF375F', '#BF5AF2', '#64D2FF', '#5E5CE6', '#8E8E93'];
 
 export default function Settings({ profile, updateProfile }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (profile) {
@@ -25,7 +23,7 @@ export default function Settings({ profile, updateProfile }) {
         profile_photo: profile.profile_photo || '',
         whatsapp_number: profile.whatsapp_number || '',
         timezone: profile.timezone || detectTimezone(),
-        accent_color: profile.accent_color || '#0F766E',
+        accent_color: profile.accent_color || '#0A84FF',
         bio: profile.bio || '',
         username: profile.username || (profile.email || '').split('@')[0],
       });
@@ -126,20 +124,6 @@ export default function Settings({ profile, updateProfile }) {
           <div><h2 className="font-semibold">Appearance</h2><p className="text-xs text-muted-foreground">Theme and accent color.</p></div>
         </div>
         <div className="space-y-4">
-          <div>
-            <GlassLabel>Appearance</GlassLabel>
-            <div className="flex gap-2">
-              {[
-                { v: 'light', icon: Sun, label: 'Light' },
-                { v: 'dark', icon: Moon, label: 'Dark' },
-                { v: 'system', icon: Monitor, label: 'Auto' },
-              ].map((t) => (
-                <GlassButton key={t.v} type="button" variant={theme === t.v ? 'primary' : 'default'} className="flex-1" onClick={() => setTheme(t.v)}>
-                  <t.icon className="w-4 h-4" /> {t.label}
-                </GlassButton>
-              ))}
-            </div>
-          </div>
           <div>
             <GlassLabel>Accent color</GlassLabel>
             <div className="flex gap-2 flex-wrap">

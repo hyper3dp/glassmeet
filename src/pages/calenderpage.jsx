@@ -63,7 +63,7 @@ export default function CalendarPage({ profile }) {
           <GlassButton size="sm" onClick={() => setShowFindTime(true)}><Zap className="w-4 h-4" /> Find a Time</GlassButton>
           <div className="flex gap-1 glass rounded-full p-1">
             {['month','week','day'].map((v) => (
-              <button key={v} onClick={()=>setView(v)} className={`px-3 py-1.5 rounded-full text-sm font-medium capitalize transition ${view===v?'accent-bg text-white':'text-muted-foreground'}`}>{v}</button>
+              <button key={v} onClick={()=>setView(v)} className={`px-3 py-1.5 rounded-full text-sm font-medium capitalize transition ${view===v?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>{v}</button>
             ))}
           </div>
         </div>
@@ -168,7 +168,7 @@ function DayView({ date, bookings, timezone }) {
     <div className="space-y-2">
       {sorted.length === 0 ? <EmptyState icon={CalIcon} title="No meetings today" description="Enjoy the free day." /> : sorted.map((b)=>(
         <div key={b.id} className="glass rounded-xl p-4 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl accent-bg flex items-center justify-center text-white"><Clock className="w-5 h-5" /></div>
+          <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"><Clock className="w-5 h-5" /></div>
           <div>
             <div className="font-medium">{b.guest_name}</div>
             <div className="text-sm text-muted-foreground">{b.event_name} · {formatMeetingTime(b.start_time, timezone)}</div>
