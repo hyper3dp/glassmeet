@@ -1,4 +1,3 @@
-  api.auth.loginWithGoogle('/calendar-connections', 'calendar').catch((error) => setGoogleError(error.message));
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, CalendarCheck, RefreshCw, Plug, Unplug, CheckCircle2,

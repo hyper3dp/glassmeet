@@ -130,9 +130,13 @@ export const api = {
       if (error) throw new Error(error.message);
       return { user: await getProfile(data.user.id), access_token: data.session?.access_token };
     },
-    loginWithGoogle: async (returnTo = '/', flow = 'login') => {
-      console.warn('Google login is temporarily disabled.');
-      return Promise.resolve();
+    loginWithGoogle: async (returnTo = '/') => {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}${appPath(returnTo)}` }
+      });
+      if (error) throw new Error(error.message);
+      if (data?.url) window.location.assign(data.url);
     },
     verifyOtp: async ({ email, token }) => {
       const { data, error } = await supabase.auth.verifyOtp({
