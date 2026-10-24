@@ -8,7 +8,7 @@ async function getProfile(userId) {
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
   if (error) throw new Error(error.message);
   return data;
 }
@@ -97,22 +97,22 @@ export const api = {
       if (error || !user) throw new Error('Not authenticated');
       
       // Try fetching the profile, or auto-create it if missing to prevent login loops
-      try {
-        return await getProfile(user.id);
-      } catch (err) {
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert([{ 
-            id: user.id, 
-            email: user.email, 
-            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '' 
-          }])
-          .select()
-          .single();
-          
-        if (createError) throw new Error(createError.message);
-        return newProfile;
-      }
+      // getProfile uses maybeSingle, so a missing row comes back as null rather than throwing
+      const profile = await getProfile(user.id);
+      if (profile) return profile;
+
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || ''
+        }])
+        .select()
+        .single();
+
+      if (createError) throw new Error(createError.message);
+      return newProfile;
     },
     updateMe: async (value) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -131,12 +131,17 @@ export const api = {
       return { user: await getProfile(data.user.id), access_token: data.session?.access_token };
     },
     loginWithGoogle: async (returnTo = '/', flow = 'login') => {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}${appPath(returnTo)}` }
+      console.warn('Google login is temporarily disabled.');
+      return Promise.resolve();
+    },
+    verifyOtp: async ({ email, token }) => {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
       });
       if (error) throw new Error(error.message);
-      if (data?.url) window.location.assign(data.url);
+      return { user: await getProfile(data.user.id), session: data.session };
     },
     logout: async () => {
       await supabase.auth.signOut();
@@ -147,6 +152,8 @@ export const api = {
       return { success: true };
     },
     resetPassword: async (value) => {
+      const { error } = await supabase.auth.updateUser({ password: value.newPassword });
+      if (error) throw new Error(error.message);
       return { success: true };
     },
     hasSession: async () => {

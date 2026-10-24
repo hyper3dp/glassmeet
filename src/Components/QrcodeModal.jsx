@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { QrCode, Download, Copy, Check, X } from 'lucide-react';
 import { GlassButton } from '@/components/glass';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 /**
  * QR Code component for booking pages.
@@ -31,13 +32,12 @@ export default function QRCodeModal({ url, open, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fade-in" />
-      <div className="glass-panel w-full max-w-sm p-6 animate-scale-in text-center relative" onClick={(e) => e.stopPropagation()}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-sm p-6 text-center block">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <QrCode className="w-5 h-5 accent-text" />
-            <h2 className="font-semibold">QR Code</h2>
+            <DialogTitle className="font-semibold">QR Code</DialogTitle>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
         </div>
@@ -56,7 +56,7 @@ export default function QRCodeModal({ url, open, onClose }) {
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied ? 'Copied' : 'Copy Link'}
           </GlassButton>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

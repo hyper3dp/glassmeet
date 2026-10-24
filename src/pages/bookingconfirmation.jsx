@@ -70,7 +70,7 @@ export default function BookingConfirmation() {
         </div>
 
         <div className="glass-panel p-8 text-center animate-scale-in">
-          <div className="w-16 h-16 rounded-2xl accent-bg flex items-center justify-center mx-auto mb-5 shadow-lg">
+          <div className="w-16 h-16 rounded-2xl accent-bg flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-semibold mb-2">You're all set{booking.guest_name ? `, ${booking.guest_name.split(' ')[0]}` : ''}.</h1>

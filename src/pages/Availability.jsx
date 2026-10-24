@@ -3,6 +3,7 @@ import { api } from '@/lib/localApi';
 import { Clock, Plus, Trash2, CalendarOff, X } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassSelect, GlassLabel, EmptyState, Spinner } from '@/components/glass';
 import { formatDate } from '@/lib/Availability.js';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -139,10 +140,10 @@ function ExceptionModal({ onAdd, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="glass-panel w-full max-w-md p-6 animate-scale-in" onClick={(e)=>e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold">Add date override</h2>
+          <DialogTitle className="text-lg font-semibold">Add date override</DialogTitle>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
         </div>
         <div className="space-y-4">
@@ -176,7 +177,7 @@ function ExceptionModal({ onAdd, onClose }) {
           <GlassButton className="flex-1" onClick={onClose}>Cancel</GlassButton>
           <GlassButton variant="primary" className="flex-1" onClick={save}>Add</GlassButton>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

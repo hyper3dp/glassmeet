@@ -8,6 +8,7 @@ import {
   formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, buildBookingContext,
 } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/availability';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function Bookings({ profile, whatsapp }) {
   const [bookings, setBookings] = useState([]);
@@ -30,7 +31,7 @@ export default function Bookings({ profile, whatsapp }) {
   const filtered = useMemo(() => {
     let list = bookings;
     if (filter === 'upcoming') list = bookings.filter((b) => b.status === 'confirmed' && new Date(b.start_time) >= now).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
-    if (filter === 'past') list = bookings.filter((b) => new Date(b.start_time) < now).sort((a,b)=> new Date(b.start_time)-new Date(b.start_time)).reverse();
+    if (filter === 'past') list = bookings.filter((b) => new Date(b.start_time) < now).sort((a,b)=> new Date(b.start_time)-new Date(a.start_time));
     if (filter === 'cancelled') list = bookings.filter((b) => b.status === 'cancelled');
     return list;
   }, [bookings, filter]);
@@ -126,10 +127,10 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="glass-panel w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 animate-scale-in" onClick={(e)=>e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[90vh] overflow-y-auto p-6 block">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold">Meeting details</h2>
+          <DialogTitle className="text-lg font-semibold">Meeting details</DialogTitle>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
         </div>
 
@@ -175,8 +176,8 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
           <GlassButton className="flex-1" onClick={saveNotes}>Save</GlassButton>
           {booking.status !== 'cancelled' && <GlassButton variant="danger" onClick={onCancel}><Trash2 className="w-4 h-4" /> Cancel</GlassButton>}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

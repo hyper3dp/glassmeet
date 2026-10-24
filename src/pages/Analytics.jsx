@@ -122,11 +122,11 @@ export default function Analytics({ profile }) {
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
-                <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
                 <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', fontSize: '12px' }}
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '12px' }}
                 />
                 <Bar dataKey="bookings" fill="hsl(var(--accent-color))" radius={[6, 6, 0, 0]} />
               </BarChart>
@@ -157,7 +157,7 @@ export default function Analytics({ profile }) {
                         className="flex-1 aspect-square rounded-md transition"
                         style={{
                           background: count === 0
-                            ? 'hsl(var(--muted))'
+                            ? 'var(--muted)'
                             : `hsl(var(--accent-color) / ${0.2 + intensity * 0.8})`,
                         }}
                         title={`${days[dayIdx]} ${hours[hourIdx]}:00 — ${count} booking${count !== 1 ? 's' : ''}`}

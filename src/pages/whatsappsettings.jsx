@@ -87,11 +87,11 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
             </GlassSelect>
           </div>
           <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={form.enabled} onChange={(e)=>set('enabled', e.target.checked)} className="w-5 h-5 rounded accent-bg" />
+            <input type="checkbox" checked={form.enabled} onChange={(e)=>set('enabled', e.target.checked)} className="w-5 h-5 rounded-sm accent-bg" />
             <span className="text-sm">Enable WhatsApp messaging for new bookings</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={form.auto_send_confirmation} onChange={(e)=>set('auto_send_confirmation', e.target.checked)} className="w-5 h-5 rounded accent-bg" />
+            <input type="checkbox" checked={form.auto_send_confirmation} onChange={(e)=>set('auto_send_confirmation', e.target.checked)} className="w-5 h-5 rounded-sm accent-bg" />
             <span className="text-sm">Auto-open WhatsApp confirmation after each booking</span>
           </label>
         </div>

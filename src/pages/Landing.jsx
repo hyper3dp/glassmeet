@@ -32,7 +32,7 @@ export default function Landing() {
       <header className="fixed top-4 left-4 right-4 z-50">
         <div className="glass-panel max-w-6xl mx-auto flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl accent-bg flex items-center justify-center shadow-lg">
+            <div className="w-9 h-9 rounded-xl accent-bg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <span className="font-semibold text-lg">GlassMeet</span>

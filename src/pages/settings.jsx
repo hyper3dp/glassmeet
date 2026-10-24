@@ -1,23 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/localApi';
 import {
-  User, Mail, Phone, Globe, Palette, Save, Check, Moon, Sun, Monitor, Camera, Link as LinkIcon, Copy, CalendarCheck, Unplug,
+  User, Mail, Phone, Globe, Palette, Save, Check, Camera, Moon, Sun, Monitor, Link as LinkIcon, Copy, CalendarCheck, Unplug,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
+import { Switch } from '@/components/ui/switch';
 import { useTheme } from 'next-themes';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
 
-const COLORS = ['#0A84FF', '#30D158', '#FF9F0A', '#FF375F', '#BF5AF2', '#64D2FF', '#5E5CE6', '#8E8E93'];
-
-const THEMES = [
-  { v: 'crystal', label: 'Crystal', desc: 'Clean & bright' },
-  { v: 'midnight', label: 'Midnight', desc: 'Deep blue' },
-  { v: 'aurora', label: 'Aurora', desc: 'Green & teal' },
-  { v: 'frost', label: 'Frost', desc: 'Ice blue' },
-  { v: 'graphite', label: 'Graphite', desc: 'Neutral gray' },
-  { v: 'ocean', label: 'Ocean', desc: 'Teal & blue' },
-];
+const COLORS = ['#0F766E', '#0A84FF', '#30D158', '#FF9F0A', '#FF375F', '#BF5AF2', '#64D2FF', '#5E5CE6', '#8E8E93'];
 
 export default function Settings({ profile, updateProfile }) {
   const [form, setForm] = useState(null);
@@ -25,18 +17,15 @@ export default function Settings({ profile, updateProfile }) {
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     if (profile) {
       setForm({
         full_name: profile.full_name || '',
         profile_photo: profile.profile_photo || '',
         whatsapp_number: profile.whatsapp_number || '',
         timezone: profile.timezone || detectTimezone(),
-        accent_color: profile.accent_color || '#0A84FF',
-        theme: profile.theme || 'crystal',
+        accent_color: profile.accent_color || '#0F766E',
         bio: profile.bio || '',
         username: profile.username || (profile.email || '').split('@')[0],
       });
@@ -138,27 +127,16 @@ export default function Settings({ profile, updateProfile }) {
         </div>
         <div className="space-y-4">
           <div>
-            <GlassLabel>Color theme</GlassLabel>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {THEMES.map((t) => (
-                <button key={t.v} onClick={()=>set('theme', t.v)} className={`glass-button rounded-xl px-3 py-3 text-left ${form.theme===t.v ? 'accent-border' : ''}`}>
-                  <div className="text-sm font-medium">{t.label}</div>
-                  <div className="text-xs text-muted-foreground">{t.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <GlassLabel>Appearance mode</GlassLabel>
+            <GlassLabel>Appearance</GlassLabel>
             <div className="flex gap-2">
               {[
                 { v: 'light', icon: Sun, label: 'Light' },
                 { v: 'dark', icon: Moon, label: 'Dark' },
                 { v: 'system', icon: Monitor, label: 'Auto' },
               ].map((t) => (
-                <button key={t.v} onClick={()=>setTheme(t.v)} className={`glass-button rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-2 flex-1 justify-center ${mounted && theme===t.v ? 'accent-border accent-text' : ''}`}>
+                <GlassButton key={t.v} type="button" variant={theme === t.v ? 'primary' : 'default'} className="flex-1" onClick={() => setTheme(t.v)}>
                   <t.icon className="w-4 h-4" /> {t.label}
-                </button>
+                </GlassButton>
               ))}
             </div>
           </div>
@@ -166,7 +144,7 @@ export default function Settings({ profile, updateProfile }) {
             <GlassLabel>Accent color</GlassLabel>
             <div className="flex gap-2 flex-wrap">
               {COLORS.map((c) => (
-                <button key={c} onClick={()=>set('accent_color', c)} className="w-9 h-9 rounded-full transition" style={{ background: c, outline: form.accent_color===c ? '2px solid #fff' : 'none', outlineOffset: '2px', boxShadow: form.accent_color===c ? `0 0 0 2px ${c}` : 'none' }} />
+                <button key={c} onClick={()=>set('accent_color', c)} className="w-9 h-9 rounded-full transition-all duration-200" style={{ background: c, outline: form.accent_color===c ? '2px solid var(--foreground)' : '1px solid var(--border)', outlineOffset: '3px' }} />
               ))}
             </div>
           </div>
@@ -225,9 +203,7 @@ function CalendarSettingRow({ label, connected, email, calendars, autoSync, onTo
           )}
         </div>
         {connected && (
-          <button onClick={onToggleSync} className={`relative w-9 h-5 rounded-full transition-colors ${autoSync ? 'accent-bg' : 'bg-muted'}`}>
-            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoSync ? 'translate-x-4' : 'translate-x-0.5'}`} />
-          </button>
+          <Switch checked={autoSync} onCheckedChange={onToggleSync} aria-label={`Auto-sync ${label}`} />
         )}
       </div>
       {connected ? (

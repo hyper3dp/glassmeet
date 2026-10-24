@@ -121,7 +121,7 @@ function MonthView({ cursor, bookingsByDay, onSelect }) {
               <span className={`text-sm font-medium ${isToday?'accent-text':''}`}>{date.getDate()}</span>
               <div className="flex flex-col gap-0.5 overflow-hidden">
                 {dayBookings.slice(0,2).map((b)=>(
-                  <span key={b.id} className="text-[10px] truncate accent-text bg-accent/10 rounded px-1 py-0.5">{formatMeetingTime(b.start_time,'UTC')} {b.guest_name}</span>
+                  <span key={b.id} className="text-[10px] truncate accent-text bg-accent/10 rounded-sm px-1 py-0.5">{formatMeetingTime(b.start_time,'UTC')} {b.guest_name}</span>
                 ))}
                 {dayBookings.length > 2 && <span className="text-[10px] text-muted-foreground">+{dayBookings.length-2} more</span>}
               </div>

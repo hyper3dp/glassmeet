@@ -6,6 +6,7 @@ import {
   Rss, Copy, RotateCcw, Trash2, Bell, Plus, Globe,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput } from '@/components/glass';
+import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/localApi';
 import { useApp } from '@/lib/useprofile.js';
 import { downloadIcs } from '@/lib/calendar';
@@ -13,6 +14,7 @@ import { downloadICSFeed, generateSubscriptionToken } from '@/lib/calendarFeed';
 import OutlookIcon from '@/components/outlookicon.jsx';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
 import { appPath } from '@/lib/authReturnTo';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const SAMPLE_BOOKING = {
   id: 'sample',
@@ -246,7 +248,7 @@ export default function CalendarConnections() {
       {/* Google Calendar */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-white shadow-xs flex items-center justify-center shrink-0">
             <GoogleG />
           </div>
           <div className="flex-1 min-w-0">
@@ -281,13 +283,7 @@ export default function CalendarConnections() {
                 )}
                 {googleError && <p className="text-xs text-destructive">{googleError}</p>}
                 <label className="flex items-center gap-2.5 cursor-pointer pt-1">
-                  <button
-                    type="button"
-                    onClick={toggleAutoSync}
-                    className={`relative w-9 h-5 rounded-full transition-colors ${autoSync ? 'accent-bg' : 'bg-muted'}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoSync ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                  </button>
+                  <Switch checked={autoSync} onCheckedChange={toggleAutoSync} />
                   <span className="text-sm">Auto-sync new bookings to Google</span>
                 </label>
               </div>
@@ -356,7 +352,7 @@ export default function CalendarConnections() {
       {/* Microsoft Outlook */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-[#0078D4] shadow-sm flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-[#0078D4] shadow-xs flex items-center justify-center shrink-0">
             <OutlookIcon className="w-6 h-6" />
           </div>
           <div className="flex-1 min-w-0">
@@ -389,13 +385,7 @@ export default function CalendarConnections() {
                   </div>
                 )}
                 <label className="flex items-center gap-2.5 cursor-pointer pt-1">
-                  <button
-                    type="button"
-                    onClick={toggleOutlookAutoSync}
-                    className={`relative w-9 h-5 rounded-full transition-colors ${outlookAutoSync ? 'accent-bg' : 'bg-muted'}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${outlookAutoSync ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                  </button>
+                  <Switch checked={outlookAutoSync} onCheckedChange={toggleOutlookAutoSync} />
                   <span className="text-sm">Auto-sync new bookings to Outlook</span>
                 </label>
               </div>
@@ -611,12 +601,12 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
   const [selected, setSelected] = useState(selectedCalendarId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="glass-panel max-w-md w-full p-6 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center"><GoogleG /></div>
+          <div className="w-10 h-10 rounded-xl bg-white shadow-xs flex items-center justify-center"><GoogleG /></div>
           <div>
-            <h3 className="font-semibold">Google Calendar</h3>
+            <DialogTitle className="font-semibold">Google Calendar</DialogTitle>
             <p className="text-xs text-muted-foreground">{connected ? 'Select calendars to check for conflicts' : 'OAuth authorization required'}</p>
           </div>
         </div>
@@ -652,8 +642,8 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
             </div>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -676,12 +666,12 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
   const toggle = (cal) => setSelected((s) => s.includes(cal) ? s.filter((c) => c !== cal) : [...s, cal]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="glass-panel max-w-md w-full p-6 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-[#0078D4] shadow-sm flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></div>
+          <div className="w-10 h-10 rounded-xl bg-[#0078D4] shadow-xs flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></div>
           <div>
-            <h3 className="font-semibold">Microsoft Outlook</h3>
+            <DialogTitle className="font-semibold">Microsoft Outlook</DialogTitle>
             <p className="text-xs text-muted-foreground">{connected ? 'Select calendars to check for conflicts' : 'OAuth authorization required'}</p>
           </div>
         </div>
@@ -745,7 +735,7 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
             </div>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

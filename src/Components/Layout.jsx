@@ -36,17 +36,13 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
   const navigate = useNavigate();
   const [tabletNavOpen, setTabletNavOpen] = useState(false);
 
-  // Apply accent color + theme globally
+  // Apply the user's accent colour globally (the palette itself is fixed dark)
   useEffect(() => {
     if (profile?.accent_color) {
       const hsl = hexToHslString(profile.accent_color);
       document.documentElement.style.setProperty('--accent-color', hsl);
-      document.documentElement.style.setProperty('--ring', hsl);
     }
-    if (profile?.theme) {
-      document.documentElement.setAttribute('data-theme', profile.theme);
-    }
-  }, [profile?.accent_color, profile?.theme]);
+  }, [profile?.accent_color]);
 
   // Close tablet nav on route change
   useEffect(() => { setTabletNavOpen(false); }, [location.pathname]);
@@ -81,12 +77,12 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         <div className="glass-panel flex flex-col h-full p-4">
           <div className="flex items-center justify-between px-2 py-3 mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl accent-bg flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <div className="font-semibold text-foreground leading-tight">GlassMeet</div>
-                <div className="text-[11px] text-muted-foreground">WhatsApp scheduling</div>
+                <div className="font-semibold tracking-tight text-foreground leading-tight">GlassMeet</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">WhatsApp scheduling</div>
               </div>
             </div>
             <NotificationCenter />
@@ -98,7 +94,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
               className="glass-button rounded-xl px-3 py-2.5 text-sm text-muted-foreground flex items-center gap-2 mb-2"
             >
               <Search className="w-4 h-4" /> Quick search
-              <kbd className="ml-auto text-[10px] glass rounded px-1.5 py-0.5">⌘K</kbd>
+              <kbd className="ml-auto text-[10px] tracking-wider bg-background border border-border rounded-md px-1.5 py-0.5">⌘K</kbd>
             </button>
           )}
 
@@ -123,8 +119,8 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         <div className="glass-panel flex flex-col h-full w-64 p-4">
           <div className="flex items-center justify-between px-2 py-3 mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl accent-bg flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary-foreground" />
               </div>
               <div className="font-semibold leading-tight">GlassMeet</div>
             </div>
@@ -152,7 +148,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         <NotificationCenter />
       </header>
 
-      {tabletNavOpen && <div className="hidden md:block lg:hidden fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={() => setTabletNavOpen(false)} />}
+      {tabletNavOpen && <div className="hidden md:block lg:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setTabletNavOpen(false)} />}
 
       {/* Main content */}
       <main className="lg:ml-[280px] min-h-screen pb-24 lg:pb-0 md:pt-16 lg:pt-0">
@@ -170,7 +166,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
               to={item.to}
               className={({ isActive }) =>
                 cn('flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium transition-all',
-                  isActive ? 'accent-text' : 'text-muted-foreground')
+                  isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')
               }
             >
               <item.icon className="w-5 h-5" />
@@ -179,9 +175,9 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
           ))}
           <NavLink
             to="/event-types?new=true"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium text-white"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium text-muted-foreground"
           >
-            <div className="w-8 h-8 rounded-xl accent-bg flex items-center justify-center -mt-3 shadow-lg">
+            <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center -mt-3">
               <Plus className="w-5 h-5" />
             </div>
             Create

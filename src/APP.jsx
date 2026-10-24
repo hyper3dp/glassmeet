@@ -17,6 +17,7 @@ import LiquidGlassFilter from '@/components/liquidglassfilter.jsx';
 // Auth pages
 import Login from './pages/login.jsx';
 import Register from './pages/register.jsx';
+import Verify from './pages/verify.jsx';
 import ForgotPassword from './pages/forgotpassword.jsx';
 import ResetPassword from './pages/resetpassword.jsx';
 
@@ -37,8 +38,13 @@ import Terms from '@/pages/terms.jsx';
 import Privacy from '@/pages/privacy.jsx';
 
 const FullScreenLoader = () => (
-  <div className="fixed inset-0 flex items-center justify-center">
-    <div className="w-8 h-8 border-4 border-foreground/20 border-t-accent rounded-full animate-spin"></div>
+  <div 
+    className="fixed inset-0 flex items-center justify-center" 
+    role="status" 
+    aria-live="polite"
+  >
+    <div className="w-8 h-8 border-2 border-border border-t-foreground rounded-full animate-spin"></div>
+    <span className="sr-only">Loading application...</span>
   </div>
 );
 
@@ -66,7 +72,7 @@ function AppShell() {
   if (!profile) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-4">
-        <div className="w-8 h-8 border-4 border-foreground/20 border-t-accent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-border border-t-foreground rounded-full animate-spin"></div>
         <p className="text-sm text-muted-foreground">Setting up your profile...</p>
       </div>
     );

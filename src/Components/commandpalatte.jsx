@@ -4,6 +4,7 @@ import {
   CalendarClock, Calendar, BookOpen, Clock, MessageCircle, CalendarCheck,
   Settings, Plus, Search, BarChart3, Bell, X, CornerDownLeft,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const COMMANDS = [
   { label: 'Create event', icon: Plus, path: '/event-types?new=true', desc: 'New event type' },
@@ -52,12 +53,9 @@ export default function CommandPalette({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fade-in" />
-      <div
-        className="glass-panel w-full max-w-xl overflow-hidden animate-scale-in relative"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl overflow-hidden block top-[15vh] translate-y-0 data-[state=open]:slide-in-from-top-[13%] p-0 gap-0">
+        <DialogTitle className="sr-only">Command palette</DialogTitle>
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60">
           <Search className="w-4 h-4 text-muted-foreground" />
           <input
@@ -66,7 +64,7 @@ export default function CommandPalette({ open, onClose }) {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Type a command or search…"
-            className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
+            className="flex-1 bg-transparent outline-hidden text-sm text-foreground placeholder:text-muted-foreground"
           />
           <button onClick={onClose} className="w-6 h-6 rounded-lg glass flex items-center justify-center"><X className="w-3.5 h-3.5" /></button>
         </div>
@@ -93,7 +91,7 @@ export default function CommandPalette({ open, onClose }) {
             ))
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

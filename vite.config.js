@@ -1,10 +1,11 @@
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   base: '/glassmeet/',
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
       { find: '@/components', replacement: fileURLToPath(new URL('./src/Components', import.meta.url)) },

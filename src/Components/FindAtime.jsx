@@ -3,6 +3,7 @@ import { X, Clock, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { api } from '@/lib/localApi';
 import { GlassButton } from '@/components/glass';
 import { generateSlots, detectTimezone, formatDate } from '@/lib/Availability.js';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const DAY_LABELS = ['Today', 'Tomorrow'];
 
@@ -57,13 +58,12 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fade-in" />
-      <div className="glass-panel w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 animate-scale-in relative" onClick={(e) => e.stopPropagation()}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[85vh] overflow-y-auto p-6 block">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 accent-text" />
-            <h2 className="font-semibold text-lg">Find a Time</h2>
+            <DialogTitle className="font-semibold text-lg">Find a Time</DialogTitle>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
         </div>
@@ -119,7 +119,7 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
             )}
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -94,8 +94,9 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, time
   const slots = [];
 
   const dateStr = formatDate(date);
+  // start_time is an ISO (usually UTC) string, so compare on the local date, not the string prefix
   const dayBookings = bookings
-    .filter((b) => b.status !== 'cancelled' && b.start_time && b.start_time.startsWith(dateStr))
+    .filter((b) => b.status !== 'cancelled' && b.start_time && formatDate(new Date(b.start_time)) === dateStr)
     .map((b) => {
       const bs = new Date(b.start_time);
       const be = new Date(b.end_time);

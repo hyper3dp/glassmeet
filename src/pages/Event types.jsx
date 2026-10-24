@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import { Plus, Clock, Edit3, Trash2, ExternalLink } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, EmptyState, Spinner } from '@/components/glass';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function EventTypes({ profile }) {
   const [eventTypes, setEventTypes] = useState([]);
@@ -130,10 +131,10 @@ function EventModal({ event, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
-      <div className="glass-panel w-full max-w-xl p-6" onMouseDown={(eventObject) => eventObject.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl p-6 block">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{event ? 'Edit event type' : 'New event type'}</h2>
+          <DialogTitle className="text-lg font-semibold">{event ? 'Edit event type' : 'New event type'}</DialogTitle>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-2 hover:bg-foreground/5">×</button>
         </div>
         <form onSubmit={submit} className="space-y-4">
@@ -183,7 +184,7 @@ function EventModal({ event, onClose, onSave }) {
             <GlassButton type="submit" variant="primary" disabled={saving}>{saving ? 'Saving...' : 'Save event'}</GlassButton>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
