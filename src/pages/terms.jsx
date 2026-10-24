@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import LegalPage from '@/components/LegalPage.jsx';
+import LegalPage, { ContactEmails } from '@/components/LegalPage.jsx';
 import { LEGAL } from '@/lib/legal';
 
-const { appName, operator, contactEmail, jurisdiction, minimumAge } = LEGAL;
-const mail = <a href={`mailto:${contactEmail}`}>{contactEmail}</a>;
+const { appName, operator, operatorDescription, jurisdiction, minimumAge } = LEGAL;
+const mail = <ContactEmails />;
 
 const sections = [
   {
@@ -13,8 +13,8 @@ const sections = [
     body: (
       <>
         <p>
-          These Terms of Service (&ldquo;Terms&rdquo;) are an agreement between you and {operator} (&ldquo;we&rdquo;,
-          &ldquo;us&rdquo;) for the use of {appName}. By creating an account, or by booking a meeting through a{' '}
+          These Terms of Service (&ldquo;Terms&rdquo;) are an agreement between you and {operator},{' '}
+          {operatorDescription} (&ldquo;we&rdquo;, &ldquo;us&rdquo;), for the use of {appName}. By creating an account, or by booking a meeting through a{' '}
           {appName} booking page, you agree to these Terms. If you don&rsquo;t agree, don&rsquo;t use {appName}.
         </p>
         <p>

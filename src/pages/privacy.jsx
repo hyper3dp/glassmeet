@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import LegalPage from '@/components/LegalPage.jsx';
+import LegalPage, { ContactEmails } from '@/components/LegalPage.jsx';
 import { LEGAL } from '@/lib/legal';
 
-const { appName, operator, contactEmail, minimumAge } = LEGAL;
-const mail = <a href={`mailto:${contactEmail}`}>{contactEmail}</a>;
+const { appName, operator, operatorDescription, minimumAge } = LEGAL;
+const mail = <ContactEmails />;
 
 const sections = [
   {
@@ -14,7 +14,7 @@ const sections = [
       <>
         <p>
           {appName} is a scheduling tool that lets people publish a booking page, take bookings and confirm
-          meetings over WhatsApp. {appName} is operated by {operator} (&ldquo;we&rdquo;, &ldquo;us&rdquo;).
+          meetings over WhatsApp. {appName} is operated by {operator}, {operatorDescription} (&ldquo;we&rdquo;, &ldquo;us&rdquo;).
         </p>
         <p>
           This policy explains what personal information we handle, why, and the choices you have. If you have
@@ -204,8 +204,8 @@ const sections = [
     body: (
       <>
         <p>
-          You can view and update most of your information in Settings. Depending on where you live, you may also have
-          the right to access, correct, export or delete your personal information, to object to or restrict certain
+          You can view and update most of your information in Settings. Depending on where you live (for example under the UAE Personal Data Protection
+          Law, the EU or UK GDPR, or California law), you may also have the right to access, correct, export or delete your personal information, to object to or restrict certain
           uses, and to withdraw consent.
         </p>
         <p>

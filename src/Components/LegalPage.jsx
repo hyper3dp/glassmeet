@@ -3,6 +3,16 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { LEGAL } from '@/lib/legal';
 
+// The contact addresses as mailto links: "a@x.com or b@y.com".
+export function ContactEmails({ className }) {
+  return LEGAL.contactEmails.map((email, i) => (
+    <React.Fragment key={email}>
+      {i > 0 && ' or '}
+      <a href={`mailto:${email}`} className={className}>{email}</a>
+    </React.Fragment>
+  ));
+}
+
 // Shared layout for the Privacy Policy and Terms of Service.
 // `sections` is [{ id, title, body }]; each id becomes an anchor in the table of contents.
 export default function LegalPage({ title, intro, sections, otherDoc }) {
@@ -67,10 +77,7 @@ export default function LegalPage({ title, intro, sections, otherDoc }) {
 
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
           <span>
-            Questions? Email{' '}
-            <a href={`mailto:${LEGAL.contactEmail}`} className="text-foreground underline underline-offset-4">
-              {LEGAL.contactEmail}
-            </a>
+            Questions? Email <ContactEmails className="text-foreground underline underline-offset-4" />
           </span>
           <Link to={otherDoc.to} className="inline-flex items-center gap-1.5 text-foreground transition-all duration-200 hover:opacity-80">
             {otherDoc.label} <ArrowRight className="h-4 w-4" />
