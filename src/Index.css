@@ -254,6 +254,23 @@
   .meta-label {
     @apply text-xs font-medium uppercase tracking-wider text-muted-foreground;
   }
+
+  /* long-form text on the Privacy Policy / Terms pages */
+  .legal-prose {
+    @apply space-y-4 text-sm leading-relaxed text-muted-foreground sm:text-[15px];
+  }
+
+  .legal-prose ul {
+    @apply list-disc space-y-2 pl-5 marker:text-hint;
+  }
+
+  .legal-prose strong {
+    @apply font-medium text-foreground;
+  }
+
+  .legal-prose a {
+    @apply text-foreground underline underline-offset-4 transition-all duration-200 hover:opacity-80;
+  }
 }
 
 @utility no-scrollbar {

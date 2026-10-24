@@ -144,6 +144,10 @@ export default function Landing() {
           <Sparkles className="w-4 h-4 accent-text" /> GlassMeet
         </div>
         <p>Schedule meetings. Stay on WhatsApp.</p>
+        <nav aria-label="Legal" className="mt-4 flex items-center justify-center gap-5 text-xs">
+          <Link to="/privacy" className="transition-all duration-200 hover:text-foreground">Privacy Policy</Link>
+          <Link to="/terms" className="transition-all duration-200 hover:text-foreground">Terms of Service</Link>
+        </nav>
       </footer>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import {
   Clock, Calendar, Globe, ChevronLeft, ChevronRight, ArrowRight, Loader2, Sparkles, Video, MessageCircle, Check,
@@ -340,6 +340,11 @@ export default function BookingPage() {
               <GlassButton variant="primary" size="lg" className="w-full mt-5" onClick={confirm} disabled={submitting}>
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Confirming…</> : isFull ? <>Join Waitlist <ArrowRight className="w-4 h-4" /></> : event?.requires_approval ? <>Request Booking <ArrowRight className="w-4 h-4" /></> : <>Confirm booking <ArrowRight className="w-4 h-4" /></>}
               </GlassButton>
+              <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
+                Your details are shared with the host. By booking you agree to GlassMeet&rsquo;s{' '}
+                <Link to="/terms" className="text-foreground underline underline-offset-4">Terms</Link> and{' '}
+                <Link to="/privacy" className="text-foreground underline underline-offset-4">Privacy Policy</Link>.
+              </p>
             </div>
           )}
         </div>
