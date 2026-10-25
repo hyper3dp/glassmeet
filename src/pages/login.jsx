@@ -42,26 +42,26 @@ export default function Login() {
   return (
     <AuthLayout
       icon={LogIn}
-      title="Welcome back"
-      subtitle="Log in to your account"
+      title="Log in to your account"
+      subtitle="Welcome back to GlassMeet"
       footer={
         <>
           Don't have an account?{" "}
           <Link
             to={"/register" + (returnTo !== "/" ? "?returnTo=" + encodeURIComponent(returnTo) : "")}
-            className="text-primary font-medium hover:underline"
+            className="text-link font-semibold hover:underline"
           >
             Create one
           </Link>
         </>
       }
     >
-      <Button type="button" variant="outline" className="mb-6 h-12 w-full text-sm font-medium" onClick={handleGoogle}>
+      <Button type="button" variant="outline" className="mb-6 h-12 w-full text-[15px] font-bold" onClick={handleGoogle}>
         <GoogleIcon className="mr-2 h-5 w-5" /> Continue with Google
       </Button>
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">or sign in with email</span></div>
+        <div className="relative flex justify-center text-sm"><span className="bg-card px-3 text-muted-foreground">OR</span></div>
       </div>
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
@@ -90,7 +90,7 @@ export default function Login() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+            <Link to="/forgot-password" className="text-sm font-semibold text-link hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -108,7 +108,7 @@ export default function Login() {
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" className="w-full h-12 text-[15px] font-bold" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

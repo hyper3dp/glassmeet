@@ -43,7 +43,7 @@ export default function Verify() {
       footer={
         <button 
           onClick={() => navigate('/register')} 
-          className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
+          className="text-sm text-muted-foreground hover:text-link flex items-center gap-1"
         >
           <ArrowLeft className="w-3 h-3" /> Back to registration
         </button>
@@ -83,7 +83,7 @@ export default function Verify() {
           </div>
         )}
 
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" className="w-full h-12 text-[15px] font-bold" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

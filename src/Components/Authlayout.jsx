@@ -1,17 +1,17 @@
 import React from "react";
+import Logo from "@/components/logo.jsx";
 
-export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
+// Calendly-style auth frame: logo, bold heading, one card. `icon` is accepted for older callers and not drawn.
+export default function AuthLayout({ icon: _icon, title, subtitle, footer, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4">
-            <Icon className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-          {subtitle && <p className="text-muted-foreground mt-2">{subtitle}</p>}
+    <div className="min-h-screen flex flex-col items-center bg-background px-4 py-10 sm:py-16">
+      <Logo to="/" />
+      <div className="w-full max-w-[440px] mt-10">
+        <div className="text-center mb-8">
+          <h1 className="text-[28px] font-bold tracking-tight leading-tight">{title}</h1>
+          {subtitle && <p className="text-muted-foreground mt-2 text-[15px]">{subtitle}</p>}
         </div>
-        <div className="bg-card rounded-2xl border border-border p-8">
+        <div className="bg-card rounded-xl border border-border shadow-card p-6 sm:p-8">
           {children}
         </div>
         {footer && (

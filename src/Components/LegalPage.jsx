@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { LEGAL } from '@/lib/legal';
+import Logo from '@/components/logo.jsx';
 
 // The contact addresses as mailto links: "a@x.com or b@y.com".
 export function ContactEmails({ className }) {
@@ -18,15 +19,10 @@ export function ContactEmails({ className }) {
 export default function LegalPage({ title, intro, sections, otherDoc }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            {LEGAL.appName}
-          </Link>
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-all duration-200 hover:text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
+          <Logo to="/" />
+          <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground transition-all duration-200 hover:text-link">
             <ArrowLeft className="h-4 w-4" /> Home
           </Link>
         </div>
@@ -34,23 +30,22 @@ export default function LegalPage({ title, intro, sections, otherDoc }) {
 
       <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:py-16">
         <div className="mb-10 max-w-2xl">
-          <p className="meta-label mb-3">Legal</p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-[40px] sm:leading-tight">{title}</h1>
           <p className="mt-3 text-sm text-muted-foreground">Effective {LEGAL.effectiveDate}</p>
-          {intro && <p className="mt-6 leading-relaxed text-muted-foreground">{intro}</p>}
+          {intro && <p className="mt-6 text-[17px] leading-relaxed text-muted-foreground">{intro}</p>}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-          <nav aria-label="On this page" className="hidden lg:sticky lg:top-8 lg:block lg:self-start">
-            <p className="meta-label mb-3">On this page</p>
+          <nav aria-label="On this page" className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
+            <p className="mb-3 px-2 text-sm font-bold">On this page</p>
             <ol className="space-y-0.5 text-sm">
               {sections.map((section, i) => (
                 <li key={section.id}>
                   <a
                     href={`#${section.id}`}
-                    className="flex rounded-lg px-2 py-1.5 text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"
+                    className="flex rounded-md px-2 py-1.5 font-semibold text-muted-foreground transition-all duration-200 hover:bg-primary-soft hover:text-link"
                   >
-                    <span className="mr-2 w-5 shrink-0 tabular-nums text-hint">{i + 1}.</span>
+                    <span className="mr-2 w-5 shrink-0 tabular text-hint">{i + 1}.</span>
                     {section.title}
                   </a>
                 </li>
@@ -58,15 +53,15 @@ export default function LegalPage({ title, intro, sections, otherDoc }) {
             </ol>
           </nav>
 
-          <article className="matte rounded-2xl border border-border p-6 sm:p-8">
+          <article className="max-w-[720px] rounded-xl border border-border bg-card p-6 shadow-card sm:p-10">
             {sections.map((section, i) => (
               <section
                 key={section.id}
                 id={section.id}
-                className="scroll-mt-8 border-b border-border py-8 first:pt-0 last:border-0 last:pb-0"
+                className="scroll-mt-24 border-b border-border py-8 first:pt-0 last:border-0 last:pb-0"
               >
-                <h2 className="mb-4 text-lg font-semibold tracking-tight">
-                  <span className="mr-2 tabular-nums text-hint">{i + 1}.</span>
+                <h2 className="mb-4 text-xl font-bold">
+                  <span className="mr-2 tabular text-hint">{i + 1}.</span>
                   {section.title}
                 </h2>
                 <div className="legal-prose">{section.body}</div>
@@ -77,9 +72,9 @@ export default function LegalPage({ title, intro, sections, otherDoc }) {
 
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
           <span>
-            Questions? Email <ContactEmails className="text-foreground underline underline-offset-4" />
+            Questions? Email <ContactEmails className="font-semibold text-link hover:underline" />
           </span>
-          <Link to={otherDoc.to} className="inline-flex items-center gap-1.5 text-foreground transition-all duration-200 hover:opacity-80">
+          <Link to={otherDoc.to} className="inline-flex items-center gap-1.5 font-semibold text-link transition-all duration-200 hover:underline">
             {otherDoc.label} <ArrowRight className="h-4 w-4" />
           </Link>
         </footer>

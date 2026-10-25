@@ -32,7 +32,7 @@ export default function PageNotFound({}) {
                     
                     {/* Main Message */}
                     <div className="space-y-3">
-                        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                        <h2 className="text-2xl font-bold tracking-tight text-foreground">
                             Page Not Found
                         </h2>
                         <p className="text-muted-foreground leading-relaxed">
@@ -42,10 +42,10 @@ export default function PageNotFound({}) {
                     
                     {/* Admin Note */}
                     {isFetched && authData.isAuthenticated && authData.user?.role === 'admin' && (
-                        <div className="mt-8 p-4 bg-card rounded-2xl border border-border">
+                        <div className="mt-8 p-4 bg-card rounded-xl shadow-card border border-border">
                             <div className="flex items-start space-x-3">
-                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-orange-500/10 flex items-center justify-center mt-0.5">
-                                    <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-warning/15 flex items-center justify-center mt-0.5">
+                                    <div className="w-2 h-2 rounded-full bg-warning"></div>
                                 </div>
                                 <div className="text-left space-y-1">
                                     <p className="meta-label">Admin Note</p>
@@ -61,7 +61,7 @@ export default function PageNotFound({}) {
                     <div className="pt-6">
                         <button 
                             onClick={() => window.location.href = appPath('/')} 
-                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-xl hover:bg-primary/90 transition-all duration-200 focus:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                            className="inline-flex items-center px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-full hover:bg-primary-hover transition-all duration-200 focus:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
                         >
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />

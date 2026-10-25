@@ -42,7 +42,7 @@ export default function Guests({ profile }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Guests</h1>
+        <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight">Guests</h1>
         <p className="text-muted-foreground text-sm mt-1">People who have booked meetings with you.</p>
       </div>
 
@@ -62,8 +62,8 @@ export default function Guests({ profile }) {
             return (
               <GlassCard key={key} className="flex flex-col">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-11 h-11 rounded-2xl glass flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold accent-text">{(g.name || '?')[0]}</span>
+                  <div className="w-11 h-11 rounded-full bg-primary-soft flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-link">{(g.name || '?')[0]}</span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm truncate">{g.name}</div>

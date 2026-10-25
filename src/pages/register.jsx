@@ -44,28 +44,28 @@ export default function Register() {
   return (
     <AuthLayout
       icon={UserPlus}
-      title="Create your account"
-      subtitle="Sign up to get started"
+      title="Create your free account"
+      subtitle="Share one link. Confirm on WhatsApp."
       footer={
         <>
           Already have an account?{" "}
           <Link
             to={"/login" + (safeReturnTo() !== "/" ? "?returnTo=" + encodeURIComponent(safeReturnTo()) : "")}
-            className="text-primary font-medium hover:underline"
+            className="text-link font-semibold hover:underline"
           >
             Log in
           </Link>
         </>
       }
     >
-      <Button type="button" variant="outline" className="mb-6 h-12 w-full text-sm font-medium" onClick={handleGoogle}>
+      <Button type="button" variant="outline" className="mb-6 h-12 w-full text-[15px] font-bold" onClick={handleGoogle}>
         <GoogleIcon className="mr-2 h-5 w-5" /> Continue with Google
       </Button>
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">or create with email</span></div>
+        <div className="relative flex justify-center text-sm"><span className="bg-card px-3 text-muted-foreground">OR</span></div>
       </div>
-      {notice && <p role="status" className="mb-4 text-sm text-emerald-600">{notice}</p>}
+      {notice && <p role="status" className="mb-4 text-sm text-success">{notice}</p>}
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}
@@ -122,7 +122,7 @@ export default function Register() {
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" className="w-full h-12 text-[15px] font-bold" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -134,8 +134,8 @@ export default function Register() {
         </Button>
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
           By creating an account you agree to our{" "}
-          <Link to="/terms" className="text-foreground underline underline-offset-4">Terms of Service</Link> and{" "}
-          <Link to="/privacy" className="text-foreground underline underline-offset-4">Privacy Policy</Link>.
+          <Link to="/terms" className="font-semibold text-link hover:underline">Terms of Service</Link> and{" "}
+          <Link to="/privacy" className="font-semibold text-link hover:underline">Privacy Policy</Link>.
         </p>
       </form>
     </AuthLayout>
