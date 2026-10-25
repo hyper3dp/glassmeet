@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Calendar, CalendarCheck, RefreshCw, Plug, Unplug, CheckCircle2,
+  Calendar, CalendarCheck, RefreshCw, Unplug, CheckCircle2,
   Apple, Shield, AlertCircle, Loader2, Settings2,
-  Rss, Copy, RotateCcw, Trash2, Plus, Globe,
+  Rss, Copy, RotateCcw, Trash2, Plus, Globe, Clock,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, PageHeader } from '@/components/glass';
 import { Switch } from '@/components/ui/switch';
@@ -216,7 +216,7 @@ export default function CalendarConnections() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Calendars" description="Connect your calendars so GlassMeet checks availability and adds new meetings." />
+      <PageHeader title="Calendars" description="Add meetings to the calendars you use. Google and Outlook account connections are coming soon." />
 
       {/* Google Calendar */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
@@ -227,12 +227,12 @@ export default function CalendarConnections() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-[17px] font-bold">Google Calendar</h2>
-              <StatusBadge connected={googleConnected} />
+              {googleConnected ? <StatusBadge connected /> : <ComingSoonBadge />}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               {googleConnected
                 ? 'Connected. Availability is checked against your Google Calendar before booking slots are shown.'
-                : 'Connect so busy times stay off your booking page and new bookings are added to your calendar.'}
+                : 'Soon you can connect Google Calendar so busy times stay off your booking page and new bookings are added to it. Until then, guests can add meetings to Google Calendar from their confirmation page.'}
             </p>
 
             {googleConnected && (
@@ -281,9 +281,7 @@ export default function CalendarConnections() {
               </GlassButton>
             </>
           ) : (
-            <GlassButton size="sm" variant="primary" onClick={handleConnectGoogle}>
-              <Plug className="w-4 h-4" /> Connect
-            </GlassButton>
+            <ComingSoonButton label="Google Calendar" />
           )}
         </div>
       </GlassCard>
@@ -331,12 +329,12 @@ export default function CalendarConnections() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-[17px] font-bold">Microsoft Outlook</h2>
-              <StatusBadge connected={outlookConnected} />
+              {outlookConnected ? <StatusBadge connected /> : <ComingSoonBadge />}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               {outlookConnected
                 ? `Connected to ${outlookEmail}. Availability is checked against your Outlook calendar before booking slots are shown.`
-                : 'Connect your Microsoft 365 or Outlook.com account (work, school, or personal) to check availability and sync meetings.'}
+                : 'Soon you can connect a Microsoft 365 or Outlook.com account to check availability and sync meetings. Until then, guests can add meetings to Outlook from their confirmation page.'}
             </p>
 
             {outlookConnected && (
@@ -380,9 +378,7 @@ export default function CalendarConnections() {
               </GlassButton>
             </>
           ) : (
-            <GlassButton size="sm" variant="primary" onClick={handleConnectOutlook}>
-              <Plug className="w-4 h-4" /> Connect
-            </GlassButton>
+            <ComingSoonButton label="Microsoft Outlook" />
           )}
         </div>
       </GlassCard>
@@ -413,7 +409,7 @@ export default function CalendarConnections() {
               Subscribe
             </GlassButton>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Paste a WebCal URL from Outlook, Google, Apple, or any calendar that supports .ics feeds. The subscription is read-only — two-way sync requires a Microsoft account connection above.</p>
+          <p className="text-xs text-muted-foreground mt-2">Paste a WebCal URL from Outlook, Google, Apple, or any calendar that supports .ics feeds. The subscription is read-only; two-way sync will come with Google and Outlook account connections.</p>
         </div>
       </GlassCard>
 
@@ -554,6 +550,23 @@ function StatusBadge({ connected }) {
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">
       <AlertCircle className="w-3 h-3" /> Not connected
     </span>
+  );
+}
+
+function ComingSoonBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-soft text-link">
+      <Clock className="w-3 h-3" /> Coming soon
+    </span>
+  );
+}
+
+// Connecting isn't available yet; the button stays visible so hosts know it's planned.
+function ComingSoonButton({ label }) {
+  return (
+    <GlassButton size="sm" type="button" disabled aria-label={`${label} connection coming soon`} className="disabled:opacity-100 border-dashed text-muted-foreground">
+      <Clock className="w-4 h-4" /> Coming soon
+    </GlassButton>
   );
 }
 

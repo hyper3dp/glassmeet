@@ -212,7 +212,7 @@ function CalendarSettingRow({ label, connected, email, calendars, autoSync, onTo
               <Check className="w-3 h-3" /> Connected
             </span>
           ) : (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">Not connected</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-soft text-link">Coming soon</span>
           )}
         </div>
         {connected && (
@@ -230,7 +230,7 @@ function CalendarSettingRow({ label, connected, email, calendars, autoSync, onTo
           </button>
         </div>
       ) : (
-        <p className="mt-1 text-sm text-muted-foreground">Connect it from the Calendars page.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Account connections are coming soon.</p>
       )}
     </div>
   );
