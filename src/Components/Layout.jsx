@@ -30,9 +30,9 @@ const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(naviga
 
 const MOBILE_NAV = [
   { to: '/dashboard', label: 'Home', icon: Home },
+  { to: '/event-types', label: 'Scheduling', icon: Link2 },
   { to: '/bookings', label: 'Meetings', icon: CalendarDays },
   { to: '/calendar', label: 'Calendar', icon: CalendarIcon },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export default function Layout({ children, profile, onOpenCommandPalette }) {
@@ -124,7 +124,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
 
       <div className="lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-sm border-b border-border lg:border-transparent">
+        <header className="sticky top-0 z-30 h-16 bg-background border-b border-border lg:border-transparent">
           <div className="h-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center gap-3">
             <button onClick={() => setDrawerOpen(true)} aria-label="Open menu" className="lg:hidden w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-secondary">
               <Menu className="w-5 h-5" />

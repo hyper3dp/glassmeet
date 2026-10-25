@@ -42,7 +42,8 @@ export default function Analytics({ profile }) {
       const h = new Date(b.start_time).getHours();
       hourCounts[h] = (hourCounts[h] || 0) + 1;
     });
-    const popularHour = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
+    const rankedHours = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
+    const popularHour = rankedHours[0] && rankedHours[0][1] > 1 && (!rankedHours[1] || rankedHours[0][1] > rankedHours[1][1]) ? rankedHours[0] : null;
 
     // Average duration
     const avgDuration = eventTypes.length
@@ -52,7 +53,7 @@ export default function Analytics({ profile }) {
     return {
       total, completed, cancelled, confirmed,
       popularEvent: popularEvent ? popularEvent[0] : '—',
-      popularHour: popularHour ? `${popularHour[0]}:00` : '—',
+      popularHour: popularHour ? new Date(2000, 0, 1, Number(popularHour[0])).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Not enough data',
       avgDuration,
     };
   }, [bookings, eventTypes]);

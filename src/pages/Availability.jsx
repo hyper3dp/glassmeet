@@ -7,6 +7,25 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+// Every 15 minutes, value "HH:MM", label "9:00am" as Calendly writes it
+const TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
+  const h = Math.floor(i / 4), m = (i % 4) * 15;
+  const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const label = `${h % 12 || 12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
+  return { value, label };
+});
+
+function TimeSelect({ value, onChange, label }) {
+  const v = (value || '').slice(0, 5);
+  const known = TIME_OPTIONS.some((o) => o.value === v);
+  return (
+    <GlassSelect value={v} onChange={(e) => onChange(e.target.value)} aria-label={label} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0 tabular">
+      {!known && v && <option value={v}>{v}</option>}
+      {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </GlassSelect>
+  );
+}
+
 export default function Availability({ profile }) {
   const [rules, setRules] = useState([]);
   const [exceptions, setExceptions] = useState([]);
@@ -103,9 +122,9 @@ export default function Availability({ profile }) {
                       {!on && <div className="sm:pt-2.5 text-sm text-muted-foreground">Unavailable</div>}
                       {dayRules.map((r) => (
                         <div key={r.id} className="flex items-center gap-2">
-                          <GlassInput type="time" value={r.start_time} onChange={(e)=>updateRule(r.id,'start_time',e.target.value)} className="h-10 flex-1 sm:flex-none sm:w-[118px] min-w-0 px-2.5 tabular" aria-label={`${day} start`} />
+                          <TimeSelect value={r.start_time} onChange={(v)=>updateRule(r.id,'start_time',v)} label={`${day} start`} />
                           <span className="text-muted-foreground">–</span>
-                          <GlassInput type="time" value={r.end_time} onChange={(e)=>updateRule(r.id,'end_time',e.target.value)} className="h-10 flex-1 sm:flex-none sm:w-[118px] min-w-0 px-2.5 tabular" aria-label={`${day} end`} />
+                          <TimeSelect value={r.end_time} onChange={(v)=>updateRule(r.id,'end_time',v)} label={`${day} end`} />
                           <button onClick={()=>deleteRule(r.id)} aria-label="Remove interval" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><X className="w-4 h-4" /></button>
                         </div>
                       ))}

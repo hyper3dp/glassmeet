@@ -20,6 +20,17 @@ export default function Settings({ profile, updateProfile }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
+
+  useEffect(() => {
+    if (!form) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (visible) setActiveSection(visible.target.id);
+    }, { rootMargin: '-80px 0px -55% 0px' });
+    SECTIONS.forEach((s) => { const el = document.getElementById(s.id); if (el) observer.observe(el); });
+    return () => observer.disconnect();
+  }, [!!form]);
 
   useEffect(() => {
     if (profile) {
@@ -62,8 +73,8 @@ export default function Settings({ profile, updateProfile }) {
           <ul className="sticky top-24 space-y-0.5">
             {SECTIONS.map((s) => (
               <li key={s.id}>
-                <a href={`#${s.id}`} className="glass-nav-item flex items-center gap-3 rounded-lg px-3 h-10 text-sm font-semibold text-foreground">
-                  <s.icon className="w-4 h-4 text-muted-foreground" /> {s.label}
+                <a href={`#${s.id}`} aria-current={activeSection === s.id ? 'true' : undefined} className={`glass-nav-item flex items-center gap-3 rounded-lg px-3 h-10 text-sm font-semibold text-foreground ${activeSection === s.id ? 'active' : ''}`}>
+                  <s.icon className="w-4 h-4 opacity-70" /> {s.label}
                 </a>
               </li>
             ))}

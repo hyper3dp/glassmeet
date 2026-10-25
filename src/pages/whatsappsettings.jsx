@@ -96,6 +96,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
 
       <GlassCard hover={false}>
         <h2 className="text-lg font-bold mb-1">Message templates</h2>
+        <p className="text-sm text-muted-foreground">GlassMeet fills these in and opens WhatsApp; you send them. Automatic reminders are coming next.</p>
         <p className="text-sm text-muted-foreground mb-5">Use placeholders: [Name], [Host], [Date], [Time], [Duration], [Meeting Link], [Timezone].</p>
         <div className="space-y-5">
           <div>
@@ -103,11 +104,11 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
             <GlassTextarea rows={6} value={form.confirmation_template} onChange={(e)=>set('confirmation_template', e.target.value)} />
           </div>
           <div>
-            <GlassLabel>24-hour reminder</GlassLabel>
+            <GlassLabel>24-hour reminder (you send it)</GlassLabel>
             <GlassTextarea rows={4} value={form.reminder_24h_template} onChange={(e)=>set('reminder_24h_template', e.target.value)} />
           </div>
           <div>
-            <GlassLabel>1-hour reminder</GlassLabel>
+            <GlassLabel>1-hour reminder (you send it)</GlassLabel>
             <GlassTextarea rows={4} value={form.reminder_1h_template} onChange={(e)=>set('reminder_1h_template', e.target.value)} />
           </div>
         </div>

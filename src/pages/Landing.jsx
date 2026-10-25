@@ -34,7 +34,7 @@ const FEATURES = [
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const UNAVAILABLE = new Set([0, 6, 7, 13, 14, 20]);
 const SELECTED_DAY = 10;
-const TIMES = ['9:00am', '9:30am', '10:00am', '11:30am', '2:00pm'];
+const TIMES = ['9:00 AM', '9:30 AM', '10:00 AM', '11:30 AM', '2:00 PM'];
 const SELECTED_TIME = 2;
 
 // A static, Calendly-style preview of the guest booking page (illustrative, not live data).
@@ -112,7 +112,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-card">
       {/* Nav */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b border-border bg-card">
         <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
           <Logo to="/" />
           <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">

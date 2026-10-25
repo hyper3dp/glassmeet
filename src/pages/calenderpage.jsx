@@ -6,6 +6,10 @@ import { formatMeetingTime } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/Availability.js';
 import FindATime from '@/components/FindAtime.jsx';
 
+// y-m-d of a local calendar cell, and of a booking in the host time zone
+const cellKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const bookingKey = (iso, tz) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz });
+
 export default function CalendarPage({ profile }) {
   const [view, setView] = useState('month'); // month | week | day
   const [cursor, setCursor] = useState(new Date());
@@ -28,11 +32,11 @@ export default function CalendarPage({ profile }) {
   const bookingsByDay = useMemo(() => {
     const map = {};
     for (const b of bookings) {
-      const key = b.start_time.slice(0, 10);
+      const key = bookingKey(b.start_time, timezone);
       (map[key] = map[key] || []).push(b);
     }
     return map;
-  }, [bookings]);
+  }, [bookings, timezone]);
 
   const move = (dir) => {
     const d = new Date(cursor);
@@ -74,13 +78,13 @@ export default function CalendarPage({ profile }) {
           </div>
         </div>
 
-        {view === 'month' && <MonthView cursor={cursor} bookingsByDay={bookingsByDay} onSelect={(d)=>{ setSelectedDay(d); }} />}
+        {view === 'month' && <MonthView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} onSelect={(d)=>{ setSelectedDay(d); }} />}
         {view === 'week' && <WeekView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} />}
-        {view === 'day' && <DayView date={cursor} bookings={bookingsByDay[cursor.toISOString().slice(0,10)]||[]} timezone={timezone} />}
+        {view === 'day' && <DayView date={cursor} bookings={bookingsByDay[cellKey(cursor)]||[]} timezone={timezone} />}
       </div>
 
       {selectedDay && (
-        <DayPanel date={selectedDay} bookings={bookingsByDay[selectedDay.toISOString().slice(0,10)]||[]} timezone={timezone} onClose={()=>setSelectedDay(null)} />
+        <DayPanel date={selectedDay} bookings={bookingsByDay[cellKey(selectedDay)]||[]} timezone={timezone} onClose={()=>setSelectedDay(null)} />
       )}
 
       <FindATime open={showFindTime} onClose={() => setShowFindTime(false)} profile={profile} />
@@ -88,7 +92,7 @@ export default function CalendarPage({ profile }) {
   );
 }
 
-function MonthView({ cursor, bookingsByDay, onSelect }) {
+function MonthView({ cursor, bookingsByDay, timezone, onSelect }) {
   const year = cursor.getFullYear(), month = cursor.getMonth();
   const first = new Date(year, month, 1);
   const startDay = first.getDay();
@@ -108,7 +112,7 @@ function MonthView({ cursor, bookingsByDay, onSelect }) {
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
         {cells.map((date, i) => {
           if (!date) return <div key={i} className="bg-background" />;
-          const key = date.toISOString().slice(0,10);
+          const key = cellKey(date);
           const dayBookings = bookingsByDay[key] || [];
           const isToday = date.getTime() === today.getTime();
           return (
@@ -116,7 +120,7 @@ function MonthView({ cursor, bookingsByDay, onSelect }) {
               <span className={`w-7 h-7 rounded-full text-sm font-semibold tabular flex items-center justify-center ${isToday?'bg-primary text-primary-foreground':''}`}>{date.getDate()}</span>
               <div className="flex flex-col gap-0.5 overflow-hidden">
                 {dayBookings.slice(0,2).map((b)=>(
-                  <span key={b.id} className="text-[11px] font-semibold truncate text-link bg-primary-soft rounded px-1.5 py-0.5">{formatMeetingTime(b.start_time,'UTC')} {b.guest_name}</span>
+                  <span key={b.id} className="text-[11px] font-semibold truncate text-link bg-primary-soft rounded px-1.5 py-0.5">{formatMeetingTime(b.start_time, timezone)} {b.guest_name}</span>
                 ))}
                 {dayBookings.length > 2 && <span className="text-[10px] text-muted-foreground">+{dayBookings.length-2} more</span>}
               </div>
@@ -135,7 +139,7 @@ function WeekView({ cursor, bookingsByDay, timezone }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
       {days.map((date, i) => {
-        const key = date.toISOString().slice(0,10);
+        const key = cellKey(date);
         const dayBookings = (bookingsByDay[key]||[]).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
         const isToday = date.getTime() === today.getTime();
         return (

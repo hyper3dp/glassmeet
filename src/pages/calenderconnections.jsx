@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, CalendarCheck, RefreshCw, Plug, Unplug, CheckCircle2,
-  Apple, Shield, AlertCircle, Loader2, Settings2, Zap, Link2, ZapOff,
+  Apple, Shield, AlertCircle, Loader2, Settings2,
   Rss, Copy, RotateCcw, Trash2, Plus, Globe,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, PageHeader } from '@/components/glass';
@@ -218,29 +218,6 @@ export default function CalendarConnections() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="Calendars" description="Connect your calendars so GlassMeet checks availability and adds new meetings." />
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border shadow-card">
-        <SummaryStat
-          icon={Link2}
-          label="Connected"
-          value={`${(googleConnected ? 1 : 0) + (outlookConnected ? 1 : 0)} / 3`}
-          hint={[googleConnected && 'Google', outlookConnected && 'Outlook', 'Apple'].filter(Boolean).join(' + ') || 'Apple only'}
-        />
-        <SummaryStat
-          icon={RefreshCw}
-          label="Last sync"
-          value={lastSynced ? new Date(lastSynced).toLocaleDateString() : '—'}
-          hint={lastSynced ? new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not synced yet'}
-        />
-        <SummaryStat
-          icon={autoSync ? Zap : ZapOff}
-          label="Auto-sync"
-          value={autoSync ? 'On' : 'Off'}
-          hint={autoSync ? 'Real-time' : 'Manual'}
-          className="col-span-2 sm:col-span-1"
-        />
-      </div>
-
       {/* Google Calendar */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
@@ -255,7 +232,7 @@ export default function CalendarConnections() {
             <p className="text-sm text-muted-foreground mt-1">
               {googleConnected
                 ? 'Connected. Availability is checked against your Google Calendar before booking slots are shown.'
-                : 'Connect to automatically check availability, prevent conflicts, and create events when meetings are booked.'}
+                : 'Connect so busy times stay off your booking page and new bookings are added to your calendar.'}
             </p>
 
             {googleConnected && (
@@ -359,7 +336,7 @@ export default function CalendarConnections() {
             <p className="text-sm text-muted-foreground mt-1">
               {outlookConnected
                 ? `Connected to ${outlookEmail}. Availability is checked against your Outlook calendar before booking slots are shown.`
-                : 'Connect your Microsoft 365 or Outlook.com account (work, school, or personal) to check availability, prevent conflicts, and sync meetings.'}
+                : 'Connect your Microsoft 365 or Outlook.com account (work, school, or personal) to check availability and sync meetings.'}
             </p>
 
             {outlookConnected && (
@@ -577,18 +554,6 @@ function StatusBadge({ connected }) {
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">
       <AlertCircle className="w-3 h-3" /> Not connected
     </span>
-  );
-}
-
-function SummaryStat({ icon: Icon, label, value, hint, className }) {
-  return (
-    <div className={`bg-card px-5 py-4 ${className || ''}`}>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-0.5">
-        <Icon className="w-3.5 h-3.5" /> {label}
-      </div>
-      <div className="text-lg font-bold leading-tight">{value}</div>
-      {hint && <div className="text-xs text-muted-foreground mt-0.5">{hint}</div>}
-    </div>
   );
 }
 

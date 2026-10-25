@@ -19,7 +19,7 @@ export function ContactEmails({ className }) {
 export default function LegalPage({ title, intro, sections, otherDoc }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-30 border-b border-border bg-card">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Logo to="/" />
           <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground transition-all duration-200 hover:text-link">

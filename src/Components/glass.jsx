@@ -64,11 +64,15 @@ export function GlassBadge({ className, children, color, ...props }) {
   );
 }
 
+// Chevron drawn in the muted slate, which reads on both themes' fields
+const SELECT_CHEVRON = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23708aa6' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`;
+
 // Native <select> (pages pass <option> children) styled to match the shadcn SelectTrigger
 export function GlassSelect({ className, children, ...props }) {
   return (
     <select
-      className={cn('flex h-11 w-full cursor-pointer rounded-lg border border-input bg-field px-3.5 text-sm text-foreground transition-all duration-200 hover:border-border-hover focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50', className)}
+      style={{ backgroundImage: SELECT_CHEVRON, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.85rem center', backgroundSize: '1rem' }}
+      className={cn('flex h-11 w-full cursor-pointer appearance-none rounded-lg border border-input bg-field pl-3.5 pr-10 text-sm text-foreground transition-all duration-200 hover:border-border-hover focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50', className)}
       {...props}
     >
       {children}
