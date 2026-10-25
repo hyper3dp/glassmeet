@@ -48,23 +48,24 @@ This guide outlines the development environment, commands, and code styling rule
 * **Database Naming:** Table names and column names should be short and concise (PostgreSQL standard).
 * **Security:** Rely on Row Level Security (RLS) policies in Supabase to secure user data. Never bypass RLS in frontend clients.
 
-### UI Design System & Styling (Active - Hilos / Modern Calendly Dark Aesthetic)
+### UI Design System & Styling (Active - Calendly look, light + dark)
 
-* **Goal:** Look like Calendly with a high-end dark SaaS aesthetic. Dark-only (next-themes is forced to `dark`; there is no light mode).
+* **Goal:** Look as close to Calendly as possible. The theme follows the OS (next-themes `defaultTheme="system"`): light is true Calendly, dark is its matching mirror. Both must be checked for every change.
 * **Stack:** Tailwind CSS v4 (CSS-first config in `src/Index.css`, `@tailwindcss/vite` plugin; there is no `tailwind.config.js`). shadcn/ui components live in `src/Components/ui/` (aliased as `@/components/ui`), restyled to this guide; add more with `npx shadcn@latest add <name>` and restyle them to match.
-* **Palette (as tokens in `src/Index.css` — use the token classes, not raw hex):**
-  * Base background `#09090b` → `bg-background`
-  * Card & container surfaces `#121214` with a subtle matte grain → `bg-card` / the `matte` utility
-  * Inputs & secondary elements `#18181b` → `bg-secondary`
-  * Borders 1px `#27272a` → `border-border`, shifting to `#3f3f46` on hover → `hover:border-border-hover`
-  * Text: primary `#fafafa` → `text-foreground`; secondary labels `#a1a1aa` → `text-muted-foreground`; muted hints `#52525b` → `text-hint`
-* **Typography:** System sans-serif stack (`-apple-system`, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif), antialiased. Headings `tracking-tight`, medium–semibold. Labels & meta: uppercase `text-xs tracking-wider` in muted tones (`Label` / `.meta-label`).
-* **Geometry:** Generous container padding (`p-6`–`p-8`), cards `rounded-2xl` (16px), form controls and buttons `rounded-xl`.
-* **States:** All transitions `transition-all duration-200`. Active / selected pills and primary buttons invert to solid white with black text (`bg-primary text-primary-foreground`, i.e. `bg-white text-black`); inactive states stay matte dark with subtle borders.
-* **Inputs:** `rounded-xl`, `bg-secondary`, focus border `zinc-500` (no glow rings); native date/dropdown pickers render dark via `color-scheme: dark`.
-* **Scrollbars:** Ultra-thin, transparent track, rounded thumbs (global in `src/Index.css`).
-* **Accent color:** Users may pick a personal accent in Settings; it sets `--accent-color` (HSL) and is used sparingly via `.accent-text` / `.accent-bg` for small icons and dots — never for active states. Public booking pages use the event's own color.
-* **Components:** Prefer the shadcn components (`Button`, `Card`, `Input`, `Dialog`, `Switch`, ...). Page-level wrappers in `src/Components/glass.jsx` (`GlassCard`, `GlassButton`, ...) are built on them — use those for consistency on app pages.
+* **Palette (tokens in `src/Index.css`, `:root` = light, `.dark` = dark — use the token classes, never raw hex):**
+  * Page `bg-background` (#f8f9fb / #0d1117); cards and panels `bg-card` (#ffffff / #151b24) with `shadow-card`
+  * Soft fills and hover `bg-secondary`; form fields `bg-field` with `border-input`
+  * Borders `border-border`, `hover:border-border-hover`
+  * Text: `text-foreground` (navy #0b3558 / #e8eef6), `text-muted-foreground` (#476788 / #9fb2c8), `text-hint`
+  * Primary `bg-primary text-primary-foreground` (Calendly blue #006bff / #1a6be6) for primary buttons and the selected day; `bg-primary-soft` + `text-link` for selected/active states (nav item, tabs, available days); `text-link` for all blue text and links
+  * Status: `text-success`, `text-warning`, `text-destructive`
+* **Typography:** System sans-serif stack (`-apple-system`, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif), antialiased. Headings bold, navy. Labels are sentence case, `text-sm font-semibold` (no uppercase tracked labels, no eyebrows above headings).
+* **Geometry:** Buttons and pills `rounded-full`; inputs `rounded-lg` (8px); cards `rounded-xl` (12px) with a 1px border and `shadow-card`.
+* **Layout:** App pages use `PageHeader` (title, actions, optional underline `Tabs`) from `src/Components/glass.jsx`. The shell is a flush left sidebar with an outline "+ Create" pill and a top bar (search, notifications, avatar).
+* **States:** All transitions `transition-all duration-200`. Keyboard focus is a 2px blue ring (`--ring`).
+* **Booking page:** Calendly's card: details left, circle month grid centre, time slots right; a picked slot splits into time + Next. The event's own colour (`--ev`) drives selection there.
+* **Accent color:** Users may pick a personal accent in Settings; it sets `--accent-color` (HSL) for small dots only — never for active states.
+* **Components:** Prefer the shadcn components (`Button`, `Card`, `Input`, `Dialog`, `Switch`, ...) and the wrappers in `src/Components/glass.jsx` (`GlassCard`, `GlassButton`, `PageHeader`, `Tabs`, `Avatar`, ...). Event types render with `src/Components/eventcard.jsx`. The `glass-*` class names are legacy aliases for the Calendly surfaces.
 
 
 
