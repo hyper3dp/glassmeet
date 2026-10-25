@@ -197,7 +197,7 @@
     color: var(--foreground);
   }
 
-  /* keyboard focus: Calendly's blue ring */
+  /* keyboard focus: a 2px teal ring */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -263,8 +263,7 @@
     border: 1px solid var(--border);
   }
 
-  .glass-panel,
-  .liquid-glass {
+  .glass-panel {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
@@ -332,7 +331,7 @@
     color: var(--foreground);
   }
 
-  /* active nav: soft blue fill with blue text, as in Calendly's sidebar */
+  /* active nav: soft teal fill with teal text, laid out like Calendly's sidebar */
   .glass-nav-item.active {
     background: var(--primary-soft);
     color: var(--link);

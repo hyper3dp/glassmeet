@@ -10,9 +10,7 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview --host 0.0.0.0",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "preview": "vite preview --host 0.0.0.0"
   },
   "engines": {
     "node": ">=22.12.0"

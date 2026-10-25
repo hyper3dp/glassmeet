@@ -12,7 +12,6 @@ import ProtectedRoute from '@/components/protectedroute.jsx';
 import { useProfile, AppContext, useApp } from '@/lib/useprofile.js';
 import Layout from '@/components/Layout';
 import CommandPalette from '@/components/commandpalatte.jsx';
-import LiquidGlassFilter from '@/components/liquidglassfilter.jsx';
 
 // Auth pages
 import Login from './pages/login.jsx';
@@ -154,7 +153,6 @@ function App() {
         <QueryClientProvider client={queryClientInstance}>
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <ScrollToTop />
-            <LiquidGlassFilter />
             <AuthenticatedApp />
           </Router>
           <Toaster />
