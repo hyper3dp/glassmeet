@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/localApi';
-import { Users, Search, Mail, Phone, Clock, ArrowRight } from 'lucide-react';
-import { GlassCard, GlassInput, EmptyState, Spinner, GlassButton } from '@/components/glass';
-import { formatMeetingDate, formatMeetingTime } from '@/lib/whatsapp';
+import { Users, Search, Mail, Phone, Clock } from 'lucide-react';
+import { GlassCard, GlassInput, EmptyState, Spinner } from '@/components/glass';
+import { formatMeetingDate } from '@/lib/whatsapp';
 
 export default function Guests({ profile }) {
   const [bookings, setBookings] = useState([]);
