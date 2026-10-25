@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
 
-const COLORS = ['#006BFF', '#0A8A4C', '#E55D00', '#D6335C', '#8247F5', '#0099B3', '#4252D4', '#64748B'];
+const COLORS = ['#66ACA9', '#2B7A75', '#344248', '#E55D00', '#D6335C', '#8247F5', '#006BFF', '#64748B'];
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -39,7 +39,7 @@ export default function Settings({ profile, updateProfile }) {
         profile_photo: profile.profile_photo || '',
         whatsapp_number: profile.whatsapp_number || '',
         timezone: profile.timezone || detectTimezone(),
-        accent_color: profile.accent_color || '#006BFF',
+        accent_color: profile.accent_color || '#66ACA9',
         bio: profile.bio || '',
         username: profile.username || (profile.email || '').split('@')[0],
       });

@@ -4,7 +4,7 @@ import { MessageCircle, Clock, Check, ArrowRight, ChevronLeft, ChevronRight, Vid
 import { cn } from '@/lib/utils';
 import { GlassButton } from '@/components/glass';
 import { useAuth } from '@/lib/Authcontext.jsx';
-import Logo from '@/components/logo.jsx';
+import Logo, { LogoMark } from '@/components/logo.jsx';
 
 // Every line here describes something the app does today (see PRODUCT.md, "Promise only what ships").
 const STEPS = [
@@ -127,7 +127,7 @@ export default function Landing() {
       <main>
         {/* Hero: the promise on the left, the product doing it on the right */}
         <section className="relative overflow-hidden px-4 sm:px-6 pt-14 pb-20 sm:pt-20 lg:pb-28">
-          <div className="pointer-events-none absolute -right-40 top-10 hidden lg:block h-[560px] w-[560px] rounded-[42%] bg-primary-soft rotate-12" aria-hidden="true" />
+          <LogoMark size={620} tone="bg-brand-teal/15" className="pointer-events-none absolute -right-48 -top-6 hidden lg:block" />
           <div className="relative max-w-6xl mx-auto grid items-center gap-12 lg:grid-cols-[1fr_minmax(0,32rem)] lg:gap-14">
             <div>
               <h1 className="text-[2.75rem] leading-[1.05] sm:text-6xl lg:text-[4rem] font-bold tracking-[-0.03em]">
@@ -193,16 +193,16 @@ export default function Landing() {
 
         {/* Closing call to action */}
         <section className="px-4 sm:px-6 pb-24">
-          <div className="max-w-6xl mx-auto flex flex-col gap-8 rounded-2xl bg-[#0b3558] dark:bg-primary-soft p-8 sm:p-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-6xl mx-auto flex flex-col gap-8 rounded-2xl bg-brand-teal p-8 sm:p-12 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white dark:text-foreground">You're one link away</h2>
-              <p className="mt-3 max-w-lg text-lg leading-relaxed text-[#c9d6e6] dark:text-muted-foreground">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-brand-slate">You're one link away</h2>
+              <p className="mt-3 max-w-lg text-lg leading-relaxed text-brand-slate">
                 Create your booking page in minutes and share it in your next WhatsApp chat.
               </p>
             </div>
             <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-              <Link to="/register"><GlassButton variant="primary" size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base">Get started, it's free</GlassButton></Link>
-              <Link to="/login"><GlassButton size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base">Log in</GlassButton></Link>
+              <Link to="/register"><GlassButton size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base border-transparent bg-brand-slate text-white hover:bg-brand-slate/90 hover:border-transparent">Get started, it's free</GlassButton></Link>
+              <Link to="/login"><GlassButton size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base border-brand-slate bg-transparent text-brand-slate hover:bg-brand-slate/10 hover:border-brand-slate">Log in</GlassButton></Link>
             </div>
           </div>
         </section>

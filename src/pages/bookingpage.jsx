@@ -93,7 +93,7 @@ export default function BookingPage() {
     setPendingSlot(null);
   }, [selectedDate, event, rules, exceptions, bookedSlots, googleBusy]);
 
-  const color = event?.color || '#006BFF';
+  const color = event?.color || '#2B7A75';
 
   const monthDays = useMemo(() => {
     if (!event) return [];
@@ -427,13 +427,13 @@ export default function BookingPage() {
 
 // Navy or white text, whichever reads on the event colour
 function readableOn(hex) {
-  const h = (hex || '#006bff').replace('#', '');
+  const h = (hex || '#2b7a75').replace('#', '');
   const [r, g, b] = [0, 2, 4].map((i) => {
     const c = parseInt(h.substring(i, i + 2), 16) / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
   const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return L > 0.4 ? '#0b3558' : '#ffffff';
+  return L > 0.3 ? '#344248' : '#ffffff';
 }
 
 function hexToHsl(hex) {

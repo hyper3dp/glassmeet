@@ -5,105 +5,108 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * GlassMeet design system — Calendly look (see CLAUDE.md / DESIGN.md).
- * The theme follows the OS: :root is light (true Calendly), .dark is its dark mirror.
- *   light: #f8f9fb page · #ffffff surfaces · navy #0b3558 text · #d4e0ed borders · blue #006bff
- *   dark:  #0d1117 page · #151b24 surfaces · #e8eef6 text · #273342 borders · blue #1a6be6
- * Primary = solid blue with white text; selected/active = soft blue with blue text.
+ * GlassMeet design system — Calendly layout in the GlassMeet brand (see CLAUDE.md / DESIGN.md).
+ * The theme follows the OS: :root is light, .dark is its mirror.
+ *   light: #f6f9f9 page · #ffffff surfaces · slate #344248 text · deep teal #2b7a75 primary
+ *   dark:  #0f1516 page · #162022 surfaces · #e6eeee text · brand teal #66aca9 primary (slate text)
+ * Selected/active = soft teal with teal text. Brand teal #66aca9 is for the logo and brand surfaces.
  */
 
 :root {
-  --background: #f8f9fb;
-  --foreground: #0b3558;
+  --background: #f6f9f9;
+  --foreground: #344248;
   --card: #ffffff;
-  --card-foreground: #0b3558;
+  --card-foreground: #344248;
   --popover: #ffffff;
-  --popover-foreground: #0b3558;
-  --primary: #006bff;
-  --primary-hover: #0055cc;
+  --popover-foreground: #344248;
+  --primary: #2b7a75;
+  --primary-hover: #22645f;
   --primary-foreground: #ffffff;
-  --primary-soft: #e6f0ff;
-  --link: #0060e6;
-  --secondary: #f2f6fb;
-  --secondary-foreground: #0b3558;
+  --primary-soft: #e3f1f0;
+  --link: #24706b;
+  --secondary: #eef4f4;
+  --secondary-foreground: #344248;
   --field: #ffffff;
-  --muted: #f2f6fb;
-  --muted-foreground: #476788;
-  --hint: #637789;
-  --accent: #f2f6fb;
-  --accent-foreground: #0b3558;
+  --muted: #eef4f4;
+  --muted-foreground: #55686d;
+  --hint: #66787c;
+  --accent: #eef4f4;
+  --accent-foreground: #344248;
   --destructive: #c8372d;
   --success: #0a8a4c;
   --warning: #b25e00;
-  --border: #d4e0ed;
-  --border-hover: #a6bbd1;
-  --input: #b9cbde;
-  --ring: #006bff;
+  --border: #d6e2e1;
+  --border-hover: #a8c2c0;
+  --input: #bccfcd;
+  --ring: #2b7a75;
   --radius: 0.5rem;
-  --shadow-card: 0 1px 2px rgba(11, 53, 88, 0.04), 0 2px 8px rgba(11, 53, 88, 0.06);
-  --shadow-pop: 0 4px 12px rgba(11, 53, 88, 0.08), 0 12px 32px rgba(11, 53, 88, 0.12);
-  --scrim: rgba(11, 53, 88, 0.45);
-  --chart-1: #006bff;
-  --chart-2: #5fa2ff;
+  --shadow-card: 0 1px 2px rgba(52, 66, 72, 0.05), 0 2px 8px rgba(52, 66, 72, 0.07);
+  --shadow-pop: 0 4px 12px rgba(52, 66, 72, 0.09), 0 12px 32px rgba(52, 66, 72, 0.13);
+  --scrim: rgba(52, 66, 72, 0.5);
+  --chart-1: #2b7a75;
+  --chart-2: #66aca9;
   --chart-3: #0a8a4c;
   --chart-4: #b25e00;
-  --chart-5: #a6bbd1;
+  --chart-5: #a8c2c0;
   --sidebar: #ffffff;
-  --sidebar-foreground: #0b3558;
-  --sidebar-primary: #006bff;
+  --sidebar-foreground: #344248;
+  --sidebar-primary: #2b7a75;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e6f0ff;
-  --sidebar-accent-foreground: #0060e6;
-  --sidebar-border: #d4e0ed;
-  --sidebar-ring: #006bff;
+  --sidebar-accent: #e3f1f0;
+  --sidebar-accent-foreground: #24706b;
+  --sidebar-border: #d6e2e1;
+  --sidebar-ring: #2b7a75;
   /* user-chosen highlight colour (Settings → Accent color), an HSL triplet; used sparingly for dots */
-  --accent-color: 215 100% 50%;
+  --accent-color: 177 30% 54%;
+  /* brand kit: teal #66aca9, slate #344248 (logo, bands, decoration; not text on white) */
+  --brand-teal: #66aca9;
+  --brand-slate: #344248;
   color-scheme: light;
 }
 
 .dark {
-  --background: #0d1117;
-  --foreground: #e8eef6;
-  --card: #151b24;
-  --card-foreground: #e8eef6;
-  --popover: #1c2430;
-  --popover-foreground: #e8eef6;
-  --primary: #1a6be6;
-  --primary-hover: #2f7cf2;
-  --primary-foreground: #ffffff;
-  --primary-soft: #1a2a44;
-  --link: #6aa6ff;
-  --secondary: #1c2430;
-  --secondary-foreground: #e8eef6;
-  --field: #1c2430;
-  --muted: #1c2430;
-  --muted-foreground: #9fb2c8;
-  --hint: #7d8fa4;
-  --accent: #1c2430;
-  --accent-foreground: #e8eef6;
+  --background: #0f1516;
+  --foreground: #e6eeee;
+  --card: #162022;
+  --card-foreground: #e6eeee;
+  --popover: #1d2a2c;
+  --popover-foreground: #e6eeee;
+  --primary: #66aca9;
+  --primary-hover: #7dbcb9;
+  --primary-foreground: #14201f;
+  --primary-soft: #1b3332;
+  --link: #7fc4c0;
+  --secondary: #1d2a2c;
+  --secondary-foreground: #e6eeee;
+  --field: #1d2a2c;
+  --muted: #1d2a2c;
+  --muted-foreground: #a0b4b4;
+  --hint: #7f9495;
+  --accent: #1d2a2c;
+  --accent-foreground: #e6eeee;
   --destructive: #ff7b72;
   --success: #3fb97a;
   --warning: #e3a044;
-  --border: #273342;
-  --border-hover: #3a4a5e;
-  --input: #3a4a5e;
-  --ring: #6aa6ff;
+  --border: #2a3a3c;
+  --border-hover: #3e5153;
+  --input: #3e5153;
+  --ring: #7fc4c0;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
   --scrim: rgba(0, 0, 0, 0.6);
-  --chart-1: #6aa6ff;
-  --chart-2: #2f7cf2;
+  --chart-1: #66aca9;
+  --chart-2: #2b7a75;
   --chart-3: #3fb97a;
   --chart-4: #e3a044;
-  --chart-5: #3a4a5e;
-  --sidebar: #151b24;
-  --sidebar-foreground: #e8eef6;
-  --sidebar-primary: #1a6be6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a2a44;
-  --sidebar-accent-foreground: #6aa6ff;
-  --sidebar-border: #273342;
-  --sidebar-ring: #6aa6ff;
+  --chart-5: #3e5153;
+  --sidebar: #162022;
+  --sidebar-foreground: #e6eeee;
+  --sidebar-primary: #66aca9;
+  --sidebar-primary-foreground: #14201f;
+  --sidebar-accent: #1b3332;
+  --sidebar-accent-foreground: #7fc4c0;
+  --sidebar-border: #2a3a3c;
+  --sidebar-ring: #7fc4c0;
   color-scheme: dark;
 }
 
@@ -118,6 +121,8 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-slate: var(--brand-slate);
   --color-link: var(--link);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);

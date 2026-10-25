@@ -48,16 +48,18 @@ This guide outlines the development environment, commands, and code styling rule
 * **Database Naming:** Table names and column names should be short and concise (PostgreSQL standard).
 * **Security:** Rely on Row Level Security (RLS) policies in Supabase to secure user data. Never bypass RLS in frontend clients.
 
-### UI Design System & Styling (Active - Calendly look, light + dark)
+### UI Design System & Styling (Active - Calendly layout, GlassMeet brand, light + dark)
 
-* **Goal:** Look as close to Calendly as possible. The theme follows the OS (next-themes `defaultTheme="system"`): light is true Calendly, dark is its matching mirror. Both must be checked for every change.
+* **Goal:** Calendly's layout and components in the GlassMeet brand (teal `#66ACA9`, slate `#344248`). The theme follows the OS (next-themes `defaultTheme="system"`); light and dark must both be checked for every change.
+* **Brand assets:** `src/assets/brand/mark.png` and `wordmark-text.png` are alpha masks from the brand kit, rendered by `Logo` / `LogoMark` in `src/Components/logo.jsx` (mark tinted `bg-brand-teal`, lettering follows `bg-foreground`). Favicons live in `public/`. Never redraw the mark.
 * **Stack:** Tailwind CSS v4 (CSS-first config in `src/Index.css`, `@tailwindcss/vite` plugin; there is no `tailwind.config.js`). shadcn/ui components live in `src/Components/ui/` (aliased as `@/components/ui`), restyled to this guide; add more with `npx shadcn@latest add <name>` and restyle them to match.
 * **Palette (tokens in `src/Index.css`, `:root` = light, `.dark` = dark — use the token classes, never raw hex):**
-  * Page `bg-background` (#f8f9fb / #0d1117); cards and panels `bg-card` (#ffffff / #151b24) with `shadow-card`
+  * Page `bg-background` (#f6f9f9 / #0f1516); cards and panels `bg-card` (#ffffff / #162022) with `shadow-card`
   * Soft fills and hover `bg-secondary`; form fields `bg-field` with `border-input`
   * Borders `border-border`, `hover:border-border-hover`
-  * Text: `text-foreground` (navy #0b3558 / #e8eef6), `text-muted-foreground` (#476788 / #9fb2c8), `text-hint`
-  * Primary `bg-primary text-primary-foreground` (Calendly blue #006bff / #1a6be6) for primary buttons and the selected day; `bg-primary-soft` + `text-link` for selected/active states (nav item, tabs, available days); `text-link` for all blue text and links
+  * Text: `text-foreground` (brand slate #344248 / #e6eeee), `text-muted-foreground` (#55686d / #a0b4b4), `text-hint`
+  * Primary `bg-primary text-primary-foreground` (deep teal #2b7a75 with white text / brand teal #66aca9 with slate text) for primary buttons; `bg-primary-soft` + `text-link` for selected/active states (nav item, tabs, available days); `text-link` for all coloured text and links
+  * Brand `bg-brand-teal` / `text-brand-slate` for the logo, the landing CTA band and decoration only — brand teal is too light for text or white-text buttons on white
   * Status: `text-success`, `text-warning`, `text-destructive`
 * **Typography:** System sans-serif stack (`-apple-system`, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif), antialiased. Headings bold, navy. Labels are sentence case, `text-sm font-semibold` (no uppercase tracked labels, no eyebrows above headings).
 * **Geometry:** Buttons and pills `rounded-full`; inputs `rounded-lg` (8px); cards `rounded-xl` (12px) with a 1px border and `shadow-card`.

@@ -1,19 +1,31 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import markUrl from '@/assets/brand/mark.png';
+import wordUrl from '@/assets/brand/wordmark-text.png';
 
-// GlassMeet wordmark: blue tile + name. `to` makes it a link.
-export default function Logo({ to, className, size = 'md' }) {
-  const tile = size === 'sm' ? 'w-7 h-7 rounded-md' : 'w-8 h-8 rounded-lg';
-  const icon = size === 'sm' ? 'w-4 h-4' : 'w-[18px] h-[18px]';
+// The brand kit's art is used as alpha masks so it can be tinted per theme:
+// the mark stays brand teal, the lettering follows the text colour (slate on light, near-white on dark).
+const maskStyle = (url) => ({
+  WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`,
+  WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+  WebkitMaskSize: 'contain', maskSize: 'contain',
+  WebkitMaskPosition: 'center', maskPosition: 'center',
+});
+
+export function LogoMark({ size = 32, className, tone = 'bg-brand-teal' }) {
+  return <span aria-hidden="true" className={cn('inline-block shrink-0', tone, className)} style={{ width: size, height: size, ...maskStyle(markUrl) }} />;
+}
+
+// Lockup proportions follow the kit: lettering is 0.66x the mark's height, gap 0.28x.
+export default function Logo({ to, className, size = 'md', textTone = 'bg-foreground', markTone }) {
+  const h = size === 'sm' ? 26 : size === 'lg' ? 44 : 32;
   const content = (
-    <span className={cn('inline-flex items-center gap-2', className)}>
-      <span className={cn(tile, 'bg-primary text-primary-foreground flex items-center justify-center')}>
-        <CalendarCheck className={icon} strokeWidth={2.25} />
-      </span>
-      <span className={cn('font-bold tracking-tight text-foreground', size === 'sm' ? 'text-base' : 'text-lg')}>GlassMeet</span>
+    <span className={cn('inline-flex items-center', className)} style={{ gap: Math.round(h * 0.28) }}>
+      <LogoMark size={h} tone={markTone} />
+      <span aria-hidden="true" className={cn('inline-block', textTone)} style={{ height: Math.round(h * 0.66), width: Math.round(h * 0.66 * (915 / 148)), ...maskStyle(wordUrl) }} />
+      <span className="sr-only">GlassMeet</span>
     </span>
   );
-  return to ? <Link to={to} aria-label="GlassMeet home">{content}</Link> : content;
+  return to ? <Link to={to} aria-label="GlassMeet home" className="inline-flex">{content}</Link> : content;
 }
