@@ -40,20 +40,30 @@ Deno.serve(async (req) => {
   const token = url.searchParams.get('token') || (fromPath && fromPath !== 'calendar-feed' ? fromPath : '');
   if (!token || !/^[a-f0-9]{32,128}$/i.test(token)) return notFound();
 
-  const { data: feed } = await supabase.from('cal_feeds').select('owner').eq('token', token).maybeSingle();
+  const { data: feed, error: feedError } = await supabase.from('cal_feeds').select('owner').eq('token', token).maybeSingle();
+  if (feedError) {
+    console.error('cal_feeds lookup failed', feedError.code, feedError.message);
+    return new Response(`Feed lookup failed (${feedError.code || 'error'})`, { status: 503, headers: { 'Content-Type': 'text/plain' } });
+  }
   if (!feed) return notFound();
 
   const [{ data: profile }, { data: bookings, error }] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', feed.owner).maybeSingle(),
     supabase
       .from('bookings')
-      .select('id, event_name, guest_name, guest_email, guest_phone, guest_notes, meeting_url, start_time, end_time, status, approval_status, created_at')
+      .select('*')
       .eq('host_id', feed.owner)
       .gte('start_time', new Date(Date.now() - 60 * 864e5).toISOString())
       .order('start_time', { ascending: true })
       .limit(1000),
   ]);
-  if (error) return new Response('Feed temporarily unavailable', { status: 503 });
+  // A missing bookings table (or no bookings yet) is an empty calendar, not an error,
+  // so calendar apps can still subscribe; other failures are real outages.
+  const missingTable = error && (error.code === '42P01' || error.code === 'PGRST205' || /does not exist|schema cache/i.test(error.message));
+  if (error && !missingTable) {
+    console.error('bookings query failed', error.code, error.message);
+    return new Response('Feed temporarily unavailable', { status: 503 });
+  }
 
   const name = profile?.full_name ? `GlassMeet: ${profile.full_name}` : 'GlassMeet';
   const lines = [

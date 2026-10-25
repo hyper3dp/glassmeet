@@ -36,3 +36,5 @@ create policy cal_feeds_delete_own on public.cal_feeds
 -- anon never reads tokens; the feed is served by the edge function with the service role.
 revoke all on public.cal_feeds from anon;
 grant select, insert, update, delete on public.cal_feeds to authenticated;
+-- the calendar-feed edge function reads tokens with the service role
+grant select on public.cal_feeds to service_role;
