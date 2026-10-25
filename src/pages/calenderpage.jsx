@@ -107,7 +107,7 @@ function MonthView({ cursor, bookingsByDay, onSelect }) {
       </div>
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
         {cells.map((date, i) => {
-          if (!date) return <div key={i} className="bg-secondary/60" />;
+          if (!date) return <div key={i} className="bg-background" />;
           const key = date.toISOString().slice(0,10);
           const dayBookings = bookingsByDay[key] || [];
           const isToday = date.getTime() === today.getTime();

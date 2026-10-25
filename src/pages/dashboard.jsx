@@ -99,7 +99,7 @@ export default function Dashboard({ profile }) {
         <Stat label="Event types" value={eventTypes.length} />
       </dl>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-8 xl:grid-cols-[1fr_340px] [&>section]:min-w-0">
         {/* Upcoming meetings */}
         <section>
           <div className="mb-3 flex items-center justify-between">
@@ -187,12 +187,14 @@ function BookingRow({ booking, timezone, color }) {
   const start = formatMeetingTime(booking.start_time, timezone);
   const end = booking.end_time ? formatMeetingTime(booking.end_time, timezone) : null;
   return (
-    <Link to="/bookings" className="flex items-center gap-4 px-5 py-4 border-b border-border last:border-b-0 transition-all duration-200 hover:bg-secondary">
-      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: color || 'var(--primary)' }} />
-      <div className="w-36 shrink-0 text-sm tabular text-muted-foreground">{start}{end && ` – ${end}`}</div>
+    <Link to="/bookings" className="flex items-start sm:items-center gap-4 px-5 py-4 border-b border-border last:border-b-0 transition-all duration-200 hover:bg-secondary">
+      <span className="mt-1 sm:mt-0 w-3.5 h-3.5 rounded-full shrink-0" style={{ background: color || 'var(--primary)' }} />
+      <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4">
+      <div className="sm:w-40 shrink-0 text-sm tabular text-muted-foreground">{start}{end && ` – ${end}`}</div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-bold">{booking.guest_name}</div>
         <div className="truncate text-sm text-muted-foreground">Event type <span className="font-semibold text-foreground">{booking.event_name || 'Meeting'}</span></div>
+      </div>
       </div>
     </Link>
   );

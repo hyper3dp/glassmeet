@@ -61,7 +61,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
-      <PageHeader title="WhatsApp" description="How GlassMeet prepares confirmations for your guests." className="mb-0" />
+      <PageHeader title="WhatsApp" description="How GlassMeet prepares confirmations for your guests." />
 
       <GlassCard hover={false}>
         <div className="flex items-center gap-3 mb-5">

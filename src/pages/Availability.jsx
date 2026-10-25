@@ -84,9 +84,9 @@ export default function Availability({ profile }) {
           <div className="text-sm text-muted-foreground flex items-center gap-1.5"><Globe className="w-4 h-4" /> {profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}</div>
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_1fr]">
+        <div className="grid xl:grid-cols-2 [&>section]:min-w-0">
           {/* Weekly hours */}
-          <section className="p-6 lg:border-r border-border">
+          <section className="p-5 sm:p-6 xl:border-r border-border">
             <h2 className="text-[15px] font-bold flex items-center gap-2"><RefreshCw className="w-4 h-4 text-muted-foreground" /> Weekly hours</h2>
             <p className="mt-1 mb-5 text-sm text-muted-foreground">Set when you are typically available for meetings</p>
             <div className="space-y-4">
@@ -94,23 +94,23 @@ export default function Availability({ profile }) {
                 const dayRules = rules.filter((r) => r.day_of_week === dow).sort((a,b)=> a.start_time.localeCompare(b.start_time));
                 const on = dayRules.length > 0;
                 return (
-                  <div key={dow} className="flex items-start gap-3">
+                  <div key={dow} className="flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-2">
                     <label className="flex items-center gap-3 pt-1.5 w-[74px] shrink-0 cursor-pointer">
                       <input type="checkbox" checked={on} onChange={(e) => toggleDay(dow, e.target.checked)} className="w-4 h-4" aria-label={`Available on ${day}`} />
                       <span className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center ${on ? 'bg-foreground text-background' : 'bg-secondary text-muted-foreground'}`} title={day}>{day[0]}</span>
                     </label>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      {!on && <div className="pt-2.5 text-sm text-muted-foreground">Unavailable</div>}
+                    <div className="order-last sm:order-none basis-full sm:basis-auto flex-1 min-w-0 space-y-2">
+                      {!on && <div className="sm:pt-2.5 text-sm text-muted-foreground">Unavailable</div>}
                       {dayRules.map((r) => (
                         <div key={r.id} className="flex items-center gap-2">
-                          <GlassInput type="time" value={r.start_time} onChange={(e)=>updateRule(r.id,'start_time',e.target.value)} className="h-10 w-[118px] px-2.5 tabular" aria-label={`${day} start`} />
+                          <GlassInput type="time" value={r.start_time} onChange={(e)=>updateRule(r.id,'start_time',e.target.value)} className="h-10 flex-1 sm:flex-none sm:w-[118px] min-w-0 px-2.5 tabular" aria-label={`${day} start`} />
                           <span className="text-muted-foreground">–</span>
-                          <GlassInput type="time" value={r.end_time} onChange={(e)=>updateRule(r.id,'end_time',e.target.value)} className="h-10 w-[118px] px-2.5 tabular" aria-label={`${day} end`} />
+                          <GlassInput type="time" value={r.end_time} onChange={(e)=>updateRule(r.id,'end_time',e.target.value)} className="h-10 flex-1 sm:flex-none sm:w-[118px] min-w-0 px-2.5 tabular" aria-label={`${day} end`} />
                           <button onClick={()=>deleteRule(r.id)} aria-label="Remove interval" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><X className="w-4 h-4" /></button>
                         </div>
                       ))}
                     </div>
-                    <button onClick={()=>addRule(dow)} aria-label={`Add hours on ${day}`} className="mt-1 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><Plus className="w-4 h-4" /></button>
+                    <button onClick={()=>addRule(dow)} aria-label={`Add hours on ${day}`} className="ml-auto sm:ml-0 mt-1 w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><Plus className="w-4 h-4" /></button>
                   </div>
                 );
               })}
@@ -118,7 +118,7 @@ export default function Availability({ profile }) {
           </section>
 
           {/* Date-specific hours */}
-          <section className="p-6 border-t lg:border-t-0 border-border">
+          <section className="p-5 sm:p-6 border-t xl:border-t-0 border-border">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-[15px] font-bold flex items-center gap-2"><CalendarOff className="w-4 h-4 text-muted-foreground" /> Date-specific hours</h2>

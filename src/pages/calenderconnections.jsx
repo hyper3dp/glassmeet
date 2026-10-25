@@ -216,7 +216,7 @@ export default function CalendarConnections() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Calendars" description="Connect your calendars so GlassMeet checks availability and adds new meetings." className="mb-0" />
+      <PageHeader title="Calendars" description="Connect your calendars so GlassMeet checks availability and adds new meetings." />
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border shadow-card">

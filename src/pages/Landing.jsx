@@ -57,7 +57,7 @@ function BookingPreview() {
           <p className="text-base font-bold">Select a Date &amp; Time</p>
           <div className="mt-4 flex items-center justify-center gap-4 text-sm font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-full text-hint"><ChevronLeft className="h-4 w-4" /></span>
-            Next month
+            {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-soft text-link"><ChevronRight className="h-4 w-4" /></span>
           </div>
           <div className="mt-3 grid grid-cols-7 gap-y-1 text-center">

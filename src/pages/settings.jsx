@@ -169,8 +169,8 @@ export default function Settings({ profile, updateProfile }) {
             <p className="text-sm text-muted-foreground mt-3">Apple Calendar works on Apple devices through .ics downloads. Manage connections on the <Link to="/calendar-connections" className="font-semibold text-link hover:underline">Calendars page</Link>.</p>
           </Section>
 
-          <div className="sticky bottom-20 md:bottom-4 z-10 flex justify-end">
-            <GlassButton variant="primary" type="button" onClick={save} disabled={saving} className="shadow-pop">
+          <div className="flex justify-end">
+            <GlassButton variant="primary" type="button" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : saved ? <><Check className="w-4 h-4" /> Saved</> : 'Save changes'}
             </GlassButton>
           </div>

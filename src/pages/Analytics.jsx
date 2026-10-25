@@ -87,7 +87,7 @@ export default function Analytics({ profile }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Analytics" description="How guests book with you." className="mb-0" />
+      <PageHeader title="Analytics" description="How guests book with you." />
 
       <dl className="grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card">
         <StatCard label="Total booked" value={stats.total} />
