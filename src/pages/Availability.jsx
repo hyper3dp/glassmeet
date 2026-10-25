@@ -40,13 +40,7 @@ export default function Availability({ profile }) {
         api.entities.AvailabilityRule.filter({ created_by_id: profile.id }),
         api.entities.AvailabilityException.filter({ created_by_id: profile.id }, 'date'),
       ]);
-      // Seed default Mon–Fri 9–17 for first-time users so booking pages work immediately.
-      if (r.length === 0) {
-        await api.entities.AvailabilityRule.bulkCreate(
-          [1,2,3,4,5].map((dow) => ({ day_of_week: dow, start_time: '09:00', end_time: '17:00' }))
-        );
-        r = await api.entities.AvailabilityRule.filter({ created_by_id: profile.id });
-      }
+      // First-run Mon–Fri 9–17 hours are seeded once by useProfile when the app loads.
       setRules(r);
       setExceptions(e);
     } catch (err) {}

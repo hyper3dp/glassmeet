@@ -23,7 +23,6 @@ export default function BookingPage() {
   const [slots, setSlots] = useState([]);
   const [bookedSlots, setBookedSlots] = useState([]);
   const [googleBusy, setGoogleBusy] = useState([]);
-  const [googleBusyError, setGoogleBusyError] = useState('');
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -52,15 +51,11 @@ export default function BookingPage() {
     if (!event) return;
     const timeMin = new Date(cursor.getFullYear(), cursor.getMonth(), 1).toISOString();
     const timeMax = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1).toISOString();
+    // Google Calendar busy times are optional (connections are "coming soon"); without them,
+    // slots come from the host's availability and GlassMeet bookings.
     api.google.busy(event.created_by_id, timeMin, timeMax)
-      .then((busy) => {
-        setGoogleBusy(busy);
-        setGoogleBusyError('');
-      })
-      .catch(() => {
-        setGoogleBusy([]);
-        setGoogleBusyError('The host calendar could not be checked. Try again later.');
-      });
+      .then((busy) => setGoogleBusy(Array.isArray(busy) ? busy : []))
+      .catch(() => setGoogleBusy([]));
   }, [event, cursor]);
 
   useEffect(() => { load(); }, []);
@@ -108,7 +103,7 @@ export default function BookingPage() {
   }, [cursor, event]);
 
   const dayHasSlots = (date) => {
-    if (!event || googleBusyError || isPastDate(date) || !isWithinMaxFuture(date, event.max_future_days)) return false;
+    if (!event || isPastDate(date) || !isWithinMaxFuture(date, event.max_future_days)) return false;
     const s = generateSlots(date, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz);
     return s.length > 0;
   };
@@ -142,7 +137,7 @@ export default function BookingPage() {
       if (conflict) { setError('Sorry, that time was just taken. Please pick another.'); setSubmitting(false); return; }
 
       const requiresApproval = event.requires_approval || false;
-      const booking = await api.entities.Booking.create({
+      const booking = await api.bookings.createAsGuest({
         event_type_id: event.id,
         event_name: event.name,
         host_id: event.created_by_id,
@@ -151,7 +146,7 @@ export default function BookingPage() {
         guest_phone: form.guest_phone,
         guest_notes: form.guest_notes,
         start_time: start,
-        end_time: end,
+        end_time: end.toISOString(),
         timezone: hostTz,
         meeting_url: event.meeting_url || '',
         status: requiresApproval ? 'confirmed' : 'confirmed',
@@ -159,15 +154,6 @@ export default function BookingPage() {
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
-      if (!requiresApproval) {
-        await api.entities.BookedSlot.create({
-          event_type_id: event.id,
-          host_id: event.created_by_id,
-          start_time: start,
-          end_time: end,
-          status: 'confirmed',
-        });
-      }
       navigate(`/confirm/${booking.id}`, { state: { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } } });
     } catch (e) {
       setError('Could not complete booking. ' + (e.message || 'Please try again.'));
@@ -256,7 +242,6 @@ export default function BookingPage() {
               {/* Calendar */}
               <section className="p-6 sm:p-8">
                 <h2 className="text-xl font-bold mb-6">Select a Date &amp; Time</h2>
-                {googleBusyError && <p role="alert" className="mb-4 text-sm text-destructive">{googleBusyError}</p>}
 
                 <div className="max-w-[420px] mx-auto">
                   <div className="flex items-center justify-center gap-6 mb-6">

@@ -18,7 +18,11 @@ const entities = new Proxy({}, {
     const tableMap = {
       EventType: 'event_types',
       Booking: 'bookings',
-      BookedSlot: 'bookings', // Mapped to bookings for now
+      BookedSlot: 'busy_slots', // read-only view: times and status, no guest details (public booking pages)
+      AvailabilityRule: 'availability_rules',
+      AvailabilityException: 'availability_exceptions',
+      WhatsAppSetting: 'whatsapp_settings',
+      Notification: 'notifications',
     };
     const table = tableMap[entityName] || entityName;
 
@@ -70,8 +74,8 @@ const entities = new Proxy({}, {
         // Supabase doesn't support bulk update with different values per ID in one call
         // We map them to individual updates
         const results = [];
-        for (const item of values) {
-          const { data, error } = await supabase.from(table).update(item.value).eq('id', item.id).select().single();
+        for (const { id, value, ...fields } of values) {
+          const { data, error } = await supabase.from(table).update(value || fields).eq('id', id).select().single();
           if (error) throw new Error(error.message);
           results.push(data);
         }
@@ -213,6 +217,16 @@ export const api = {
       const { data, error } = await supabase.from('google_accounts').delete().eq('user_id', (await supabase.auth.getUser()).data.user.id);
       if (error) throw new Error(error.message);
       return { success: true };
+    },
+  },
+  // Guests can create a booking but not read bookings back (RLS), so the id is made here
+  // and the row is inserted without returning it.
+  bookings: {
+    createAsGuest: async (value) => {
+      const row = { id: crypto.randomUUID(), ...value };
+      const { error } = await supabase.from('bookings').insert([row]);
+      if (error) throw new Error(error.message);
+      return { ...row, created_date: new Date().toISOString() };
     },
   },
   // Calendar subscription feed: one secret token per host, served as .ics by the calendar-feed edge function

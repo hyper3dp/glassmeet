@@ -18,17 +18,17 @@ export function useProfile() {
       setProfile(me);
       // load whatsapp settings for this user
       try {
-        const settings = await api.entities.WhatsAppSetting.filter({ owner_id: me.id });
+        const settings = await api.entities.WhatsAppSetting.filter({ created_by_id: me.id });
         setWhatsapp(settings[0] || null);
       } catch {
         setWhatsapp(null);
       }
       // ensure default working hours exist so booking pages work out of the box
       try {
-        const rules = await api.entities.AvailabilityRule.filter({ owner_id: me.id });
+        const rules = await api.entities.AvailabilityRule.filter({ created_by_id: me.id });
         if (rules.length === 0) {
           await api.entities.AvailabilityRule.bulkCreate(
-            [1, 2, 3, 4, 5].map((dow) => ({ owner_id: me.id, day_of_week: dow, start_time: '09:00', end_time: '17:00' }))
+            [1, 2, 3, 4, 5].map((dow) => ({ day_of_week: dow, start_time: '09:00', end_time: '17:00' }))
           );
         }
       } catch { /* non-fatal */ }
