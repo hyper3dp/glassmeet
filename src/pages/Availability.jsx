@@ -44,7 +44,14 @@ export default function Availability({ profile }) {
         api.entities.AvailabilityException.filter({ created_by_id: profile.id }, 'date'),
       ]);
       // First-run Mon–Fri 9–17 hours are seeded once by useProfile when the app loads.
-      setRules(r);
+      // One range per day: keep each day's earliest range and remove any extras left from
+      // before (they'd still open booking times without showing here).
+      const keep = new Map();
+      [...r].sort((a, b) => toMin(a.start_time) - toMin(b.start_time)).forEach((rule) => { if (!keep.has(rule.day_of_week)) keep.set(rule.day_of_week, rule); });
+      const kept = [...keep.values()];
+      const extras = r.filter((rule) => !kept.includes(rule));
+      if (extras.length) Promise.all(extras.map((rule) => api.entities.AvailabilityRule.delete(rule.id))).catch(() => {});
+      setRules(kept);
       setExceptions(e);
     } catch {}
     setLoading(false);
@@ -76,11 +83,10 @@ export default function Availability({ profile }) {
     });
   };
 
+  // Turning a day on gives it 9:00–5:00; each day has at most one range
   const addRule = (dow) => {
-    const dayRules = rules.filter((r) => r.day_of_week === dow).sort((a, b) => toMin(a.end_time) - toMin(b.end_time));
-    const last = dayRules[dayRules.length - 1];
-    const start = last ? Math.min(toMin(last.end_time) + 60, 23 * 60) : 9 * 60;
-    const values = { day_of_week: dow, start_time: fromMin(start), end_time: fromMin(last ? Math.min(start + 60, 23 * 60 + 45) : 17 * 60) };
+    if (rulesRef.current.some((r) => r.day_of_week === dow)) return;
+    const values = { day_of_week: dow, start_time: '09:00', end_time: '17:00' };
     const tempId = `tmp-${Date.now()}`;
     setRules((rs) => [...rs, { id: tempId, ...values }]);
     track(async () => {
@@ -96,11 +102,16 @@ export default function Availability({ profile }) {
   };
 
   const updateRule = (id, field, value) => {
-    setRules((rs) => rs.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    // keep the range valid: moving one end past the other pushes the other end along
+    const row = rulesRef.current.find((r) => r.id === id);
+    const change = { [field]: value };
+    if (row && field === 'start_time' && toMin(value) >= toMin(row.end_time)) change.end_time = fromMin(Math.min(toMin(value) + 60, 23 * 60 + 45));
+    if (row && field === 'end_time' && toMin(value) <= toMin(row.start_time)) change.start_time = fromMin(Math.max(toMin(value) - 60, 0));
+    setRules((rs) => rs.map((r) => (r.id === id ? { ...r, ...change } : r)));
     if (String(id).startsWith('tmp-')) return; // saved with its final values once created
     const entry = pending.current[id] || { fields: {} };
     clearTimeout(entry.timer);
-    entry.fields = { ...entry.fields, [field]: value };
+    entry.fields = { ...entry.fields, ...change };
     entry.timer = setTimeout(() => {
       const fields = entry.fields;
       delete pending.current[id];
@@ -166,26 +177,23 @@ export default function Availability({ profile }) {
             )}
             <div className="space-y-4">
               {DAYS.map((day, dow) => {
-                const dayRules = rules.filter((r) => r.day_of_week === dow).sort((a, b) => toMin(a.start_time) - toMin(b.start_time));
-                const on = dayRules.length > 0;
+                const r = rules.find((x) => x.day_of_week === dow);
+                const on = !!r;
                 return (
-                  <div key={dow} className="flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-2">
-                    <label className="flex items-center gap-3 pt-1.5 w-[74px] shrink-0 cursor-pointer">
+                  <div key={dow} className="flex flex-wrap min-[420px]:flex-nowrap items-center gap-x-3 gap-y-2 min-h-10">
+                    <label className="flex items-center gap-3 w-[74px] shrink-0 cursor-pointer">
                       <Checkbox checked={on} onCheckedChange={(v) => toggleDay(dow, v === true)} aria-label={`Available on ${day}`} />
                       <span className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center ${on ? 'bg-foreground text-background' : 'bg-secondary text-muted-foreground'}`} title={day}>{day[0]}</span>
                     </label>
-                    <div className="order-last sm:order-none basis-full sm:basis-auto flex-1 min-w-0 space-y-2">
-                      {!on && <div className="sm:pt-2.5 text-sm text-muted-foreground">Unavailable</div>}
-                      {dayRules.map((r) => (
-                        <div key={r.id} className="flex items-center gap-2">
-                          <TimeSelect value={r.start_time} onChange={(v) => updateRule(r.id, 'start_time', v)} aria-label={`${day} start`} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
-                          <span className="text-muted-foreground">–</span>
-                          <TimeSelect value={r.end_time} onChange={(v) => updateRule(r.id, 'end_time', v)} aria-label={`${day} end`} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
-                          <button onClick={() => deleteRule(r.id)} aria-label="Remove interval" className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><X className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                    </div>
-                    <button onClick={() => addRule(dow)} aria-label={`Add hours on ${day}`} className="ml-auto sm:ml-0 mt-1 w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><Plus className="w-4 h-4" /></button>
+                    {on ? (
+                      <div className="flex basis-full min-[420px]:basis-auto flex-1 min-w-0 items-center gap-2">
+                        <TimeSelect value={r.start_time} onChange={(v) => updateRule(r.id, 'start_time', v)} aria-label={`${day} start`} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
+                        <span className="text-muted-foreground">–</span>
+                        <TimeSelect value={r.end_time} onChange={(v) => updateRule(r.id, 'end_time', v)} aria-label={`${day} end`} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">Unavailable</div>
+                    )}
                   </div>
                 );
               })}

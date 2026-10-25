@@ -263,7 +263,9 @@ export const api = {
       const user = await sessionUser();
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
       const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type, cacheControl: '31536000' });
+      // Each upload gets a new name, so a plain insert is enough. upsert would also need
+      // select + update rights on storage.objects, which the avatars policies don't grant.
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
       if (error) {
         throw new Error(/bucket not found/i.test(error.message)
           ? 'Photo storage is not set up yet (the "avatars" bucket is missing).'
