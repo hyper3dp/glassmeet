@@ -46,8 +46,15 @@ export function generateICSFeed(bookings, calendarName = 'GlassMeet') {
       `DTSTAMP:${dtStamp}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,
-      `SUMMARY:${escapeICS(b.event_name || 'Meeting')}`,
-      `DESCRIPTION:${escapeICS(`Guest: ${b.guest_name || ''}\n${b.guest_notes || ''}`)}`,
+      `SUMMARY:${escapeICS(b.guest_name ? `${b.event_name || 'Meeting'} with ${b.guest_name}` : (b.event_name || 'Meeting'))}`,
+      `DESCRIPTION:${escapeICS([
+        b.guest_name && `Guest: ${b.guest_name}`,
+        b.guest_email && `Email: ${b.guest_email}`,
+        b.guest_phone && `WhatsApp: ${b.guest_phone}`,
+        b.meeting_url && `Join: ${b.meeting_url}`,
+        b.guest_notes && `Notes: ${b.guest_notes}`,
+        'Booked with GlassMeet',
+      ].filter(Boolean).join('\n'))}`,
       'STATUS:CONFIRMED',
     );
     if (b.meeting_url) lines.push(`LOCATION:${escapeICS(b.meeting_url)}`);
@@ -61,8 +68,8 @@ export function generateICSFeed(bookings, calendarName = 'GlassMeet') {
 /**
  * Triggers a download of an ICS file.
  */
-export function downloadICSFeed(bookings, filename = 'glassmeet-calendar.ics') {
-  const ics = generateICSFeed(bookings);
+export function downloadICSFeed(bookings, filename = 'glassmeet-calendar.ics', calendarName = 'GlassMeet') {
+  const ics = generateICSFeed(bookings, calendarName);
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

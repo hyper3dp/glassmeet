@@ -160,12 +160,32 @@ export default function CalendarConnections() {
   };
 
   const testAppleCalendar = () => {
-    setTesting('apple');
+    setTesting('apple-test');
     setTimeout(() => {
       downloadIcs(SAMPLE_BOOKING, SAMPLE_EVENT, { full_name: profile?.full_name || 'Host' });
-      setTestResult({ type: 'apple', ok: true });
+      setTestResult({ type: 'apple', ok: true, message: 'Test event downloaded. Open it to check your calendar app accepts GlassMeet events.' });
       setTesting(null);
     }, 600);
+  };
+
+  // One .ics with every upcoming confirmed meeting, for Apple Calendar or any calendar app
+  const exportMyMeetings = async () => {
+    setTesting('apple');
+    try {
+      const all = await api.entities.Booking.filter({ host_id: profile.id }, 'start_time', 500);
+      const now = Date.now();
+      const upcoming = all.filter((b) => b.status !== 'cancelled' && b.approval_status !== 'pending' && new Date(b.end_time || b.start_time).getTime() >= now);
+      if (!upcoming.length) {
+        setTestResult({ type: 'apple', ok: false, message: 'No upcoming meetings to add yet. New bookings will appear here.' });
+      } else {
+        downloadICSFeed(upcoming, 'glassmeet-meetings.ics', `GlassMeet: ${profile?.full_name || 'Meetings'}`);
+        setTestResult({ type: 'apple', ok: true, message: `Downloaded ${upcoming.length} upcoming meeting${upcoming.length === 1 ? '' : 's'}. Open the file to add ${upcoming.length === 1 ? 'it' : 'them'} to your calendar.` });
+      }
+    } catch (error) {
+      setTestResult({ type: 'apple', ok: false, message: `Could not load your meetings: ${error.message}` });
+    } finally {
+      setTesting(null);
+    }
   };
 
   // Calendar subscriptions
@@ -300,22 +320,22 @@ export default function CalendarConnections() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              Add meetings to Apple Calendar on iPhone, iPad, and Mac using a standard <code className="text-xs">.ics</code> calendar file. No account connection required.
+              Add your upcoming meetings to Apple Calendar on iPhone, iPad and Mac with a standard <code className="text-xs">.ics</code> file. No account connection required. Download again to pick up new bookings.
             </p>
-            {testResult?.type === 'apple' && testResult.ok && (
-              <p className="text-xs text-success mt-2 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3 h-3" /> Test event downloaded — open it to add to Apple Calendar.
+            {testResult?.type === 'apple' && (
+              <p role="status" className={`text-xs mt-2 flex items-center gap-1.5 ${testResult.ok ? 'text-success' : 'text-muted-foreground'}`}>
+                {testResult.ok ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <AlertCircle className="w-3 h-3 shrink-0" />} {testResult.message}
               </p>
             )}
           </div>
         </div>
         <div className="px-5 pb-5 flex flex-wrap gap-2">
-          <GlassButton size="sm" variant="primary" onClick={testAppleCalendar} disabled={testing === 'apple'}>
+          <GlassButton size="sm" variant="primary" type="button" onClick={exportMyMeetings} disabled={!!testing}>
             {testing === 'apple' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Apple className="w-4 h-4" />}
-            Add to Calendar
+            Add my meetings
           </GlassButton>
-          <GlassButton size="sm" variant="ghost" onClick={testAppleCalendar} disabled={testing === 'apple'}>
-            <CalendarCheck className="w-4 h-4" /> Test connection
+          <GlassButton size="sm" variant="ghost" type="button" onClick={testAppleCalendar} disabled={!!testing}>
+            {testing === 'apple-test' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarCheck className="w-4 h-4" />} Download test event
           </GlassButton>
         </div>
       </GlassCard>
