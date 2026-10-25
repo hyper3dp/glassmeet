@@ -49,6 +49,22 @@ const entities = new Proxy({}, {
     };
     const table = tableMap[entityName] || entityName;
 
+    // Busy times come from the busy_times() function: one host, a date range, times only.
+    // Until that migration is applied, fall back to the older busy_slots view.
+    if (entityName === 'BookedSlot') {
+      return {
+        filter: async ({ host_id: host, status } = {}) => {
+          const from = new Date(Date.now() - 86400000).toISOString();
+          const to = new Date(Date.now() + 800 * 86400000).toISOString();
+          const { data, error } = await supabase.rpc('busy_times', { p_host: host, p_from: from, p_to: to });
+          if (!error) return status ? data.filter((b) => b.status === status) : data;
+          const fallback = await supabase.from('busy_slots').select('*').eq('host_id', host).gte('end_time', from);
+          if (fallback.error) throw new Error(fallback.error.message);
+          return status ? fallback.data.filter((b) => b.status === status) : fallback.data;
+        },
+      };
+    }
+
     return {
       filter: async (where = {}, sort, limit) => {
         let query = supabase.from(table).select('*');
@@ -206,15 +222,8 @@ export const api = {
       const { data: { session } } = await supabase.auth.getSession();
       return Boolean(session);
     },
-    onAuthStateChange: (callback) => {
-      return {
-        data: {
-          subscription: supabase.auth.onAuthStateChange((event, session) => {
-            callback(event, session);
-          }),
-        },
-      };
-    },
+    // same shape as supabase-js: { data: { subscription } }
+    onAuthStateChange: (callback) => supabase.auth.onAuthStateChange((event, session) => callback(event, session)),
   },
   google: {
     status: async () => {

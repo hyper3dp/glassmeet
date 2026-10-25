@@ -18,8 +18,9 @@ export default class ErrorBoundary extends React.Component {
     console.error('GlassMeet page error:', error, info?.componentStack);
     const chunkFailed = /Loading chunk|dynamically imported module|Importing a module script failed/i.test(String(error?.message));
     try {
-      if (chunkFailed && !sessionStorage.getItem('gm-chunk-reload')) {
-        sessionStorage.setItem('gm-chunk-reload', '1');
+      const last = Number(sessionStorage.getItem('gm-chunk-reload') || 0);
+      if (chunkFailed && Date.now() - last > 30000) {
+        sessionStorage.setItem('gm-chunk-reload', String(Date.now()));
         window.location.reload();
       }
     } catch { /* storage unavailable */ }

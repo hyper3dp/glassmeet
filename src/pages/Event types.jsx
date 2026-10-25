@@ -33,18 +33,28 @@ export default function EventTypes({ profile }) {
     setLoading(false);
   };
 
-  const openNew = () => { setEditing(null); setShowModal(true); };
+  const [modalCount, setModalCount] = useState(0); // a fresh form each time "Create" opens
+  const openNew = () => { setEditing(null); setModalCount((n) => n + 1); setShowModal(true); };
   const openEdit = (e) => { setEditing(e); setShowModal(true); };
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this event type? Existing bookings remain.')) return;
-    await api.entities.EventType.delete(id);
-    setEventTypes(eventTypes.filter((e) => e.id !== id));
+    try {
+      await api.entities.EventType.delete(id);
+      setEventTypes((list) => list.filter((e) => e.id !== id));
+    } catch (e) {
+      alert(`Could not delete this event type. ${e.message || ''}`.trim());
+    }
   };
 
   const handleToggle = async (ev, active) => {
-    await api.entities.EventType.update(ev.id, { active });
-    setEventTypes((list) => list.map((x) => (x.id === ev.id ? { ...x, active } : x)));
+    try {
+      const saved = await api.entities.EventType.update(ev.id, { active });
+      if (!saved) throw new Error('It may have been deleted. Reload the page.');
+      setEventTypes((list) => list.map((x) => (x.id === ev.id ? { ...x, active: saved.active } : x)));
+    } catch (e) {
+      alert(`Could not ${active ? 'turn on' : 'turn off'} this event type. ${e.message || ''}`.trim());
+    }
   };
 
   const q = query.trim().toLowerCase();
@@ -91,6 +101,7 @@ export default function EventTypes({ profile }) {
 
       {showModal && (
         <EventModal
+          key={editing?.id || `new-${modalCount}`}
           event={editing}
           onClose={() => setShowModal(false)}
           onSave={async (values) => {
@@ -201,7 +212,7 @@ function EventModal({ event, onClose, onSave }) {
         meeting_url: kind === 'video' || kind === 'other' ? form.meeting_url.trim() : '',
         address: kind === 'in_person' ? form.address.trim() : null,
         duration: Number(form.duration),
-        max_attendees: form.booking_type === 'group' ? Number(form.max_attendees) : 1,
+        max_attendees: form.booking_type === 'group' ? Math.min(500, Math.max(2, Number(form.max_attendees) || 2)) : 1,
       });
     } catch (e) {
       setError(e.message || 'Could not save this event type.');
@@ -307,7 +318,7 @@ function EventModal({ event, onClose, onSave }) {
             {form.booking_type === 'group' && (
               <div className="flex items-center justify-between gap-4 py-3">
                 <label htmlFor="event-capacity" className="text-sm font-semibold">Spots per time</label>
-                <GlassInput id="event-capacity" type="number" inputMode="numeric" min="2" max="500" value={form.max_attendees} onChange={(e) => setField('max_attendees', e.target.value)} className="w-24 text-center" />
+                <GlassInput id="event-capacity" type="number" inputMode="numeric" min="2" max="500" required value={form.max_attendees} onChange={(e) => setField('max_attendees', e.target.value)} className="w-24 text-center" />
               </div>
             )}
             <ToggleRow id="ev-active" label="Active" description="Guests can book this event from its link." checked={form.active} onChange={(v) => setField('active', v)} />

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/localApi';
 import { appPath } from '@/lib/authReturnTo';
 
@@ -12,21 +12,26 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
+  const userId = useRef(null);
 
-  const checkUserAuth = useCallback(async () => {
-    setIsLoadingAuth(true);
+  // quiet: refresh the user without showing the full-screen loader (and unmounting the app)
+  const checkUserAuth = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setIsLoadingAuth(true);
     try {
       const currentUser = await api.auth.me();
       if (currentUser) {
+        userId.current = currentUser.id;
         setUser(currentUser);
         setIsAuthenticated(true);
         setAuthError(null);
       } else {
+        userId.current = null;
         setUser(null);
         setIsAuthenticated(false);
       }
     } catch (error) {
       console.warn('Auth check failed or session expired:', error);
+      userId.current = null;
       setUser(null);
       setIsAuthenticated(false);
       setAuthError(null);
@@ -54,15 +59,20 @@ export const AuthProvider = ({ children }) => {
   }, [checkAppState]);
 
   useEffect(() => {
+    // Supabase also fires SIGNED_IN when a hidden tab comes back and TOKEN_REFRESHED hourly;
+    // those are the same user, so nothing needs to reload.
     const subscriptionResult = api.auth.onAuthStateChange?.((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
+        userId.current = null;
         setUser(null);
         setIsAuthenticated(false);
-      } else if (session?.user || event === 'SIGNED_IN') {
-        checkUserAuth();
+        return;
       }
-      setAuthChecked(true);
-      setIsLoadingAuth(false);
+      if (event === 'PASSWORD_RECOVERY' && !window.location.pathname.endsWith('/reset-password')) {
+        window.location.replace(appPath('/reset-password'));
+        return;
+      }
+      if (session.user && session.user.id !== userId.current) checkUserAuth({ quiet: authChecked });
     });
 
     const unsubscribe = subscriptionResult?.data?.subscription?.unsubscribe || subscriptionResult?.unsubscribe;
@@ -72,7 +82,7 @@ export const AuthProvider = ({ children }) => {
         unsubscribe();
       }
     };
-  }, [checkUserAuth]);
+  }, [checkUserAuth, authChecked]);
 
   const logout = async (shouldRedirect = true) => {
     try {

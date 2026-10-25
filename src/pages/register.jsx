@@ -27,7 +27,8 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await api.auth.register({ email, password });
-      if (result.session) window.location.assign(appPath(safeReturnTo()));
+      // signed in straight away when email confirmation is off
+      if (result.access_token) window.location.assign(appPath(safeReturnTo()));
       else setNotice("Check your email for a confirmation link before signing in.");
     } catch (err) {
       setError(err.message || "Registration failed");

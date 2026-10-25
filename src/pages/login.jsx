@@ -9,12 +9,24 @@ import AuthLayout from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import { appPath, safeReturnTo } from "@/lib/authReturnTo";
 
+// an auth link that failed (expired, already used, Google cancelled) leaves its message here;
+// see the inline script in index.html
+const takeAuthError = () => {
+  try {
+    const message = sessionStorage.getItem('gm-auth-error');
+    sessionStorage.removeItem('gm-auth-error');
+    return message;
+  } catch {
+    return null;
+  }
+};
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(() => new URLSearchParams(window.location.search).get('google_error') === 'not_configured'
+  const [error, setError] = useState(() => takeAuthError() || (new URLSearchParams(window.location.search).get('google_error') === 'not_configured'
     ? 'Google sign-in is not configured. Add the Google OAuth values to your .env file.'
-    : '');
+    : ''));
   const [loading, setLoading] = useState(false);
   // Post-login destination (e.g. the MCP OAuth consent page sends users here
   // with returnTo so the grant flow can resume). Same-origin paths only.

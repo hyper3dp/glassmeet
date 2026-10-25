@@ -5,15 +5,27 @@ import {
   CalendarPlus, Download, Users,
 } from 'lucide-react';
 import { GlassButton } from '@/components/glass';
-import { formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, DEFAULT_CONFIRMATION_TEMPLATE } from '@/lib/whatsapp';
+import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { downloadIcs, openGoogleCalendar, openAppleCalendar, openOutlookCalendar } from '@/lib/calendar';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
+import { detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
 import { isEmbed, useEmbedResize, announceBooked } from '@/lib/embed.js';
 
+// The booking page passes the booking in router state and also keeps it in sessionStorage,
+// so a refresh (which on GitHub Pages goes through 404.html and drops router state) still works.
+const savedBooking = (pathname) => {
+  try {
+    const id = pathname.split('/').pop();
+    return JSON.parse(sessionStorage.getItem(`gm-booking-${id}`) || 'null') || {};
+  } catch {
+    return {};
+  }
+};
+
 export default function BookingConfirmation() {
   const location = useLocation();
-  const { booking, event, host } = (location.state || {});
+  const { booking, event, host } = location.state || savedBooking(location.pathname);
   const [copied, setCopied] = useState(false);
   const [embed] = useState(isEmbed);
   useEmbedResize(embed);
@@ -24,14 +36,15 @@ export default function BookingConfirmation() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-4 text-center">
         <div className="w-14 h-14 rounded-full bg-primary-soft flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-link" /></div>
-        <h1 className="text-xl font-bold">You're all set</h1>
-        <p className="text-sm text-muted-foreground">Your booking went through.</p>
+        <h1 className="text-xl font-bold">Booking details aren’t available here</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">If you just booked, your host has your request. Check your calendar or WhatsApp for the details.</p>
         {!embed && <Link to="/"><GlassButton variant="primary" size="sm">Back to home</GlassButton></Link>}
       </div>
     );
   }
 
-  const tz = booking.timezone || 'UTC';
+  // the guest's own zone, matching the times they picked from (booking.timezone is the host's)
+  const tz = detectTimezone() || booking.timezone || 'UTC';
   const date = formatMeetingDate(booking.start_time, tz);
   const time = formatMeetingTime(booking.start_time, tz);
   const endTime = formatMeetingTime(booking.end_time, tz);
@@ -39,14 +52,17 @@ export default function BookingConfirmation() {
   const meetingUrl = booking.meeting_url || event?.meeting_url || '';
   const pending = booking.approval_status === 'pending';
 
-  const waMsg = fillTemplate(DEFAULT_CONFIRMATION_TEMPLATE, {
-    guestName: booking.guest_name,
-    hostName,
-    date, time,
-    duration: `${event?.duration || 30} min`,
-    meetingUrl,
-    timezone: tz,
-  });
+  // The guest's message to the host. GlassMeet doesn't have the host's number, so WhatsApp opens
+  // its contact picker (it used to open a chat with the guest's own number).
+  const waMsg = [
+    `Hi ${hostName}! ${pending ? 'I just requested' : 'I just booked'} "${event?.name || 'a meeting'}" through GlassMeet.`,
+    '',
+    `Date: ${date}`,
+    `Time: ${time} – ${endTime} (${tz})`,
+    meetingUrl ? `Meeting: ${meetingUrl}` : null,
+    '',
+    `— ${booking.guest_name}`,
+  ].filter((line) => line !== null).join('\n');
 
   const copyLink = () => { navigator.clipboard.writeText(meetingUrl); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
@@ -105,8 +121,8 @@ export default function BookingConfirmation() {
 
           {/* Actions */}
           <div className="mx-auto mt-6 max-w-[520px] space-y-3">
-            <GlassButton variant="primary" size="lg" className="w-full" type="button" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}>
-              <MessageCircle className="w-4 h-4" /> Open WhatsApp
+            <GlassButton variant="primary" size="lg" className="w-full" type="button" onClick={()=>window.open(buildWhatsAppShareLink(waMsg), '_blank')}>
+              <MessageCircle className="w-4 h-4" /> Message {hostName} on WhatsApp
             </GlassButton>
           </div>
 

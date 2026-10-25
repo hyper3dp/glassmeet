@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { X, Clock, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { api } from '@/lib/localApi';
 import { GlassButton } from '@/components/glass';
-import { generateSlots, detectTimezone, formatDate } from '@/lib/Availability.js';
+import { generateSlots, detectTimezone, formatDate, dateInZone } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const DAY_LABELS = ['Today', 'Tomorrow'];
@@ -42,12 +42,11 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
   const daySlots = useMemo(() => {
     if (!selectedEvent) return [];
     const days = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = dateInZone(Date.now(), tz); // "today" in the host's zone, not the browser's
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() + i);
-      const slots = generateSlots(date, selectedEvent, rules, exceptions, bookedSlots, tz);
+      const slots = generateSlots(date, selectedEvent, rules, exceptions, bookedSlots, tz, tz);
       if (slots.length > 0) {
         days.push({ date, slots, label: i < 2 ? DAY_LABELS[i] : date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) });
       }

@@ -150,7 +150,7 @@ export default function CalendarConnections() {
   const exportMyMeetings = async () => {
     setTesting('apple');
     try {
-      const all = await api.entities.Booking.filter({ host_id: profile.id }, 'start_time', 500);
+      const all = (await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000)).reverse();
       const now = Date.now();
       const upcoming = all.filter((b) => b.status !== 'cancelled' && b.approval_status !== 'pending' && new Date(b.end_time || b.start_time).getTime() >= now);
       if (!upcoming.length) {

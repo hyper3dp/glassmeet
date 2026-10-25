@@ -34,8 +34,12 @@ export default function AddressManager() {
 
   const remove = async (id) => {
     if (!confirm('Delete this address? Event types already using it keep their copy.')) return;
-    setItems((list) => list.filter((a) => a.id !== id));
-    try { await api.entities.Address.delete(id); } catch (e) { setError(e.message); }
+    try {
+      await api.entities.Address.delete(id);
+      setItems((list) => list.filter((a) => a.id !== id));
+    } catch (e) {
+      setError(e.message);
+    }
   };
 
   if (state === 'loading') return <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading addresses…</div>;

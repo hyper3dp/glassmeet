@@ -38,13 +38,21 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
     }
   }, [whatsapp, profile]);
 
+  const creating = useRef(null); // the first save's create, so a second save waits for it
   const saveState = useAutosave(form, async (payload) => {
+    if (!idRef.current && creating.current) await creating.current;
     if (idRef.current) {
-      setWhatsapp(await api.entities.WhatsAppSetting.update(idRef.current, payload));
+      const updated = await api.entities.WhatsAppSetting.update(idRef.current, payload);
+      if (updated) setWhatsapp(updated);
     } else {
-      const created = await api.entities.WhatsAppSetting.create(payload);
-      idRef.current = created.id;
-      setWhatsapp(created);
+      creating.current = api.entities.WhatsAppSetting.create(payload);
+      try {
+        const created = await creating.current;
+        idRef.current = created.id;
+        setWhatsapp(created);
+      } finally {
+        creating.current = null;
+      }
     }
   }, { enabled: !!form, delay: 900 });
 

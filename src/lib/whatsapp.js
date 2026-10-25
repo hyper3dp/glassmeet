@@ -62,7 +62,7 @@ export const fillTemplate = (template, ctx) => {
 export const DEFAULT_CONFIRMATION_TEMPLATE = `Hi [Name]! Your meeting with [Host] is confirmed.
 
 Date: [Date]
-Time: [Time]
+Time: [Time] ([Timezone])
 Duration: [Duration]
 Meeting: [Meeting Link]
 

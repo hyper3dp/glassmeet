@@ -1,3 +1,4 @@
+import { icsText, icsFold } from '@/lib/ics.js';
 /**
  * Calendar subscription utilities.
  * Generates ICS calendar feeds from booking data.
@@ -11,10 +12,8 @@ function toICSDate(dateStr) {
     'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + 'Z';
 }
 
-function escapeICS(text) {
-  if (!text) return '';
-  return String(text).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-}
+// RFC 5545 escaping (any line break, control characters) — shared with calendar.js
+const escapeICS = icsText;
 
 /**
  * Generates a full ICS calendar string from an array of bookings.
@@ -62,7 +61,7 @@ export function generateICSFeed(bookings, calendarName = 'GlassMeet') {
   }
 
   lines.push('END:VCALENDAR');
-  return lines.join('\r\n');
+  return lines.map(icsFold).join('\r\n');
 }
 
 /**

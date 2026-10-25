@@ -9,7 +9,7 @@ import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/c
 import {
   generateSlots, isPastDate, isWithinMaxFuture, detectTimezone,
 } from '@/lib/Availability.js';
-import { formatMeetingDate } from '@/lib/whatsapp';
+import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
 import QRCodeModal from '@/components/QrcodeModal.jsx';
 import { appPath } from '@/lib/authReturnTo';
@@ -58,15 +58,10 @@ export default function BookingPage() {
   const maxAttendees = event?.max_attendees || 1;
   const isGroup = event?.booking_type === 'group' && maxAttendees > 1;
   const sameStart = (b, ms) => b.event_type_id === event?.id && new Date(b.start_time).getTime() === ms;
-  const blockingFor = (list) => {
-    if (!isGroup) return list;
-    const counts = {};
-    list.forEach((b) => { if (b.event_type_id === event?.id) { const k = new Date(b.start_time).getTime(); counts[k] = (counts[k] || 0) + 1; } });
-    return list.filter((b) => b.event_type_id !== event?.id || counts[new Date(b.start_time).getTime()] >= maxAttendees);
-  };
   const spotsLeftAt = (date) => Math.max(0, maxAttendees - bookedSlots.filter((b) => sameStart(b, date.getTime())).length);
 
   const guestTz = detectTimezone();
+  // weekly hours are in the host's zone; everything the guest sees is in the guest's zone
   const hostTz = event?.host_timezone || guestTz;
   const emailRequired = event?.email_required ?? true;
 
@@ -86,6 +81,8 @@ export default function BookingPage() {
   const load = async () => {
     try {
       const ev = await api.entities.EventType.get(eventTypeId);
+      // a switched-off event can't be booked; say so up front rather than at the last click
+      if (ev.active === false) { setError('This event isn’t taking bookings right now.'); setLoading(false); return; }
       setEvent(ev);
       const hostId = ev.created_by_id;
       const [r, e, b] = await Promise.all([
@@ -105,9 +102,10 @@ export default function BookingPage() {
   // generate slots when a date is selected
   useEffect(() => {
     if (!selectedDate || !event) { setSlots([]); return; }
-    const s = generateSlots(selectedDate, event, rules, exceptions, [...blockingFor(bookedSlots), ...googleBusy], hostTz);
+    const s = generateSlots(selectedDate, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz, guestTz);
     setSlots(s);
-    setSelectedSlot(null);
+    // keep the guest's pick if it's still free (a background refresh shouldn't throw them out)
+    setSelectedSlot((cur) => (cur && s.some((x) => x.date.getTime() === cur.date.getTime()) ? cur : null));
     setPendingSlot(null);
   }, [selectedDate, event, rules, exceptions, bookedSlots, googleBusy]);
 
@@ -127,7 +125,7 @@ export default function BookingPage() {
 
   const dayHasSlots = (date) => {
     if (!event || isPastDate(date) || !isWithinMaxFuture(date, event.max_future_days)) return false;
-    const s = generateSlots(date, event, rules, exceptions, [...blockingFor(bookedSlots), ...googleBusy], hostTz);
+    const s = generateSlots(date, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz, guestTz);
     return s.length > 0;
   };
 
@@ -136,12 +134,17 @@ export default function BookingPage() {
       setError(emailRequired ? 'Please fill in your name, email and WhatsApp number.' : 'Please fill in your name and WhatsApp number.');
       return;
     }
+    // the host reaches the guest on WhatsApp, so the number has to be dialable
+    if (!/^\+?\d{7,15}$/.test(normalizePhone(form.guest_phone))) {
+      setError('Enter your WhatsApp number with the country code, e.g. +971 50 123 4567.');
+      return;
+    }
     if (form.guest_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) { setError('That email address doesn’t look right.'); return; }
     if (!selectedSlot) return;
     // Validate required custom questions
     if (event?.custom_questions) {
       for (let qi = 0; qi < event.custom_questions.length; qi++) {
-        if (event.custom_questions[qi].required && !customAnswers[qi]) {
+        if (event.custom_questions[qi].required && !String(customAnswers[qi] || '').trim()) {
           setError('Please answer all required questions.');
           return;
         }
@@ -151,27 +154,30 @@ export default function BookingPage() {
     setError('');
     try {
       const start = selectedSlot.date.toISOString();
-      const end = new Date(selectedSlot.date.getTime() + (event.duration + (event.buffer_after||0)) * 60000);
-      // re-check conflict
+      // the booking ends when the meeting does; buffers only keep neighbouring bookings away
+      const end = new Date(selectedSlot.date.getTime() + event.duration * 60000);
+      // Re-check against fresh bookings with the same rules that built the list: taken, full,
+      // now in the past or inside the notice period, or past the booking window.
       const fresh = await api.entities.BookedSlot.filter({ host_id: event.created_by_id, status: 'confirmed' });
-      const conflict = blockingFor(fresh).some((b) => {
-        const bs = new Date(b.start_time).getTime();
-        const be = new Date(b.end_time).getTime();
-        const ns = new Date(start).getTime() - (event.buffer_before||0)*60000;
-        const ne = new Date(end).getTime();
-        return ns < be && bs < ne;
-      });
-      if (conflict) { setError(isGroup ? 'Sorry, that time just filled up. Please pick another.' : 'Sorry, that time was just taken. Please pick another.'); setSubmitting(false); return; }
+      const stillFree = isWithinMaxFuture(selectedDate, event.max_future_days)
+        && generateSlots(selectedDate, event, rules, exceptions, [...fresh, ...googleBusy], hostTz, guestTz)
+          .some((x) => x.date.getTime() === selectedSlot.date.getTime());
+      if (!stillFree) {
+        setError(isGroup ? 'Sorry, that time just filled up or is no longer available. Please pick another.' : 'Sorry, that time is no longer available. Please pick another.');
+        setBookedSlots(fresh); // refreshes the times shown when they go back
+        setSubmitting(false);
+        return;
+      }
 
       const requiresApproval = event.requires_approval || false;
       const booking = await api.bookings.createAsGuest({
         event_type_id: event.id,
         event_name: event.name,
         host_id: event.created_by_id,
-        guest_name: form.guest_name,
+        guest_name: form.guest_name.trim(),
         guest_email: form.guest_email.trim() || null,
-        guest_phone: form.guest_phone,
-        guest_notes: form.guest_notes,
+        guest_phone: form.guest_phone.trim(),
+        guest_notes: form.guest_notes.trim(),
         start_time: start,
         end_time: end.toISOString(),
         timezone: hostTz,
@@ -181,7 +187,10 @@ export default function BookingPage() {
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
-      navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state: { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } } });
+      const state = { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } };
+      // kept for this tab so the confirmation survives a refresh (guests can't read bookings back)
+      try { sessionStorage.setItem(`gm-booking-${booking.id}`, JSON.stringify(state)); } catch { /* storage unavailable */ }
+      navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state });
     } catch (e) {
       setError('Could not complete booking. ' + (e.message || 'Please try again.'));
     }
@@ -254,8 +263,8 @@ export default function BookingPage() {
               )}
               {selectedSlot && (
                 <>
-                  <li className="flex items-start gap-3"><Calendar className="w-5 h-5 mt-0.5 shrink-0" /> {selectedSlot.label}, {formatMeetingDate(selectedSlot.date, hostTz)}</li>
-                  <li className="flex items-start gap-3"><Globe className="w-5 h-5 mt-0.5 shrink-0" /> {hostTz}</li>
+                  <li className="flex items-start gap-3"><Calendar className="w-5 h-5 mt-0.5 shrink-0" /> {selectedSlot.label}, {formatMeetingDate(selectedSlot.date, guestTz)}</li>
+                  <li className="flex items-start gap-3"><Globe className="w-5 h-5 mt-0.5 shrink-0" /> {guestTz}</li>
                 </>
               )}
               {isGroup && <li className="flex items-start gap-3"><Users className="w-5 h-5 mt-0.5 shrink-0" /> Up to {maxAttendees} guests per time{selectedSlot ? ` · ${spotsLeftAt(selectedSlot.date)} spots left` : ''}</li>}
@@ -331,7 +340,7 @@ export default function BookingPage() {
 
                   <div className="mt-8">
                     <div className="text-[15px] font-bold mb-2">Time zone</div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground"><Globe className="w-4 h-4" /> {hostTz}</div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground"><Globe className="w-4 h-4" /> {guestTz}</div>
                   </div>
                 </div>
               </section>
@@ -378,20 +387,20 @@ export default function BookingPage() {
               <div className="max-w-[440px] space-y-5">
                 <div>
                   <GlassLabel htmlFor="g-name">Name *</GlassLabel>
-                  <GlassInput id="g-name" autoComplete="name" value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
+                  <GlassInput id="g-name" autoComplete="name" maxLength={100} value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-email">{emailRequired ? 'Email *' : 'Email (optional)'}</GlassLabel>
-                  <GlassInput id="g-email" type="email" autoComplete="email" value={form.guest_email} onChange={(e)=>setForm({...form, guest_email: e.target.value})} />
+                  <GlassInput id="g-email" type="email" autoComplete="email" maxLength={254} value={form.guest_email} onChange={(e)=>setForm({...form, guest_email: e.target.value})} />
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-phone">WhatsApp number *</GlassLabel>
-                  <GlassInput id="g-phone" type="tel" autoComplete="tel" value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: e.target.value})} placeholder="+1 555 000 0000" />
+                  <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: e.target.value})} placeholder="+1 555 000 0000" />
                   <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.</p>
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-notes" className="leading-snug">Please share anything that will help prepare for our meeting.</GlassLabel>
-                  <GlassTextarea id="g-notes" rows={3} value={form.guest_notes} onChange={(e)=>setForm({...form, guest_notes: e.target.value})} />
+                  <GlassTextarea id="g-notes" rows={3} maxLength={2000} value={form.guest_notes} onChange={(e)=>setForm({...form, guest_notes: e.target.value})} />
                 </div>
 
                 {/* Custom questions */}

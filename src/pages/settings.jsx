@@ -32,12 +32,23 @@ export default function Settings({ profile, updateProfile }) {
         whatsapp_number: profile.whatsapp_number || '',
         timezone: profile.timezone || detectTimezone(),
         bio: profile.bio || '',
-        username: profile.username || (profile.email || '').split('@')[0],
+        username: profile.username || '',
       });
     }
   }, [profile]);
 
-  const saveState = useAutosave(form, (value) => updateProfile(value), { enabled: !!form, delay: 900 });
+  // Booking pages read the zone from each event type (guests can't read profiles), so a new
+  // time zone is copied onto the host's event types too.
+  const savedTz = useRef(profile?.timezone || null);
+  const save = async (value) => {
+    await updateProfile({ ...value, username: value.username.trim() || null });
+    if (value.timezone && value.timezone !== savedTz.current) {
+      const events = await api.entities.EventType.filter({ created_by_id: profile.id });
+      await Promise.all(events.filter((e) => e.host_timezone !== value.timezone).map((e) => api.entities.EventType.update(e.id, { host_timezone: value.timezone })));
+      savedTz.current = value.timezone;
+    }
+  };
+  const saveState = useAutosave(form, save, { enabled: !!form, delay: 900 });
 
   useEffect(() => {
     if (!form) return undefined;

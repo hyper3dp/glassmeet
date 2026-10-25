@@ -78,65 +78,106 @@ export const formatDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 
-// Check if two date ranges overlap (in minutes from midnight)
-const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd;
+// ── time zones ────────────────────────────────────────────────────────────
+// Working hours are wall-clock times in the host's time zone ("09:00" in Asia/Dubai); a guest
+// elsewhere must see the matching moment in their own zone. These helpers convert between
+// wall-clock time in a named zone and real instants, DST included.
 
-// Generate available time slots for a given date for an event type
-// bookings: array of existing bookings { start_time, end_time, status }
-// eventType: { duration, buffer_before, buffer_after, min_notice, max_future_days }
-export const generateSlots = (date, eventType, rules, exceptions, bookings, timezone) => {
+const partsFormatters = {};
+const zoneParts = (ms, tz) => {
+  const f = partsFormatters[tz] || (partsFormatters[tz] = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+  }));
+  const p = {};
+  for (const { type, value } of f.formatToParts(new Date(ms))) p[type] = Number(value);
+  return p;
+};
+
+// minutes the zone is ahead of UTC at that instant
+const offsetMinutes = (ms, tz) => {
+  const p = zoneParts(ms, tz);
+  return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000) / 60000);
+};
+
+// the instant (ms) when the wall clock in tz reads y-m-d plus `minutes` (month is 0-based;
+// overflowing days roll over like Date.UTC)
+export const zonedTimeToUtc = (y, m, d, minutes, tz) => {
+  const guess = Date.UTC(y, m, d, 0, minutes);
+  const first = guess - offsetMinutes(guess, tz) * 60000;
+  const second = guess - offsetMinutes(first, tz) * 60000;
+  return second;
+};
+
+// calendar date of an instant in tz, as a local Date (for getDay / formatDate)
+export const dateInZone = (ms, tz) => {
+  const p = zoneParts(ms, tz);
+  return new Date(p.year, p.month - 1, p.day);
+};
+
+const labelFormatters = {};
+const timeLabel = (ms, tz) => (labelFormatters[tz] || (labelFormatters[tz] = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }))).format(new Date(ms));
+
+// Available start times on one calendar day as the viewer sees it.
+// date: the viewer's day (local Date; only its y/m/d are used)
+// bookings: existing { start_time, end_time, status, event_type_id } that block time
+// hostTz: zone the weekly hours and date-specific hours are written in
+// viewTz: zone the slots are shown in (defaults to this browser's)
+// Bookings of this same event carry its buffers on both sides. For a group event, a booking
+// of it that isn't full yet only lets a guest join at exactly its start; it still blocks every
+// other overlapping time.
+export const generateSlots = (date, eventType, rules, exceptions, bookings, hostTz, viewTz) => {
   const duration = eventType.duration || 30;
-  const bufferBefore = eventType.buffer_before || 0;
-  const bufferAfter = eventType.buffer_after || 0;
+  const bufferBefore = (eventType.buffer_before || 0) * 60000;
+  const bufferAfter = (eventType.buffer_after || 0) * 60000;
   const slotStep = 15; // 15-minute granularity
+  const tz = hostTz || detectTimezone();
+  const vtz = viewTz || detectTimezone();
 
-  const intervals = intervalsForDate(date, rules, exceptions);
+  const dayStart = zonedTimeToUtc(date.getFullYear(), date.getMonth(), date.getDate(), 0, vtz);
+  const dayEnd = zonedTimeToUtc(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, vtz);
+  const earliest = Date.now() + (eventType.min_notice || 0) * 3600000;
+
+  const capacity = eventType.booking_type === 'group' ? (eventType.max_attendees || 1) : 1;
+  const live = bookings.filter((b) => b.status !== 'cancelled' && b.approval_status !== 'declined' && b.start_time && b.end_time);
+  const takenAt = {};
+  live.forEach((b) => { if (b.event_type_id === eventType.id) { const k = new Date(b.start_time).getTime(); takenAt[k] = (takenAt[k] || 0) + 1; } });
+  const busy = live.map((b) => {
+    const start = new Date(b.start_time).getTime();
+    const same = eventType.id && b.event_type_id === eventType.id;
+    const end = new Date(b.end_time).getTime();
+    return {
+      start,
+      end,
+      // a booking of this event also keeps its own buffers clear
+      bufStart: start - (same ? bufferBefore : 0),
+      bufEnd: end + (same ? bufferAfter : 0),
+      joinableAt: same && capacity > 1 && takenAt[start] < capacity ? start : null,
+    };
+  });
+  // Buffers may overlap each other but never a meeting: the new meeting stays out of existing
+  // buffers, and the new meeting's buffers stay clear of existing meetings.
+  const clashes = (b, start, end) => b.joinableAt !== start
+    && ((start < b.bufEnd && b.bufStart < end) || (start - bufferBefore < b.end && b.start < end + bufferAfter));
+
+  // the viewer's day can overlap up to three of the host's calendar days
+  const hostFirst = dateInZone(dayStart, tz);
+  const seen = new Set();
   const slots = [];
-
-  const dateStr = formatDate(date);
-  // start_time is an ISO (usually UTC) string, so compare on the local date, not the string prefix
-  const dayBookings = bookings
-    .filter((b) => b.status !== 'cancelled' && b.start_time && formatDate(new Date(b.start_time)) === dateStr)
-    .map((b) => {
-      const bs = new Date(b.start_time);
-      const be = new Date(b.end_time);
-      return {
-        start: bs.getHours() * 60 + bs.getMinutes(),
-        end: be.getHours() * 60 + be.getMinutes(),
-      };
-    });
-
-  const now = new Date();
-  const minNoticeMs = (eventType.min_notice || 0) * 60 * 60 * 1000;
-  const minBookingTime = new Date(now.getTime() + minNoticeMs);
-
-  for (const iv of intervals) {
-    for (let t = iv.start; t + duration <= iv.end; t += slotStep) {
-      const slotStart = t;
-      const slotEnd = t + duration;
-      const busyStart = slotStart - bufferBefore;
-      const busyEnd = slotEnd + bufferAfter;
-
-      // conflict with bookings
-      const conflict = dayBookings.some((b) => overlaps(busyStart, busyEnd, b.start, b.end));
-      if (conflict) continue;
-
-      // build full datetime to check min notice
-      const slotDate = new Date(date);
-      slotDate.setHours(0, 0, 0, 0);
-      slotDate.setMinutes(slotStart);
-      if (slotDate < minBookingTime) continue;
-
-      slots.push({
-        start: slotStart,
-        end: slotEnd,
-        label: minutesToLabel(slotStart),
-        date: slotDate,
-      });
+  for (let k = -1; k <= 1; k++) {
+    const hostDay = new Date(hostFirst.getFullYear(), hostFirst.getMonth(), hostFirst.getDate() + k);
+    for (const iv of intervalsForDate(hostDay, rules, exceptions)) {
+      for (let t = iv.start; t + duration <= iv.end; t += slotStep) {
+        const start = zonedTimeToUtc(hostDay.getFullYear(), hostDay.getMonth(), hostDay.getDate(), t, tz);
+        if (start < dayStart || start >= dayEnd || start < earliest || seen.has(start)) continue;
+        const end = start + duration * 60000;
+        if (busy.some((b) => clashes(b, start, end))) continue;
+        seen.add(start);
+        const startMin = Math.round((start - dayStart) / 60000);
+        slots.push({ start: startMin, end: startMin + duration, label: timeLabel(start, vtz), date: new Date(start) });
+      }
     }
   }
-
-  return slots;
+  return slots.sort((a, b) => a.date - b.date);
 };
 
 export const minutesToLabel = (mins) => {

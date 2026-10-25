@@ -15,7 +15,6 @@ const COMMANDS = [
   { label: 'Calendar connections', icon: CalendarCheck, path: '/calendar-connections', desc: 'Manage calendar sync' },
   { label: 'Availability', icon: Clock, path: '/availability', desc: 'Edit working hours' },
   { label: 'Analytics', icon: BarChart3, path: '/analytics', desc: 'View booking insights' },
-  { label: 'Notifications', icon: Bell, path: '/notifications', desc: 'Notification center' },
   { label: 'Settings', icon: Settings, path: '/settings', desc: 'Account preferences' },
 ];
 

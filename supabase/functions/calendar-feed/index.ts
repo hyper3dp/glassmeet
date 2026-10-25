@@ -15,7 +15,8 @@ const icsDate = (iso: string) => {
   const d = new Date(iso);
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
 };
-const esc = (s: unknown) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const esc = (s: unknown) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,')
+  .replace(/\r\n|\r|\n/g, '\\n').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
 
 // RFC 5545: lines longer than 75 octets are folded with CRLF + space
 const fold = (line: string) => {
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
   const { data: feed, error: feedError } = await supabase.from('cal_feeds').select('owner').eq('token', token).maybeSingle();
   if (feedError) {
     console.error('cal_feeds lookup failed', feedError.code, feedError.message);
-    return new Response(`Feed lookup failed (${feedError.code || 'error'})`, { status: 503, headers: { 'Content-Type': 'text/plain' } });
+    return new Response('Feed temporarily unavailable', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
   if (!feed) return notFound();
 
@@ -102,8 +103,9 @@ Deno.serve(async (req) => {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
       'Content-Disposition': 'inline; filename="glassmeet.ics"',
-      'Cache-Control': 'public, max-age=300',
-      'Access-Control-Allow-Origin': '*',
+      // guest details inside: calendar apps may cache it, shared proxies may not; no CORS, since
+      // calendar apps don't need it and it would let any website read a leaked feed
+      'Cache-Control': 'private, max-age=300',
     },
   });
 });

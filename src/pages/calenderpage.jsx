@@ -3,28 +3,34 @@ import { api } from '@/lib/localApi';
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Zap } from 'lucide-react';
 import { GlassButton, Spinner, EmptyState, PageHeader } from '@/components/glass';
 import { formatMeetingTime } from '@/lib/whatsapp';
-import { detectTimezone } from '@/lib/Availability.js';
+import { detectTimezone, dateInZone } from '@/lib/Availability.js';
 import FindATime from '@/components/FindAtime.jsx';
 
 // y-m-d of a local calendar cell, and of a booking in the host time zone
 const cellKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const bookingKey = (iso, tz) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz });
 
+// today's date in the host's zone (the browser may be somewhere else)
+const todayIn = (tz) => dateInZone(Date.now(), tz);
+const isPending = (b) => b.approval_status === 'pending';
+
 export default function CalendarPage({ profile }) {
   const [view, setView] = useState('month'); // month | week | day
-  const [cursor, setCursor] = useState(new Date());
+  const [cursor, setCursor] = useState(() => todayIn(profile?.timezone || detectTimezone()));
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
-  const [showFindTime, setShowFindTime] = useState(false);
+  // the command palette's "Find a time" links here with ?find=true
+  const [showFindTime, setShowFindTime] = useState(() => new URLSearchParams(window.location.search).get('find') === 'true');
   const timezone = profile?.timezone || detectTimezone();
 
   useEffect(() => { load(); }, []);
 
   const load = async () => {
     try {
-      const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 200);
-      setBookings(b.filter((x) => x.status === 'confirmed'));
+      const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000);
+      // everything still on (confirmed, completed, and requests awaiting approval)
+      setBookings(b.filter((x) => x.status !== 'cancelled'));
     } catch (e) {}
     setLoading(false);
   };
@@ -66,7 +72,7 @@ export default function CalendarPage({ profile }) {
       <div className="rounded-xl border border-border bg-card shadow-card p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-2">
-            <button onClick={()=>{ setCursor(new Date()); setSelectedDay(null); }} className="h-9 px-4 rounded-full border border-input text-sm font-semibold transition-all duration-200 hover:bg-secondary">Today</button>
+            <button onClick={()=>{ setCursor(todayIn(timezone)); setSelectedDay(null); }} className="h-9 px-4 rounded-full border border-input text-sm font-semibold transition-all duration-200 hover:bg-secondary">Today</button>
             <button onClick={()=>move(-1)} aria-label="Previous" className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><ChevronLeft className="w-5 h-5" /></button>
             <button onClick={()=>move(1)} aria-label="Next" className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><ChevronRight className="w-5 h-5" /></button>
             <h2 className="ml-1 text-lg font-bold">{title}</h2>
@@ -78,8 +84,8 @@ export default function CalendarPage({ profile }) {
           </div>
         </div>
 
-        {view === 'month' && <MonthView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} selectedDay={selectedDay} onSelect={(d)=>{ setSelectedDay(d); }} />}
-        {view === 'week' && <WeekView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} />}
+        {view === 'month' && <MonthView cursor={cursor} today={todayIn(timezone)} bookingsByDay={bookingsByDay} timezone={timezone} selectedDay={selectedDay} onSelect={(d)=>{ setSelectedDay(d); }} />}
+        {view === 'week' && <WeekView cursor={cursor} today={todayIn(timezone)} bookingsByDay={bookingsByDay} timezone={timezone} />}
         {view === 'day' && <DayView date={cursor} bookings={bookingsByDay[cellKey(cursor)]||[]} timezone={timezone} />}
       </div>
 
@@ -92,7 +98,7 @@ export default function CalendarPage({ profile }) {
   );
 }
 
-function MonthView({ cursor, bookingsByDay, timezone, selectedDay, onSelect }) {
+function MonthView({ cursor, today, bookingsByDay, timezone, selectedDay, onSelect }) {
   const year = cursor.getFullYear(), month = cursor.getMonth();
   const first = new Date(year, month, 1);
   const startDay = first.getDay();
@@ -100,7 +106,6 @@ function MonthView({ cursor, bookingsByDay, timezone, selectedDay, onSelect }) {
   const cells = [];
   for (let i = 0; i < startDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
-  const today = new Date(); today.setHours(0,0,0,0);
 
   return (
     <div>
@@ -124,13 +129,13 @@ function MonthView({ cursor, bookingsByDay, timezone, selectedDay, onSelect }) {
               {/* phones: a dot per meeting (tap the day for the list); wider: time + name chips */}
               {dayBookings.length > 0 && (
                 <span className="sm:hidden flex items-center gap-0.5" aria-hidden="true">
-                  {dayBookings.slice(0,3).map((b)=><span key={b.id} className="w-1.5 h-1.5 rounded-full bg-primary" />)}
+                  {dayBookings.slice(0,3).map((b)=><span key={b.id} className={`w-1.5 h-1.5 rounded-full ${isPending(b) ? 'bg-warning' : 'bg-primary'}`} />)}
                   {dayBookings.length > 3 && <span className="text-[10px] font-semibold leading-none text-link">+</span>}
                 </span>
               )}
               <div className="hidden sm:flex flex-col gap-0.5 overflow-hidden">
                 {dayBookings.slice(0,2).map((b)=>(
-                  <span key={b.id} className="text-[11px] font-semibold truncate text-link bg-primary-soft rounded px-1.5 py-0.5">{formatMeetingTime(b.start_time, timezone)} {b.guest_name}</span>
+                  <span key={b.id} className={`text-[11px] font-semibold truncate rounded px-1.5 py-0.5 ${isPending(b) ? 'text-warning bg-warning/15' : 'text-link bg-primary-soft'}`}>{formatMeetingTime(b.start_time, timezone)} {b.guest_name}{isPending(b) ? ' (pending)' : ''}</span>
                 ))}
                 {dayBookings.length > 2 && <span className="text-[10px] text-muted-foreground">+{dayBookings.length-2} more</span>}
               </div>
@@ -142,10 +147,9 @@ function MonthView({ cursor, bookingsByDay, timezone, selectedDay, onSelect }) {
   );
 }
 
-function WeekView({ cursor, bookingsByDay, timezone }) {
+function WeekView({ cursor, today, bookingsByDay, timezone }) {
   const start = new Date(cursor); start.setDate(start.getDate() - start.getDay());
   const days = Array.from({length:7}, (_,i) => { const d = new Date(start); d.setDate(d.getDate()+i); return d; });
-  const today = new Date(); today.setHours(0,0,0,0);
   return (
     <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
       {days.map((date, i) => {
@@ -157,8 +161,8 @@ function WeekView({ cursor, bookingsByDay, timezone }) {
             <div className={`text-xs font-semibold mb-2 ${isToday?'text-link':'text-muted-foreground'}`}>{date.toLocaleDateString('en-US',{weekday:'short'})} {date.getDate()}</div>
             <div className="space-y-1.5">
               {dayBookings.map((b)=>(
-                <div key={b.id} className="bg-primary-soft rounded-md p-1.5 text-xs">
-                  <div className="font-semibold text-link">{formatMeetingTime(b.start_time, timezone)}</div>
+                <div key={b.id} className={`rounded-md p-1.5 text-xs ${isPending(b) ? 'bg-warning/15' : 'bg-primary-soft'}`}>
+                  <div className={`font-semibold ${isPending(b) ? 'text-warning' : 'text-link'}`}>{formatMeetingTime(b.start_time, timezone)}{isPending(b) ? ' · pending' : ''}</div>
                   <div className="truncate">{b.guest_name}</div>
                 </div>
               ))}
@@ -177,10 +181,10 @@ function DayView({ date, bookings, timezone }) {
     <div className="space-y-2">
       {sorted.length === 0 ? <EmptyState icon={CalIcon} title="No meetings today" description="Enjoy the free day." /> : sorted.map((b)=>(
         <div key={b.id} className="rounded-lg border border-border p-4 flex items-center gap-4">
-          <span className="w-3.5 h-3.5 rounded-full bg-primary shrink-0" />
+          <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${isPending(b) ? 'bg-warning' : 'bg-primary'}`} />
           <div>
             <div className="font-bold">{b.guest_name}</div>
-            <div className="text-sm text-muted-foreground">{b.event_name} · {formatMeetingTime(b.start_time, timezone)}</div>
+            <div className="text-sm text-muted-foreground">{b.event_name} · {formatMeetingTime(b.start_time, timezone)}{isPending(b) ? ' · waiting for your approval' : ''}</div>
           </div>
         </div>
       ))}
@@ -205,10 +209,10 @@ function DayPanel({ date, bookings, timezone, onClose }) {
         <div className="space-y-2">
           {sorted.map((b)=>(
             <div key={b.id} className="rounded-lg border border-border p-3 flex items-center gap-3">
-              <span className="w-3 h-3 rounded-full bg-primary shrink-0" />
+              <span className={`w-3 h-3 rounded-full shrink-0 ${isPending(b) ? 'bg-warning' : 'bg-primary'}`} />
               <div>
                 <div className="font-bold text-sm">{b.guest_name}</div>
-                <div className="text-xs text-muted-foreground">{formatMeetingTime(b.start_time, timezone)} · {b.event_name}</div>
+                <div className="text-xs text-muted-foreground">{formatMeetingTime(b.start_time, timezone)} · {b.event_name}{isPending(b) ? ' · waiting for your approval' : ''}</div>
               </div>
             </div>
           ))}

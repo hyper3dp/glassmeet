@@ -25,6 +25,11 @@ const post = (message) => {
   if (window.parent !== window) window.parent.postMessage({ source: 'glassmeet', ...message }, '*');
 };
 
+// Escape inside the frame closes the pop-up (the parent page never sees keys pressed in here)
+if (typeof window !== 'undefined' && window.parent !== window) {
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isEmbed()) post({ type: 'close' }); });
+}
+
 // Keep the parent iframe as tall as the page so the frame never scrolls on its own
 export function useEmbedResize(active) {
   useEffect(() => {

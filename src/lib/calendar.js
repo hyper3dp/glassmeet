@@ -1,4 +1,5 @@
 // Calendar integration utilities for GlassMeet
+import { icsText, icsParam, icsFold } from '@/lib/ics.js';
 // Apple Calendar (.ics) + Google Calendar (add-event URL)
 
 // Format a Date as an iCalendar UTC timestamp: YYYYMMDDTHHMMSSZ
@@ -7,30 +8,9 @@ const formatIcsDate = (date) => {
   return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 };
 
-// Escape text for iCalendar (commas, semicolons, newlines)
-const escapeIcs = (text) => {
-  if (!text) return '';
-  return String(text)
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
-};
-
-// Fold long lines per RFC 5545 (max 75 octets per line)
-const foldLine = (line) => {
-  if (line.length <= 75) return line;
-  const parts = [];
-  let first = line.slice(0, 73);
-  parts.push(first);
-  let rest = line.slice(73);
-  while (rest.length > 75) {
-    parts.push(' ' + rest.slice(0, 74));
-    rest = rest.slice(74);
-  }
-  if (rest) parts.push(' ' + rest);
-  return parts.join('\r\n');
-};
+// Escaping and line folding follow RFC 5545 (see ./ics.js)
+const escapeIcs = icsText;
+const foldLine = icsFold;
 
 // Build the event description block with guest + meeting details
 const buildEventDescription = (booking, eventType, host) => {
@@ -58,7 +38,7 @@ export const generateIcsEvent = (booking, eventType, host) => {
     'VERSION:2.0',
     'PRODID:-//GlassMeet//Scheduling//EN',
     'CALSCALE:GREGORIAN',
-    'METHOD:PUBLIC',
+    'METHOD:PUBLISH',
     'BEGIN:VEVENT',
     `UID:${booking.id || crypto.randomUUID()}@glassmeet`,
     `DTSTAMP:${formatIcsDate(new Date())}`,
@@ -73,13 +53,13 @@ export const generateIcsEvent = (booking, eventType, host) => {
 
   // Attendee: guest
   if (booking.guest_email) {
-    lines.push(`ATTENDEE;CN=${escapeIcs(booking.guest_name)};ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${booking.guest_email}`);
+    lines.push(`ATTENDEE;CN=${icsParam(booking.guest_name)};ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${booking.guest_email}`);
   }
 
   // Organizer: host
   const hostEmail = host?.email || eventType?.host_email || '';
   if (hostEmail) {
-    lines.push(`ORGANIZER;CN=${escapeIcs(hostName)}:mailto:${hostEmail}`);
+    lines.push(`ORGANIZER;CN=${icsParam(hostName)}:mailto:${hostEmail}`);
   }
 
   lines.push('END:VEVENT', 'END:VCALENDAR');

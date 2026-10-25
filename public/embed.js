@@ -19,7 +19,12 @@
  * booking times and event name in event.detail (never the guest's details).
  */
 (function () {
-  if (window.GlassMeet && window.GlassMeet.version) return;
+  // a second <script> tag (say, a floating button next to an inline embed) reuses the first copy
+  if (window.GlassMeet && window.GlassMeet.version) {
+    window.GlassMeet._mountButton(document.currentScript);
+    window.GlassMeet.init();
+    return;
+  }
 
   var script = document.currentScript;
   var frames = []; // iframes this script created, so messages are only taken from them
@@ -124,9 +129,12 @@
     return lum > 0.6 ? '#14201f' : '#fff';
   }
 
-  function mountButton() {
-    var url = script && script.getAttribute('data-button-url');
-    if (!url) return;
+  function mountButton(tag) {
+    tag = tag || script;
+    var url = tag && tag.getAttribute('data-button-url');
+    if (!url || tag.getAttribute('data-glassmeet-mounted')) return;
+    tag.setAttribute('data-glassmeet-mounted', '1');
+    var script = tag;
     var color = script.getAttribute('data-button-color') || '#2b7a75';
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -146,6 +154,8 @@
     if (data.type === 'height' && iframe.getAttribute('data-glassmeet-autoheight') && data.height > 0) {
       iframe.style.height = Math.max(400, Math.min(data.height, 4000)) + 'px';
     }
+    // Escape pressed inside the pop-up's frame (keys there never reach this page)
+    if (data.type === 'close' && overlay && overlay.contains(iframe)) close();
     if (data.type === 'booked') {
       window.dispatchEvent(new CustomEvent('glassmeet:booked', { detail: { booking: data.booking, event: data.event } }));
     }
@@ -165,7 +175,7 @@
     mountButton();
   }
 
-  window.GlassMeet = { version: '1', open: open, close: close, init: init };
+  window.GlassMeet = { version: '1', open: open, close: close, init: init, _mountButton: mountButton };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();

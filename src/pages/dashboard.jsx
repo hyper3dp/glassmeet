@@ -8,6 +8,8 @@ import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/
 import { detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
 
+const BOOKINGS_LIMIT = 200;
+
 export default function Dashboard({ profile }) {
   const [bookings, setBookings] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
@@ -19,7 +21,8 @@ export default function Dashboard({ profile }) {
     (async () => {
       try {
         const [b, e] = await Promise.all([
-          api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 50),
+          // newest bookings first, so "Recently booked" really is the latest ones
+          api.entities.Booking.filter({ host_id: profile.id }, '-created_date', BOOKINGS_LIMIT),
           api.entities.EventType.filter({ created_by_id: profile.id }, '-created_date', 20),
         ]);
         setBookings(b);
@@ -30,21 +33,25 @@ export default function Dashboard({ profile }) {
   }, [profile.id]);
 
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  // calendar days in the host's zone (not UTC), so late-evening and early-morning meetings
+  // land on the right day
+  const dayKey = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: timezone });
+  const todayKey = dayKey(now);
 
   const upcoming = useMemo(
-    () => bookings.filter((b) => b.status === 'confirmed' && new Date(b.start_time) >= now).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time)),
+    () => bookings.filter((b) => b.status === 'confirmed' && new Date(b.end_time || b.start_time) >= now).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time)),
     [bookings]
   );
   const todays = useMemo(
-    () => upcoming.filter((b) => b.start_time.slice(0,10) === todayStr),
-    [upcoming]
+    () => bookings.filter((b) => b.status === 'confirmed' && dayKey(b.start_time) === todayKey),
+    [bookings, todayKey]
   );
   const recent = useMemo(() => bookings.slice(0, 5), [bookings]);
 
   const eventColor = (id) => eventTypes.find((e) => e.id === id)?.color;
 
-  const firstEvent = eventTypes[0];
+  // the link to share is the newest event that's switched on
+  const firstEvent = eventTypes.find((e) => e.active ?? true);
   const bookingLink = firstEvent ? `${window.location.origin}${appPath(`/book/${firstEvent.id}`)}` : '';
 
   const shareOnWhatsApp = () => {
@@ -95,7 +102,7 @@ export default function Dashboard({ profile }) {
       <dl className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card">
         <Stat label="Today" value={todays.length} />
         <Stat label="Upcoming" value={upcoming.length} />
-        <Stat label="All bookings" value={bookings.length} />
+        <Stat label="All bookings" value={bookings.length >= BOOKINGS_LIMIT ? `${BOOKINGS_LIMIT}+` : bookings.length} />
         <Stat label="Event types" value={eventTypes.length} />
       </dl>
 

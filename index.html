@@ -13,6 +13,25 @@
     <style>html{background:#f6f9f9}@media (prefers-color-scheme: dark){html{background:#0f1516}}</style>
     <meta name="description" content="GlassMeet — beautiful scheduling for people who actually use WhatsApp. Create booking pages, share your link, and confirm meetings on WhatsApp." />
     <title>GlassMeet — Schedule meetings. Stay on WhatsApp.</title>
+    <script>
+      // Runs before the app: put back the path public/404.html moved into ?__gh_pages_route=
+      // (with its #access_token... hash) so Supabase sees sign-in links as they were sent.
+      (function () {
+        var route = new URLSearchParams(location.search).get('__gh_pages_route');
+        if (route) {
+          var restored = new URL(route, location.origin);
+          var base = location.pathname.replace(/\/?$/, '/');
+          history.replaceState(null, '', base + restored.pathname.replace(/^\/+/, '') + restored.search + restored.hash);
+        }
+        // An expired or used auth link comes back as #error_description=...; show it on Log in.
+        var hash = new URLSearchParams(location.hash.slice(1));
+        var message = hash.get('error_description') || new URLSearchParams(location.search).get('error_description');
+        if (message) {
+          try { sessionStorage.setItem('gm-auth-error', message.replace(/\+/g, ' ')); } catch (e) {}
+          history.replaceState(null, '', location.pathname.replace(/[^/]*$/, '') + 'login');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

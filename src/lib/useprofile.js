@@ -10,8 +10,10 @@ export function useProfile() {
   const [profile, setProfile] = useState(null);
   const [whatsapp, setWhatsapp] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const me = await api.auth.me();
       setUser(me);
@@ -31,6 +33,7 @@ export function useProfile() {
     } catch (e) {
       setUser(null);
       setProfile(null);
+      setError(e?.message || 'Your profile could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -44,7 +47,7 @@ export function useProfile() {
     return updated;
   }, []);
 
-  return { user, profile, whatsapp, setWhatsapp, loading, reload: load, updateProfile };
+  return { user, profile, whatsapp, setWhatsapp, loading, error, reload: load, updateProfile };
 }
 
 export default useProfile;

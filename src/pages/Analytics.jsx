@@ -2,6 +2,20 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/localApi';
 import { BarChart3, TrendingUp, Clock, Users, Calendar } from 'lucide-react';
 import { GlassCard, EmptyState, Spinner, PageHeader } from '@/components/glass';
+import { detectTimezone } from '@/lib/Availability.js';
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// weekday, hour and month of an instant in the host's zone (not the browser's)
+const zoneFormatters = {};
+const inZone = (iso, tz) => {
+  const f = zoneFormatters[tz] || (zoneFormatters[tz] = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, weekday: 'short', hour: 'numeric', hourCycle: 'h23', year: 'numeric', month: '2-digit',
+  }));
+  const p = {};
+  for (const { type, value } of f.formatToParts(new Date(iso))) p[type] = value;
+  return { day: WEEKDAYS.indexOf(p.weekday), hour: Number(p.hour), month: `${p.year}-${p.month}` };
+};
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -10,6 +24,9 @@ export default function Analytics({ profile }) {
   const [bookings, setBookings] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const timezone = profile?.timezone || detectTimezone();
+  // canceled and declined bookings don't count towards popularity, length or attendees
+  const held = useMemo(() => bookings.filter((b) => b.status !== 'cancelled'), [bookings]);
 
   useEffect(() => {
     (async () => {
@@ -33,21 +50,22 @@ export default function Analytics({ profile }) {
 
     // Most popular event
     const eventCounts = {};
-    bookings.forEach((b) => { eventCounts[b.event_name] = (eventCounts[b.event_name] || 0) + 1; });
+    held.forEach((b) => { eventCounts[b.event_name] = (eventCounts[b.event_name] || 0) + 1; });
     const popularEvent = Object.entries(eventCounts).sort((a, b) => b[1] - a[1])[0];
 
     // Most popular booking time (hour of day)
     const hourCounts = {};
-    bookings.forEach((b) => {
-      const h = new Date(b.start_time).getHours();
+    held.forEach((b) => {
+      const h = inZone(b.start_time, timezone).hour;
       hourCounts[h] = (hourCounts[h] || 0) + 1;
     });
     const rankedHours = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
     const popularHour = rankedHours[0] && rankedHours[0][1] > 1 && (!rankedHours[1] || rankedHours[0][1] > rankedHours[1][1]) ? rankedHours[0] : null;
 
-    // Average duration
-    const avgDuration = eventTypes.length
-      ? Math.round(eventTypes.reduce((sum, e) => sum + (e.duration || 30), 0) / eventTypes.length)
+    // Average length of the meetings actually booked
+    const timed = held.filter((b) => b.end_time);
+    const avgDuration = timed.length
+      ? Math.round(timed.reduce((sum, b) => sum + (new Date(b.end_time) - new Date(b.start_time)) / 60000, 0) / timed.length)
       : 0;
 
     return {
@@ -55,34 +73,37 @@ export default function Analytics({ profile }) {
       popularEvent: popularEvent ? popularEvent[0] : '—',
       popularHour: popularHour ? new Date(2000, 0, 1, Number(popularHour[0])).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Not enough data',
       avgDuration,
+      attendees: held.reduce((sum, b) => sum + (b.attendee_count || 1), 0),
     };
-  }, [bookings, eventTypes]);
+  }, [bookings, held, timezone]);
 
   // Heatmap data: 7 days x 12 hours (8am-8pm)
   const heatmap = useMemo(() => {
     const grid = Array.from({ length: 7 }, () => Array.from({ length: 12 }, () => 0));
-    bookings.forEach((b) => {
-      const d = new Date(b.start_time);
-      const day = d.getDay();
-      const hour = d.getHours();
-      if (hour >= 8 && hour < 20) grid[day][hour - 8]++;
+    held.forEach((b) => {
+      const { day, hour } = inZone(b.start_time, timezone);
+      if (day >= 0 && hour >= 8 && hour < 20) grid[day][hour - 8]++;
     });
     return grid;
-  }, [bookings]);
+  }, [held, timezone]);
 
   const maxHeat = Math.max(1, ...heatmap.flat());
 
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = WEEKDAYS;
   const hours = ['8', '9', '10', '11', '12', '1', '2', '3', '4', '5', '6', '7'];
 
+  // one bar per calendar month (by year too, so Oct 2025 and Oct 2026 stay apart), in order
   const chartData = useMemo(() => {
     const months = {};
-    bookings.forEach((b) => {
-      const m = new Date(b.start_time).toLocaleDateString('en', { month: 'short' });
-      months[m] = (months[m] || 0) + 1;
+    held.forEach((b) => {
+      const key = inZone(b.start_time, timezone).month;
+      months[key] = (months[key] || 0) + 1;
     });
-    return Object.entries(months).map(([month, count]) => ({ month, bookings: count }));
-  }, [bookings]);
+    return Object.keys(months).sort().map((key) => {
+      const [y, m] = key.split('-').map(Number);
+      return { month: new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), bookings: months[key] };
+    });
+  }, [held, timezone]);
 
   if (loading) return <div className="flex justify-center py-24"><Spinner className="w-8 h-8" /></div>;
 
@@ -104,7 +125,7 @@ export default function Analytics({ profile }) {
           <div className="space-y-3">
             <InsightRow icon={TrendingUp} label="Most popular event" value={stats.popularEvent} />
             <InsightRow icon={Clock} label="Most popular time" value={stats.popularHour} />
-            <InsightRow icon={Users} label="Total attendees" value={bookings.reduce((s, b) => s + (b.attendee_count || 1), 0)} />
+            <InsightRow icon={Users} label="Total attendees" value={stats.attendees} />
             <InsightRow icon={Calendar} label="Event types" value={eventTypes.length} />
           </div>
         </GlassCard>

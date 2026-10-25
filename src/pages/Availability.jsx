@@ -29,12 +29,17 @@ export default function Availability({ profile }) {
   const inflight = useRef(0);
   const queue = useRef(Promise.resolve()); // saves run one at a time, in the order they were made
   const failed = useRef(false);
+  const removedTemp = useRef(new Set()); // date-specific rows deleted before their create finished
   const rulesRef = useRef(rules);
   rulesRef.current = rules;
 
   useEffect(() => {
     load();
-    return () => Object.values(pending.current).forEach(({ timer }) => clearTimeout(timer));
+    // leaving the page saves hour changes still waiting on their short delay
+    return () => Object.entries(pending.current).forEach(([id, { timer, fields }]) => {
+      clearTimeout(timer);
+      api.entities.AvailabilityRule.update(id, fields).catch(() => {});
+    });
   }, []);
 
   const load = async () => {
@@ -139,11 +144,14 @@ export default function Availability({ profile }) {
     setShowExc(false);
     track(async () => {
       const saved = await api.entities.AvailabilityException.create(exc);
+      // deleted while it was saving: remove the saved copy too
+      if (removedTemp.current.has(tempId)) { await api.entities.AvailabilityException.delete(saved.id); return; }
       setExceptions((es) => es.map((e) => (e.id === tempId ? saved : e)));
     });
   };
 
   const deleteException = (id) => {
+    if (String(id).startsWith('tmp-')) removedTemp.current.add(id);
     setExceptions((es) => es.filter((e) => e.id !== id));
     if (!String(id).startsWith('tmp-')) track(() => api.entities.AvailabilityException.delete(id));
   };

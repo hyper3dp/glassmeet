@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { embedTheme } from '@/lib/embed.js';
@@ -44,6 +44,12 @@ const FullScreenLoader = () => (
 );
 
 // Thin wrappers so pages receive profile/whatsapp from context without prop-drilling at the route level.
+// signed-out visitors to an app page go to Log in and come back to that page afterwards
+function LoginRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+}
+
 const DashboardPage = () => { const { profile } = useApp(); return <Dashboard profile={profile} />; };
 const CalendarPagePage = () => { const { profile } = useApp(); return <CalendarPage profile={profile} />; };
 const EventTypesPage = () => { const { profile } = useApp(); return <EventTypes profile={profile} />; };
@@ -85,7 +91,7 @@ const AuthenticatedApp = () => {
       <Route path="/privacy" element={<Privacy />} />
 
       {/* Protected app routes */}
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+      <Route element={<ProtectedRoute unauthenticatedElement={<LoginRedirect />} />}>
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/calendar" element={<CalendarPagePage />} />

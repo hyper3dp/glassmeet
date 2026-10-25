@@ -24,6 +24,12 @@ export default function NotificationCenter() {
 
   const unread = notifications.filter((n) => !n.read).length;
 
+  // load right away and keep checking, so the unread badge shows without opening the panel
+  useEffect(() => {
+    loadNotifications();
+    const t = setInterval(() => { if (document.visibilityState === 'visible') loadNotifications(); }, 60000);
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     if (open) loadNotifications();
   }, [open]);
@@ -35,7 +41,7 @@ export default function NotificationCenter() {
   }, []);
 
   const loadNotifications = async () => {
-    setLoading(true);
+    setLoading((was) => was || notifications.length === 0);
     try {
       const list = await api.entities.Notification.filter({}, '-created_date', 20);
       setNotifications(list);
@@ -51,7 +57,10 @@ export default function NotificationCenter() {
   };
 
   const handleClick = (n) => {
-    if (!n.read) api.entities.Notification.update(n.id, { read: true });
+    if (!n.read) {
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      api.entities.Notification.update(n.id, { read: true }).catch(() => {});
+    }
     if (n.link) navigate(n.link);
     setOpen(false);
   };
