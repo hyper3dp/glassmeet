@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function GlassCard({ className, children, hover = true, liquid: _liquid, ...props }) {
   return (
-    <Card className={cn('p-6', hover && 'hover:border-border-hover', className)} {...props}>
+    <Card className={cn('p-6 gap-0', hover && 'hover:border-border-hover', className)} {...props}>
       {children}
     </Card>
   );

@@ -133,7 +133,7 @@ export default function Landing() {
               <h1 className="text-[2.75rem] leading-[1.05] sm:text-6xl lg:text-[4rem] font-bold tracking-[-0.03em]">
                 <span className="sm:whitespace-nowrap">Schedule meetings.</span>
                 <br />
-                <span className="text-primary sm:whitespace-nowrap">Stay on WhatsApp.</span>
+                <span className="text-primary dark:text-link sm:whitespace-nowrap">Stay on WhatsApp.</span>
               </h1>
               <p className="mt-6 max-w-[34rem] text-lg sm:text-xl leading-relaxed text-muted-foreground">
                 Share one booking link. Guests pick a time without signing up, and you confirm the meeting in a WhatsApp chat instead of an email thread.
