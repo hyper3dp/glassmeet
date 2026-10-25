@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import {
@@ -28,6 +28,16 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [pendingSlot, setPendingSlot] = useState(null);
+  // On one-column layouts the times and the form open below the fold; bring them into view
+  const slotsRef = useRef(null);
+  const formRef = useRef(null);
+  const stacked = () => window.matchMedia('(max-width: 1023px)').matches;
+  useEffect(() => {
+    if (selectedDate && !selectedSlot && stacked()) slotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedDate]);
+  useEffect(() => {
+    if (selectedSlot && stacked()) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedSlot]);
   const [form, setForm] = useState({ guest_name: '', guest_email: '', guest_phone: '', guest_notes: '' });
   const [customAnswers, setCustomAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -233,7 +243,7 @@ export default function BookingPage() {
                 <li className="flex items-start gap-3"><MapPin className="w-5 h-5 mt-0.5 shrink-0" /> <span>In person<span className="block font-normal whitespace-pre-line">{event.address}</span></span></li>
               ) : (
                 <li className="flex items-start gap-3">
-                  {/phone|whatsapp/i.test(event.location || '') ? <Phone className="w-5 h-5 mt-0.5 shrink-0" /> : <Video className="w-5 h-5 mt-0.5 shrink-0" />}
+                  {/phone|whatsapp/i.test(event.location || '') ? <Phone className="w-5 h-5 mt-0.5 shrink-0" /> : /in person/i.test(event.location || '') ? <MapPin className="w-5 h-5 mt-0.5 shrink-0" /> : <Video className="w-5 h-5 mt-0.5 shrink-0" />}
                   {event.location || 'Meeting details provided upon confirmation'}
                 </li>
               )}
@@ -323,7 +333,7 @@ export default function BookingPage() {
 
               {/* Time slots */}
               {selectedDate && (
-                <section className="border-t border-border lg:border-t-0 md:col-span-2 lg:col-span-1 px-6 sm:px-8 lg:pl-0 lg:pr-8 pb-8 pt-6 lg:pt-[88px] animate-slide-in-right">
+                <section ref={slotsRef} className="scroll-mt-4 border-t border-border lg:border-t-0 md:col-span-2 lg:col-span-1 px-6 sm:px-8 lg:pl-0 lg:pr-8 pb-8 pt-6 lg:pt-[88px] animate-slide-in-right">
                   <h3 className="text-[15px] font-semibold mb-5">{pickedDateLabel}</h3>
                   {slots.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6">No times left on this day. Pick another date.</p>
@@ -358,7 +368,7 @@ export default function BookingPage() {
             </>
           ) : (
             // Details form
-            <section className="p-6 sm:p-8 animate-slide-in-right">
+            <section ref={formRef} className="scroll-mt-4 p-6 sm:p-8 animate-slide-in-right">
               <h2 className="text-xl font-bold mb-6">Enter Details</h2>
               <div className="max-w-[440px] space-y-5">
                 <div>

@@ -1,6 +1,6 @@
 import { appPath } from '@/lib/authReturnTo';
 import React, { useEffect, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home, Calendar as CalendarIcon, Link2, CalendarDays, Clock,
   MessageCircle, Settings as SettingsIcon, Plus, LogOut, CalendarCheck,
@@ -9,7 +9,7 @@ import {
 import { api } from '@/lib/localApi';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/glass';
-import Logo from '@/components/logo.jsx';
+import Logo, { LogoMark } from '@/components/logo.jsx';
 import NotificationCenter from '@/components/Notificationcenter.jsx';
 
 const NAV = [
@@ -118,10 +118,12 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-background border-b border-border lg:border-transparent">
           <div className="h-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center gap-3">
-            <button onClick={() => setDrawerOpen(true)} aria-label="Open menu" className="lg:hidden w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-secondary">
+            <button onClick={() => setDrawerOpen(true)} aria-label="Open menu" className="lg:hidden shrink-0 w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-secondary">
               <Menu className="w-5 h-5" />
             </button>
-            <div className="lg:hidden"><Logo to="/dashboard" size="sm" /></div>
+            {/* the narrowest phones (under 360px) get the mark alone so the top bar fits */}
+            <div className="lg:hidden max-[359px]:hidden"><Logo to="/dashboard" size="sm" /></div>
+            <Link to="/dashboard" aria-label="GlassMeet home" className="hidden max-[359px]:block"><LogoMark size={28} /></Link>
 
             <div className="ml-auto flex items-center gap-1.5">
               {onOpenCommandPalette && (
@@ -133,6 +135,11 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
                   <kbd className="ml-6 rounded-md bg-secondary px-1.5 py-0.5 text-[11px] font-medium">{IS_MAC ? '⌘K' : 'Ctrl K'}</kbd>
                 </button>
               )}
+              {onOpenCommandPalette && (
+                <button onClick={onOpenCommandPalette} aria-label="Search" className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground">
+                  <Search className="w-[18px] h-[18px]" />
+                </button>
+              )}
               <NotificationCenter />
               <div className="relative">
                 <button
@@ -142,7 +149,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
                   className="flex items-center gap-1 rounded-full p-1 pr-2 transition-all duration-200 hover:bg-secondary"
                 >
                   <Avatar src={profile?.profile_photo || profile?.avatar_url} name={profile?.full_name} size={32} />
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  <ChevronDown className="hidden sm:block w-4 h-4 text-muted-foreground" />
                 </button>
                 {menuOpen && (
                   <>

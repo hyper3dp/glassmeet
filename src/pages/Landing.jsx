@@ -114,12 +114,13 @@ export default function Landing() {
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-border bg-card">
         <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
-          <Logo to="/" />
-          <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
+          <span className="sm:hidden"><Logo to="/" size="sm" /></span>
+          <span className="hidden sm:block"><Logo to="/" /></span>
+          <nav className="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Primary">
             <a href="#how" className="hidden md:block px-3 text-[15px] font-semibold text-foreground hover:text-link">How it works</a>
             <a href="#features" className="hidden md:block px-3 text-[15px] font-semibold text-foreground hover:text-link">Features</a>
-            <Link to="/login" className="px-3 text-[15px] font-semibold text-foreground hover:text-link">Log in</Link>
-            <Link to="/register"><GlassButton variant="primary" type="button">Get started</GlassButton></Link>
+            <Link to="/login" className="whitespace-nowrap px-1.5 sm:px-3 text-[15px] font-semibold text-foreground hover:text-link">Log in</Link>
+            <Link to="/register"><GlassButton variant="primary" type="button" className="px-3.5 sm:px-5">Get started</GlassButton></Link>
           </nav>
         </div>
       </header>

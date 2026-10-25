@@ -72,7 +72,7 @@ export default function NotificationCenter() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-popover shadow-pop overflow-hidden animate-scale-in z-50">
+        <div className="fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-80 rounded-xl border border-border bg-popover shadow-pop overflow-hidden animate-scale-in z-50">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <h3 className="font-bold text-sm">Notifications</h3>
             {unread > 0 && (

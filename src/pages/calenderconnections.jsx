@@ -228,7 +228,7 @@ export default function CalendarConnections() {
             {feedState === 'ready' && feedUrl && (
               <>
                 <div className="mt-4 flex gap-2">
-                  <GlassInput value={feedUrl} readOnly onFocus={(e) => e.target.select()} aria-label="Calendar subscription link" className="flex-1 font-mono text-xs" />
+                  <GlassInput value={feedUrl} readOnly onFocus={(e) => e.target.select()} aria-label="Calendar subscription link" className="min-w-0 flex-1 font-mono text-base sm:text-xs" />
                   <GlassButton type="button" variant="brand" onClick={copyFeedUrl}>
                     {copiedFeed ? <><CheckCircle2 className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy</>}
                   </GlassButton>

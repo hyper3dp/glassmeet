@@ -72,9 +72,12 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
           <div>
             <GlassLabel htmlFor="wa-mode">Messaging mode</GlassLabel>
             <GlassSelect id="wa-mode" value={form.provider} onChange={(e)=>set('provider', e.target.value)}>
-              <option value="deep_link">Deep link (wa.me): opens WhatsApp with the message filled in</option>
-              <option value="business_api">WhatsApp Business API: automatic sending (not available yet)</option>
+              <option value="deep_link">Deep link (wa.me)</option>
+              <option value="business_api">Business API (not available yet)</option>
             </GlassSelect>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {form.provider === 'business_api' ? 'Automatic sending through the WhatsApp Business API is not available yet.' : 'Opens WhatsApp with the message filled in; you press send.'}
+            </p>
           </div>
           <div className="divide-y divide-border rounded-lg border border-border px-4">
             <label htmlFor="wa-enabled" className="flex items-center justify-between gap-4 py-3.5 cursor-pointer">

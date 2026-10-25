@@ -135,23 +135,23 @@ export default function Analytics({ profile }) {
       <GlassCard hover={false}>
         <h2 className="text-lg font-bold mb-1">Busiest times</h2>
         <p className="text-sm text-muted-foreground mb-4">Bookings by weekday and hour, 8am to 8pm.</p>
-        <div className="overflow-x-auto">
-          <div className="min-w-[480px]">
-            <div className="flex gap-1 mb-1 ml-10">
+        <div>
+          <div>
+            <div className="flex gap-0.5 sm:gap-1 mb-1 ml-9 sm:ml-11">
               {hours.map((h, i) => (
                 <div key={i} className="flex-1 text-center text-[10px] text-muted-foreground">{h}</div>
               ))}
             </div>
             {heatmap.map((row, dayIdx) => (
-              <div key={dayIdx} className="flex items-center gap-1 mb-1">
-                <div className="w-10 text-xs text-muted-foreground">{days[dayIdx]}</div>
-                <div className="flex gap-1 flex-1">
+              <div key={dayIdx} className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                <div className="w-8 sm:w-10 shrink-0 text-xs text-muted-foreground">{days[dayIdx]}</div>
+                <div className="flex gap-0.5 sm:gap-1 flex-1 min-w-0">
                   {row.map((count, hourIdx) => {
                     const intensity = count / maxHeat;
                     return (
                       <div
                         key={hourIdx}
-                        className="flex-1 aspect-square rounded"
+                        className="flex-1 min-w-0 aspect-square rounded-[3px] sm:rounded"
                         style={{
                           background: count === 0
                             ? 'var(--muted)'

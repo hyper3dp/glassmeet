@@ -200,7 +200,7 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 mt-6">
-          <GlassButton variant="primary" className="flex-1" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}><MessageCircle className="w-4 h-4" /> Send on WhatsApp</GlassButton>
+          <GlassButton variant="primary" className="sm:flex-1" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}><MessageCircle className="w-4 h-4" /> Send on WhatsApp</GlassButton>
           {booking.status !== 'cancelled' && <GlassButton variant="danger" onClick={onCancel}><Trash2 className="w-4 h-4" /> Cancel</GlassButton>}
         </div>
       </DialogContent>

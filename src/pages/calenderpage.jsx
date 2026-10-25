@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { api } from '@/lib/localApi';
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Zap } from 'lucide-react';
 import { GlassButton, Spinner, EmptyState, PageHeader } from '@/components/glass';
@@ -78,7 +78,7 @@ export default function CalendarPage({ profile }) {
           </div>
         </div>
 
-        {view === 'month' && <MonthView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} onSelect={(d)=>{ setSelectedDay(d); }} />}
+        {view === 'month' && <MonthView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} selectedDay={selectedDay} onSelect={(d)=>{ setSelectedDay(d); }} />}
         {view === 'week' && <WeekView cursor={cursor} bookingsByDay={bookingsByDay} timezone={timezone} />}
         {view === 'day' && <DayView date={cursor} bookings={bookingsByDay[cellKey(cursor)]||[]} timezone={timezone} />}
       </div>
@@ -92,7 +92,7 @@ export default function CalendarPage({ profile }) {
   );
 }
 
-function MonthView({ cursor, bookingsByDay, timezone, onSelect }) {
+function MonthView({ cursor, bookingsByDay, timezone, selectedDay, onSelect }) {
   const year = cursor.getFullYear(), month = cursor.getMonth();
   const first = new Date(year, month, 1);
   const startDay = first.getDay();
@@ -115,10 +115,20 @@ function MonthView({ cursor, bookingsByDay, timezone, onSelect }) {
           const key = cellKey(date);
           const dayBookings = bookingsByDay[key] || [];
           const isToday = date.getTime() === today.getTime();
+          const isSelected = selectedDay && cellKey(selectedDay) === key;
           return (
-            <button key={i} onClick={()=>onSelect(date)} className="bg-card p-1.5 sm:p-2 min-h-[72px] sm:min-h-[96px] text-left flex flex-col gap-1 transition-all duration-200 hover:bg-secondary">
+            <button key={i} onClick={()=>onSelect(date)} aria-pressed={!!isSelected}
+              aria-label={`${date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}, ${dayBookings.length} ${dayBookings.length === 1 ? 'meeting' : 'meetings'}`}
+              className={`p-1.5 sm:p-2 min-h-[60px] sm:min-h-[96px] text-left flex flex-col items-center sm:items-stretch gap-1 transition-all duration-200 ${isSelected ? 'bg-primary-soft' : 'bg-card hover:bg-secondary'}`}>
               <span className={`w-7 h-7 rounded-full text-sm font-semibold tabular flex items-center justify-center ${isToday?'bg-primary text-primary-foreground':''}`}>{date.getDate()}</span>
-              <div className="flex flex-col gap-0.5 overflow-hidden">
+              {/* phones: a dot per meeting (tap the day for the list); wider: time + name chips */}
+              {dayBookings.length > 0 && (
+                <span className="sm:hidden flex items-center gap-0.5" aria-hidden="true">
+                  {dayBookings.slice(0,3).map((b)=><span key={b.id} className="w-1.5 h-1.5 rounded-full bg-primary" />)}
+                  {dayBookings.length > 3 && <span className="text-[10px] font-semibold leading-none text-link">+</span>}
+                </span>
+              )}
+              <div className="hidden sm:flex flex-col gap-0.5 overflow-hidden">
                 {dayBookings.slice(0,2).map((b)=>(
                   <span key={b.id} className="text-[11px] font-semibold truncate text-link bg-primary-soft rounded px-1.5 py-0.5">{formatMeetingTime(b.start_time, timezone)} {b.guest_name}</span>
                 ))}
@@ -180,8 +190,13 @@ function DayView({ date, bookings, timezone }) {
 
 function DayPanel({ date, bookings, timezone, onClose }) {
   const sorted = [...bookings].sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
+  const ref = useRef(null);
+  // on phones the panel opens below the month grid, out of view
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 639px)').matches) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [date]);
   return (
-    <div className="rounded-xl border border-border bg-card shadow-card p-5">
+    <div ref={ref} className="scroll-mb-24 rounded-xl border border-border bg-card shadow-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold">{date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h3>
         <button onClick={onClose} className="text-sm font-semibold text-link hover:underline">Close</button>
