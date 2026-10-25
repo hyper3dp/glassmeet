@@ -161,6 +161,27 @@ function EventModal({ event, onClose, onSave }) {
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const kind = LOCATIONS.find((l) => l.value === form.location)?.kind;
 
+  // Saved addresses (Settings → Addresses). 'new' means typing one here.
+  const [addresses, setAddresses] = useState([]);
+  const [savedAddressesAvailable, setSavedAddressesAvailable] = useState(false);
+  const [addressChoice, setAddressChoice] = useState('new');
+  const [newAddressLabel, setNewAddressLabel] = useState('');
+  const [saveNewAddress, setSaveNewAddress] = useState(true);
+  useEffect(() => {
+    api.entities.Address.filter({}, 'created_date').then((list) => {
+      setAddresses(list);
+      setSavedAddressesAvailable(true);
+      const match = list.find((a) => a.address === form.address);
+      if (match) setAddressChoice(match.id);
+      else if (!form.address && list[0]) { setAddressChoice(list[0].id); setField('address', list[0].address); }
+    }).catch(() => setSavedAddressesAvailable(false));
+  }, []);
+  const pickAddress = (choice) => {
+    setAddressChoice(choice);
+    const a = addresses.find((x) => x.id === choice);
+    setField('address', a ? a.address : '');
+  };
+
   const submit = async (submitEvent) => {
     submitEvent.preventDefault();
     setError('');
@@ -168,6 +189,11 @@ function EventModal({ event, onClose, onSave }) {
     if (kind === 'other' && !form.custom_location.trim()) { setError('Describe where the meeting happens.'); return; }
     setSaving(true);
     try {
+      if (kind === 'in_person' && addressChoice === 'new' && saveNewAddress && savedAddressesAvailable) {
+        const saved = await api.entities.Address.create({ label: newAddressLabel.trim(), address: form.address.trim() });
+        setAddresses((list) => [...list, saved]);
+        setAddressChoice(saved.id);
+      }
       const { custom_location, ...rest } = form;
       await onSave({
         ...rest,
@@ -186,7 +212,7 @@ function EventModal({ event, onClose, onSave }) {
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-xl p-0 sm:pb-0 block">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-popover px-6 py-4">
           <DialogTitle>{event ? 'Edit event type' : 'New event type'}</DialogTitle>
           <button type="button" aria-label="Close" onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
@@ -236,10 +262,28 @@ function EventModal({ event, onClose, onSave }) {
             </GlassSelect>
           </div>
           {kind === 'in_person' && (
-            <div>
-              <GlassLabel htmlFor="event-address">Address</GlassLabel>
-              <GlassTextarea id="event-address" rows={2} maxLength={200} value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Street, building, city" required />
-              <p className="mt-1.5 text-xs text-muted-foreground">Shown to guests on the booking page and confirmation.</p>
+            <div className="space-y-3">
+              <div>
+                <GlassLabel htmlFor="event-address-pick">Address</GlassLabel>
+                <GlassSelect id="event-address-pick" value={addressChoice} onChange={(e) => pickAddress(e.target.value)}>
+                  {addresses.map((a) => <option key={a.id} value={a.id}>{a.label ? `${a.label}: ` : ''}{a.address.replace(/\s*\n\s*/g, ', ')}</option>)}
+                  <option value="new">{addresses.length ? 'New address…' : 'Enter an address…'}</option>
+                </GlassSelect>
+              </div>
+              {addressChoice === 'new' && (
+                <div className="space-y-3 rounded-lg border border-border p-3.5">
+                  <GlassTextarea id="event-address" rows={2} maxLength={300} value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Street, building, city" aria-label="New address" required />
+                  {savedAddressesAvailable && (
+                    <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <GlassInput maxLength={40} value={newAddressLabel} onChange={(e) => setNewAddressLabel(e.target.value)} placeholder="Label, e.g. Office (optional)" aria-label="Address label" />
+                      <label className="flex items-center gap-2 text-sm font-semibold">
+                        <Switch checked={saveNewAddress} onCheckedChange={setSaveNewAddress} aria-label="Save to my addresses" /> Save to my addresses
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">Shown to guests on the booking page and confirmation. Manage saved addresses in Settings.</p>
             </div>
           )}
           {kind === 'other' && (
@@ -258,23 +302,14 @@ function EventModal({ event, onClose, onSave }) {
             <p className="rounded-lg bg-secondary px-3.5 py-3 text-sm text-muted-foreground">You call the guest on the WhatsApp number they give when booking.</p>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <GlassLabel htmlFor="event-booking-type">Booking type</GlassLabel>
-              <GlassSelect id="event-booking-type" value={form.booking_type} onChange={(e) => setField('booking_type', e.target.value)}>
-                <option value="one_on_one">One-on-one</option>
-                <option value="group">Group</option>
-              </GlassSelect>
-            </div>
+          <div className="divide-y divide-border rounded-lg border border-border px-4">
+            <ToggleRow id="ev-group" label="Let several guests book the same time" description="Good for classes, workshops and group calls." checked={form.booking_type === 'group'} onChange={(v) => setField('booking_type', v ? 'group' : 'one_on_one')} />
             {form.booking_type === 'group' && (
-              <div>
-                <GlassLabel htmlFor="event-capacity">Maximum attendees</GlassLabel>
-                <GlassInput id="event-capacity" type="number" inputMode="numeric" min="2" max="500" value={form.max_attendees} onChange={(e) => setField('max_attendees', e.target.value)} />
+              <div className="flex items-center justify-between gap-4 py-3">
+                <label htmlFor="event-capacity" className="text-sm font-semibold">Spots per time</label>
+                <GlassInput id="event-capacity" type="number" inputMode="numeric" min="2" max="500" value={form.max_attendees} onChange={(e) => setField('max_attendees', e.target.value)} className="w-24 text-center" />
               </div>
             )}
-          </div>
-
-          <div className="divide-y divide-border rounded-lg border border-border px-4">
             <ToggleRow id="ev-active" label="Active" description="Guests can book this event from its link." checked={form.active} onChange={(v) => setField('active', v)} />
             <ToggleRow id="ev-approval" label="Requires approval" description="You approve each booking before it is confirmed." checked={form.requires_approval} onChange={(v) => setField('requires_approval', v)} />
             <ToggleRow id="ev-email" label="Ask for email" description="Guests must enter an email address. Off: email is optional." checked={form.email_required} onChange={(v) => setField('email_required', v)} />

@@ -1,20 +1,17 @@
 import { Toaster } from "@/components/ui/toaster";
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClientInstance } from '@/lib/query-client';
-import { BrowserRouter as Router, Route, Routes, Outlet, Navigate } from 'react-router-dom';
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
-import PageNotFound from './lib/Pagenotfound.jsx';
 import { AuthProvider, useAuth } from '@/lib/Authcontext.jsx';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './Components/scrolltotop.jsx';
 import ProtectedRoute from '@/components/protectedroute.jsx';
-import { useProfile, AppContext, useApp } from '@/lib/useprofile.js';
-import Layout from '@/components/Layout';
-import CommandPalette from '@/components/commandpalatte.jsx';
+import { useApp } from '@/lib/useprofile.js';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 
 // Pages load on demand, so guests opening a booking link don't download the host app
+const AppShell = lazy(() => import('@/components/AppShell.jsx'));
+const PageNotFound = lazy(() => import('./lib/Pagenotfound.jsx'));
 const Login = lazy(() => import('./pages/login.jsx'));
 const Register = lazy(() => import('./pages/register.jsx'));
 const ForgotPassword = lazy(() => import('./pages/forgotpassword.jsx'));
@@ -34,13 +31,6 @@ const Analytics = lazy(() => import('./pages/Analytics.jsx'));
 const Terms = lazy(() => import('@/pages/terms.jsx'));
 const Privacy = lazy(() => import('@/pages/privacy.jsx'));
 
-const PageLoader = () => (
-  <div className="flex justify-center py-24" role="status" aria-live="polite">
-    <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin"></div>
-    <span className="sr-only">Loading…</span>
-  </div>
-);
-
 const FullScreenLoader = () => (
   <div 
     className="fixed inset-0 flex items-center justify-center" 
@@ -51,50 +41,6 @@ const FullScreenLoader = () => (
     <span className="sr-only">Loading application...</span>
   </div>
 );
-
-// Loads the profile once and provides it to all app pages via context.
-function AppShell() {
-  const { profile, whatsapp, setWhatsapp, loading, updateProfile, reload } = useProfile();
-  const [cmdOpen, setCmdOpen] = useState(false);
-
-  // Command palette keyboard shortcut: Ctrl+K / Cmd+K
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setCmdOpen((v) => !v);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  // Show full screen loader while profile fetching is in progress
-  if (loading) return <FullScreenLoader />;
-  
-  // If profile creation is still in progress for new users
-  if (!profile) {
-    return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center gap-4">
-        <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-muted-foreground">Setting up your profile...</p>
-      </div>
-    );
-  }
-
-  return (
-    <AppContext.Provider value={{ profile, whatsapp, setWhatsapp, updateProfile, reload }}>
-      <Layout profile={profile} onOpenCommandPalette={() => setCmdOpen(true)}>
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <Outlet />
-          </Suspense>
-        </ErrorBoundary>
-      </Layout>
-      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
-    </AppContext.Provider>
-  );
-}
 
 // Thin wrappers so pages receive profile/whatsapp from context without prop-drilling at the route level.
 const DashboardPage = () => { const { profile } = useApp(); return <Dashboard profile={profile} />; };
@@ -163,13 +109,11 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <AuthProvider>
-        <QueryClientProvider client={queryClientInstance}>
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <ScrollToTop />
             <AuthenticatedApp />
           </Router>
           <Toaster />
-        </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>
   );

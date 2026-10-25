@@ -38,11 +38,18 @@ export default function BookingPage() {
   const bookingUrl = `${window.location.origin}${appPath(`/book/${eventTypeId}`)}`;
 
   // Group meeting: count existing bookings for this event
-  const groupBookings = bookedSlots.filter((b) => b.event_type_id === eventTypeId && b.status === 'confirmed');
+  // Group events: several guests can take the same time. Bookings of this event at the same
+  // start only block that time once it is full; everything else blocks as usual.
   const maxAttendees = event?.max_attendees || 1;
-  const isGroup = event?.booking_type === 'group';
-  const spotsRemaining = Math.max(0, maxAttendees - groupBookings.length);
-  const isFull = isGroup && spotsRemaining === 0;
+  const isGroup = event?.booking_type === 'group' && maxAttendees > 1;
+  const sameStart = (b, ms) => b.event_type_id === event?.id && new Date(b.start_time).getTime() === ms;
+  const blockingFor = (list) => {
+    if (!isGroup) return list;
+    const counts = {};
+    list.forEach((b) => { if (b.event_type_id === event?.id) { const k = new Date(b.start_time).getTime(); counts[k] = (counts[k] || 0) + 1; } });
+    return list.filter((b) => b.event_type_id !== event?.id || counts[new Date(b.start_time).getTime()] >= maxAttendees);
+  };
+  const spotsLeftAt = (date) => Math.max(0, maxAttendees - bookedSlots.filter((b) => sameStart(b, date.getTime())).length);
 
   const guestTz = detectTimezone();
   const hostTz = event?.host_timezone || guestTz;
@@ -83,7 +90,7 @@ export default function BookingPage() {
   // generate slots when a date is selected
   useEffect(() => {
     if (!selectedDate || !event) { setSlots([]); return; }
-    const s = generateSlots(selectedDate, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz);
+    const s = generateSlots(selectedDate, event, rules, exceptions, [...blockingFor(bookedSlots), ...googleBusy], hostTz);
     setSlots(s);
     setSelectedSlot(null);
     setPendingSlot(null);
@@ -105,7 +112,7 @@ export default function BookingPage() {
 
   const dayHasSlots = (date) => {
     if (!event || isPastDate(date) || !isWithinMaxFuture(date, event.max_future_days)) return false;
-    const s = generateSlots(date, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz);
+    const s = generateSlots(date, event, rules, exceptions, [...blockingFor(bookedSlots), ...googleBusy], hostTz);
     return s.length > 0;
   };
 
@@ -132,14 +139,14 @@ export default function BookingPage() {
       const end = new Date(selectedSlot.date.getTime() + (event.duration + (event.buffer_after||0)) * 60000);
       // re-check conflict
       const fresh = await api.entities.BookedSlot.filter({ host_id: event.created_by_id, status: 'confirmed' });
-      const conflict = fresh.some((b) => {
+      const conflict = blockingFor(fresh).some((b) => {
         const bs = new Date(b.start_time).getTime();
         const be = new Date(b.end_time).getTime();
         const ns = new Date(start).getTime() - (event.buffer_before||0)*60000;
         const ne = new Date(end).getTime();
         return ns < be && bs < ne;
       });
-      if (conflict) { setError('Sorry, that time was just taken. Please pick another.'); setSubmitting(false); return; }
+      if (conflict) { setError(isGroup ? 'Sorry, that time just filled up. Please pick another.' : 'Sorry, that time was just taken. Please pick another.'); setSubmitting(false); return; }
 
       const requiresApproval = event.requires_approval || false;
       const booking = await api.bookings.createAsGuest({
@@ -236,7 +243,7 @@ export default function BookingPage() {
                   <li className="flex items-start gap-3"><Globe className="w-5 h-5 mt-0.5 shrink-0" /> {hostTz}</li>
                 </>
               )}
-              {isGroup && <li className="flex items-start gap-3"><Users className="w-5 h-5 mt-0.5 shrink-0" /> {spotsRemaining} of {maxAttendees} spots left</li>}
+              {isGroup && <li className="flex items-start gap-3"><Users className="w-5 h-5 mt-0.5 shrink-0" /> Up to {maxAttendees} guests per time{selectedSlot ? ` · ${spotsLeftAt(selectedSlot.date)} spots left` : ''}</li>}
               {event?.price > 0 && <li className="flex items-start gap-3"><CreditCard className="w-5 h-5 mt-0.5 shrink-0" /> {event.price} {event.currency || 'USD'}</li>}
               {event?.requires_approval && <li className="flex items-start gap-3"><Clock3 className="w-5 h-5 mt-0.5 shrink-0" /> The host approves each request</li>}
               <li className="flex items-start gap-3"><MessageCircle className="w-5 h-5 mt-0.5 shrink-0" /> Confirmed on WhatsApp</li>
@@ -337,10 +344,11 @@ export default function BookingPage() {
                         <button
                           key={i}
                           onClick={() => setPendingSlot(i)}
-                          className="w-full h-[52px] rounded-lg border bg-card text-[15px] font-bold tabular transition-all duration-200 hover:shadow-[inset_0_0_0_1px_var(--ev)]"
+                          className="w-full h-[52px] rounded-lg border bg-card text-[15px] font-bold tabular transition-all duration-200 hover:shadow-[inset_0_0_0_1px_var(--ev)] flex flex-col items-center justify-center leading-tight"
                           style={{ borderColor: 'color-mix(in srgb, var(--ev) 55%, transparent)', color: evText }}
                         >
                           {s.label}
+                          {isGroup && <span className="text-[11px] font-semibold opacity-80">{spotsLeftAt(s.date)} {spotsLeftAt(s.date) === 1 ? 'spot' : 'spots'} left</span>}
                         </button>
                       )))}
                     </div>
@@ -409,7 +417,7 @@ export default function BookingPage() {
                   className="h-11 px-6 rounded-full text-[15px] font-bold inline-flex items-center gap-2 transition-all duration-200 hover:brightness-110 disabled:opacity-60"
                   style={{ background: 'var(--ev)', color: 'var(--ev-fg)' }}
                 >
-                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Scheduling…</> : isFull ? 'Join waitlist' : event?.requires_approval ? 'Request booking' : 'Schedule Event'}
+                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Scheduling…</> : event?.requires_approval ? 'Request booking' : 'Schedule Event'}
                 </button>
               </div>
             </section>

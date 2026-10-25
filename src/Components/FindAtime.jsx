@@ -59,7 +59,7 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[85vh] overflow-y-auto p-6 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-lg p-6 block">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-link" />

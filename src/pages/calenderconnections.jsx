@@ -492,7 +492,7 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-md p-6 block">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg border border-border bg-white flex items-center justify-center"><GoogleG /></div>
           <div>
@@ -557,7 +557,7 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-md p-6 block">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-[#0078D4] shadow-xs flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></div>
           <div>

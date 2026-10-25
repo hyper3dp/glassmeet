@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cn } from "cn"
-import { Dialog as DialogPrimitive } from "radix-ui"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
 
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -57,7 +57,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover border border-border shadow-pop p-6 text-sm text-popover-foreground duration-200 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // phones: full-width bottom sheet; sm and up: centred card (callers set sm:max-w-*)
+          "fixed z-50 grid gap-4 inset-x-0 bottom-0 w-full max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-b-0 border-border bg-popover shadow-pop p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-sm text-popover-foreground duration-200 outline-none data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-8 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-8 sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-[calc(100%-2rem)] sm:max-w-md sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:border-b sm:pb-6 sm:data-open:slide-in-from-bottom-0 sm:data-open:zoom-in-95 sm:data-closed:slide-out-to-bottom-0 sm:data-closed:zoom-out-95",
           className
         )}
         {...props}

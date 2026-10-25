@@ -1,4 +1,4 @@
--- Profile fields the app saves, event location/email options, and avatar uploads.
+-- Profile fields the app saves, event location/email options, saved addresses and avatar uploads.
 
 -- ── profiles ────────────────────────────────────────────────────────────────
 alter table public.profiles
@@ -36,3 +36,18 @@ create policy avatars_update_own on storage.objects for update to authenticated
 drop policy if exists avatars_delete_own on storage.objects;
 create policy avatars_delete_own on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- ── saved addresses (address manager) ───────────────────────────────────────
+create table if not exists public.addresses (
+  id uuid primary key default gen_random_uuid(),
+  created_by_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  label text not null default '',
+  address text not null check (char_length(address) between 1 and 300),
+  created_date timestamptz not null default now()
+);
+create index if not exists addresses_owner_idx on public.addresses (created_by_id);
+alter table public.addresses enable row level security;
+drop policy if exists addresses_own on public.addresses;
+create policy addresses_own on public.addresses for all to authenticated
+  using ((select auth.uid()) = created_by_id) with check ((select auth.uid()) = created_by_id);
+grant select, insert, update, delete on public.addresses to authenticated;

@@ -33,7 +33,7 @@ export default function QRCodeModal({ url, open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-sm p-6 text-center block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-sm p-6 text-center block">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <QrCode className="w-5 h-5 text-link" />

@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { User, Globe, Clock, Upload, Loader2, Trash2, Plug } from 'lucide-react';
+import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone } from 'lucide-react';
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, Avatar, SaveStatus } from '@/components/glass';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { api } from '@/lib/localApi';
 import { useAutosave } from '@/lib/useAutosave';
 import OutlookIcon from '@/components/outlookicon.jsx';
 import GoogleIcon from '@/components/googleicon.jsx';
+import AddressManager from '@/components/AddressManager.jsx';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'timezone', label: 'Time zone', icon: Globe },
+  { id: 'addresses', label: 'Addresses', icon: MapPin },
   { id: 'coming-soon', label: 'Coming soon', icon: Plug },
 ];
 
@@ -136,9 +138,19 @@ export default function Settings({ profile, updateProfile }) {
             </GlassSelect>
           </Section>
 
+          {/* Addresses */}
+          <Section id="addresses" title="Addresses" description="Places you meet guests. Pick one when an event type is in person.">
+            <AddressManager />
+          </Section>
+
           {/* Coming soon */}
           <Section id="coming-soon" title="Coming soon" description="Integrations we're building next.">
             <ul className="divide-y divide-border rounded-lg border border-border">
+              <ComingSoonRow
+                icon={<span className="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><Smartphone className="w-5 h-5" /></span>}
+                name="GlassMeet for iPhone and iPad"
+                body="A native app to manage bookings, availability and WhatsApp confirmations on the go."
+              />
               <ComingSoonRow
                 icon={<span className="w-10 h-10 rounded-lg bg-[#635BFF] text-white text-lg font-bold flex items-center justify-center">S</span>}
                 name="Stripe"

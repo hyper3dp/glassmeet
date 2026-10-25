@@ -36,11 +36,11 @@ export function GlassButton({ className, variant = 'default', size = 'md', liqui
 }
 
 export function GlassInput({ className, ...props }) {
-  return <Input className={cn('h-11 px-3.5 text-sm', className)} {...props} />;
+  return <Input className={cn('h-11 px-3.5 text-base sm:text-sm', className)} {...props} />;
 }
 
 export function GlassTextarea({ className, ...props }) {
-  return <Textarea className={cn('px-3.5 py-3 text-sm resize-none', className)} {...props} />;
+  return <Textarea className={cn('px-3.5 py-3 text-base sm:text-sm resize-none', className)} {...props} />;
 }
 
 export function GlassLabel({ className, children, ...props }) {
@@ -72,7 +72,7 @@ export function GlassSelect({ className, children, ...props }) {
   return (
     <select
       style={{ backgroundImage: SELECT_CHEVRON, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.85rem center', backgroundSize: '1rem' }}
-      className={cn('flex h-11 w-full cursor-pointer appearance-none rounded-lg border border-input bg-field pl-3.5 pr-10 text-sm text-foreground transition-all duration-200 hover:border-border-hover focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50', className)}
+      className={cn('flex h-11 w-full cursor-pointer appearance-none rounded-lg border border-input bg-field pl-3.5 pr-10 text-base sm:text-sm text-foreground transition-all duration-200 hover:border-border-hover focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50', className)}
       {...props}
     >
       {children}

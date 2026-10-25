@@ -16,22 +16,18 @@ export function useProfile() {
       const me = await api.auth.me();
       setUser(me);
       setProfile(me);
-      // load whatsapp settings for this user
-      try {
-        const settings = await api.entities.WhatsAppSetting.filter({ created_by_id: me.id });
-        setWhatsapp(settings[0] || null);
-      } catch {
-        setWhatsapp(null);
-      }
-      // ensure default working hours exist so booking pages work out of the box
-      try {
-        const rules = await api.entities.AvailabilityRule.filter({ created_by_id: me.id });
-        if (rules.length === 0) {
-          await api.entities.AvailabilityRule.bulkCreate(
+      // WhatsApp settings and first-run working hours load side by side
+      await Promise.all([
+        api.entities.WhatsAppSetting.filter({ created_by_id: me.id })
+          .then((settings) => setWhatsapp(settings[0] || null))
+          .catch(() => setWhatsapp(null)),
+        // ensure default working hours exist so booking pages work out of the box
+        api.entities.AvailabilityRule.filter({ created_by_id: me.id })
+          .then((rules) => rules.length === 0 && api.entities.AvailabilityRule.bulkCreate(
             [1, 2, 3, 4, 5].map((dow) => ({ day_of_week: dow, start_time: '09:00', end_time: '17:00' }))
-          );
-        }
-      } catch { /* non-fatal */ }
+          ))
+          .catch(() => { /* non-fatal */ }),
+      ]);
     } catch (e) {
       setUser(null);
       setProfile(null);

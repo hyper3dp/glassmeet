@@ -155,7 +155,7 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) close(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[90vh] overflow-y-auto p-6 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-lg p-6 block">
         <div className="flex items-center justify-between mb-5">
           <DialogTitle>Meeting details</DialogTitle>
           <div className="ml-auto mr-2"><SaveStatus state={saveState} /></div>

@@ -54,7 +54,7 @@ export default function CommandPalette({ open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl overflow-hidden block top-[15vh] translate-y-0 data-[state=open]:slide-in-from-top-[13%] p-0 gap-0">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-xl overflow-hidden block sm:top-[15vh] sm:translate-y-0 sm:data-[state=open]:slide-in-from-top-[13%] p-0 sm:pb-0 gap-0">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground" />

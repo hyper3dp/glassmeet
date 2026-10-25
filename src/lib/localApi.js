@@ -17,6 +17,10 @@ async function getProfile(userId) {
   return data;
 }
 
+let meCache = null;
+const sessionUser = async () => (await supabase.auth.getSession()).data.session?.user || null;
+supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'USER_UPDATED') meCache = null; });
+
 const entities = new Proxy({}, {
   get: (_target, entityName) => {
     const tableMap = {
@@ -27,6 +31,7 @@ const entities = new Proxy({}, {
       AvailabilityException: 'availability_exceptions',
       WhatsAppSetting: 'whatsapp_settings',
       Notification: 'notifications',
+      Address: 'addresses',
     };
     const table = tableMap[entityName] || entityName;
 
@@ -100,32 +105,37 @@ export const api = {
     getPublicSettings: async () => ({ id: 'supabase', public_settings: { app_name: 'GlassMeet (Cloud)' } }) 
   },
   auth: {
+    // The local session is enough to know who is signed in (the server re-checks the token on
+    // every query through RLS), and concurrent callers share one profile request.
     me: async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) throw new Error('Not authenticated');
-      
-      // Try fetching the profile, or auto-create it if missing to prevent login loops
-      // getProfile uses maybeSingle, so a missing row comes back as null rather than throwing
-      const profile = await getProfile(user.id);
-      if (profile) return profile;
-
-      const { data: newProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || ''
-        }])
-        .select()
-        .single();
-
-      if (createError) throw new Error(createError.message);
-      return newProfile;
+      const user = await sessionUser();
+      if (!user) throw new Error('Not authenticated');
+      if (meCache?.id === user.id) return meCache.promise;
+      const promise = (async () => {
+        // Try fetching the profile, or auto-create it if missing to prevent login loops
+        const profile = await getProfile(user.id);
+        if (profile) return profile;
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || ''
+          }])
+          .select()
+          .single();
+        if (createError) throw new Error(createError.message);
+        return newProfile;
+      })();
+      meCache = { id: user.id, promise };
+      promise.catch(() => { meCache = null; });
+      return promise;
     },
     updateMe: async (value) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await sessionUser();
       const { data, error } = await supabase.from('profiles').update(value).eq('id', user.id).select().single();
       if (error) throw new Error(error.message);
+      meCache = { id: user.id, promise: Promise.resolve(data) };
       return data;
     },
     loginViaEmailPassword: async (email, password) => {
@@ -234,11 +244,15 @@ export const api = {
   // Profile photo: uploads to the public avatars bucket under the user's own folder
   storage: {
     uploadAvatar: async (file) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await sessionUser();
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
       const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
-      if (error) throw new Error(error.message);
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type, cacheControl: '31536000' });
+      if (error) {
+        throw new Error(/bucket not found/i.test(error.message)
+          ? 'Photo storage is not set up yet (the "avatars" bucket is missing).'
+          : error.message);
+      }
       return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
     },
   },
@@ -256,7 +270,7 @@ export const api = {
   calendarFeed: {
     urlFor: (token) => `${supabaseUrl}/functions/v1/calendar-feed/${token}.ics`,
     mine: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await sessionUser();
       const { data, error } = await supabase.from('cal_feeds').select('token').eq('owner', user.id).maybeSingle();
       if (error) throw new Error(error.message);
       if (data) return data.token;
@@ -266,7 +280,7 @@ export const api = {
     },
     // New token; calendars subscribed to the old link stop updating
     rotate: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await sessionUser();
       const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
       const { data, error } = await supabase.from('cal_feeds').update({ token, rotated_at: new Date().toISOString() }).eq('owner', user.id).select('token').single();
       if (error) throw new Error(error.message);

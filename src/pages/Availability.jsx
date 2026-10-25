@@ -235,7 +235,7 @@ function ExceptionModal({ onAdd, onClose }) {
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-md p-6 block">
         <div className="flex items-center justify-between mb-5">
           <DialogTitle>Add date-specific hours</DialogTitle>
           <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
