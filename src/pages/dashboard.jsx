@@ -1,11 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/localApi';
-import {
-  Calendar, Clock, Plus, Share2, MessageCircle, Video, Users,
-  CheckCircle2, CalendarDays, ArrowRight, Link2, Zap, Search,
-} from 'lucide-react';
-import { GlassCard, GlassButton, EmptyState, Spinner } from '@/components/glass';
+import { Calendar, Plus, MessageCircle, CheckCircle2, Link2 } from 'lucide-react';
+import { GlassButton, EmptyState, Spinner, PageHeader, Avatar } from '@/components/glass';
+import EventCard from '@/components/eventcard.jsx';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
@@ -44,6 +42,8 @@ export default function Dashboard({ profile }) {
   );
   const recent = useMemo(() => bookings.slice(0, 5), [bookings]);
 
+  const eventColor = (id) => eventTypes.find((e) => e.id === id)?.color;
+
   const firstEvent = eventTypes[0];
   const bookingLink = firstEvent ? `${window.location.origin}${appPath(`/book/${firstEvent.id}`)}` : '';
 
@@ -62,165 +62,138 @@ export default function Dashboard({ profile }) {
 
   if (loading) return <div className="flex justify-center py-24"><Spinner className="w-8 h-8" /></div>;
 
+  const firstName = profile?.full_name?.split(' ')[0];
+  const groups = groupByDay(upcoming.slice(0, 8), timezone);
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            Welcome back, {profile?.full_name?.split(' ')[0] || 'there'}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">Here's your day at a glance.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/event-types?new=true"><GlassButton variant="primary"><Plus className="w-4 h-4" /> Create event</GlassButton></Link>
-          <Link to="/analytics"><GlassButton><Zap className="w-4 h-4" /> Find a time</GlassButton></Link>
-          <GlassButton onClick={shareOnWhatsApp}><MessageCircle className="w-4 h-4" /> Share</GlassButton>
-        </div>
-      </div>
+    <div className="animate-fade-in">
+      <PageHeader
+        title={firstName ? `Welcome, ${firstName}` : 'Welcome'}
+        description={todays.length ? `You have ${todays.length} meeting${todays.length === 1 ? '' : 's'} today.` : 'No meetings today.'}
+        actions={
+          <>
+            <GlassButton type="button" onClick={shareOnWhatsApp}><MessageCircle className="w-4 h-4" /> Share on WhatsApp</GlassButton>
+            <Link to="/event-types?new=true"><GlassButton variant="primary" type="button"><Plus className="w-4 h-4" strokeWidth={2.5} /> Create</GlassButton></Link>
+          </>
+        }
+      />
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Link to="/event-types?new=true" className="glass-button rounded-xl p-3 flex flex-col items-center gap-2 text-center">
-          <div className="w-9 h-9 rounded-xl glass flex items-center justify-center"><Plus className="w-4 h-4 accent-text" /></div>
-          <span className="text-xs font-medium">Create Event</span>
-        </Link>
-        <Link to="/analytics" className="glass-button rounded-xl p-3 flex flex-col items-center gap-2 text-center">
-          <div className="w-9 h-9 rounded-xl glass flex items-center justify-center"><Zap className="w-4 h-4 accent-text" /></div>
-          <span className="text-xs font-medium">Find a Time</span>
-        </Link>
-        <button onClick={copyLink} className="glass-button rounded-xl p-3 flex flex-col items-center gap-2 text-center">
-          <div className="w-9 h-9 rounded-xl glass flex items-center justify-center"><Link2 className="w-4 h-4 accent-text" /></div>
-          <span className="text-xs font-medium">{copied ? 'Copied' : 'Share Link'}</span>
-        </button>
-        <button onClick={shareOnWhatsApp} className="glass-button rounded-xl p-3 flex flex-col items-center gap-2 text-center">
-          <div className="w-9 h-9 rounded-xl glass flex items-center justify-center"><MessageCircle className="w-4 h-4 accent-text" /></div>
-          <span className="text-xs font-medium">WhatsApp</span>
-        </button>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={CalendarDays} label="Today's meetings" value={todays.length} />
-        <StatCard icon={Clock} label="Upcoming" value={upcoming.length} />
-        <StatCard icon={Users} label="Total bookings" value={bookings.length} />
-        <StatCard icon={CheckCircle2} label="Event types" value={eventTypes.length} />
-      </div>
-
-      {/* Booking link card */}
+      {/* Booking link */}
       {firstEvent && (
-        <GlassCard hover={false} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl glass flex items-center justify-center">
-              <Share2 className="w-5 h-5 accent-text" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-muted-foreground">Your booking link</div>
-              <div className="font-medium truncate max-w-xs sm:max-w-md">{bookingLink}</div>
-            </div>
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-card sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold">Your booking link</div>
+            <a href={bookingLink} target="_blank" rel="noreferrer" className="block truncate text-sm text-link hover:underline">{bookingLink}</a>
           </div>
-          <div className="flex gap-2">
-            <GlassButton size="sm" onClick={copyLink}>{copied ? <CheckCircle2 className="w-4 h-4 accent-text" /> : 'Copy'}</GlassButton>
-            <GlassButton size="sm" variant="primary" onClick={shareOnWhatsApp}><MessageCircle className="w-4 h-4" /> WhatsApp</GlassButton>
-          </div>
-        </GlassCard>
+          <GlassButton variant="brand" size="sm" type="button" onClick={copyLink}>
+            {copied ? <><CheckCircle2 className="w-4 h-4" /> Copied</> : <><Link2 className="w-4 h-4" /> Copy link</>}
+          </GlassButton>
+        </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Upcoming */}
-        <GlassCard hover={false}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Upcoming meetings</h2>
-            <Link to="/bookings" className="text-xs accent-text font-medium flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
-          </div>
-          {upcoming.length === 0 ? (
-            <EmptyState icon={Calendar} title="No meetings yet" description="Your calendar is clear. Create an event and share your booking link." />
-          ) : (
-            <div className="space-y-3">
-              {upcoming.slice(0, 5).map((b) => (
-                <BookingRow key={b.id} booking={b} timezone={timezone} />
-              ))}
-            </div>
-          )}
-        </GlassCard>
+      {/* Summary strip */}
+      <dl className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card">
+        <Stat label="Today" value={todays.length} />
+        <Stat label="Upcoming" value={upcoming.length} />
+        <Stat label="All bookings" value={bookings.length} />
+        <Stat label="Event types" value={eventTypes.length} />
+      </dl>
 
-        {/* Recent bookings */}
-        <GlassCard hover={false}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Recent bookings</h2>
-            <Link to="/bookings" className="text-xs accent-text font-medium flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+      <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
+        {/* Upcoming meetings */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold">Upcoming meetings</h2>
+            <Link to="/bookings" className="text-sm font-semibold text-link hover:underline">View all</Link>
           </div>
-          {recent.length === 0 ? (
-            <EmptyState icon={Users} title="No bookings yet" description="When someone books a time, it'll show up here." />
-          ) : (
-            <div className="space-y-3">
-              {recent.map((b) => (
-                <BookingRow key={b.id} booking={b} timezone={timezone} compact />
-              ))}
-            </div>
-          )}
-        </GlassCard>
-      </div>
-
-      {/* Event types quick */}
-      <GlassCard hover={false}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Your event types</h2>
-          <Link to="/event-types" className="text-xs accent-text font-medium flex items-center gap-1">Manage <ArrowRight className="w-3 h-3" /></Link>
-        </div>
-        {eventTypes.length === 0 ? (
-          <EmptyState icon={Plus} title="No event types" description="Create your first event type to start accepting bookings." action={<Link to="/event-types?new=true"><GlassButton variant="primary" size="sm"><Plus className="w-4 h-4" /> Create event</GlassButton></Link>} />
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {eventTypes.map((e) => (
-              <Link key={e.id} to={`/book/${e.id}`} className="glass-button rounded-2xl p-4 block">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: (e.color||'#0A84FF')+'22' }}>
-                    <Clock className="w-4 h-4" style={{ color: e.color || '#0A84FF' }} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">{e.name}</div>
-                    <div className="text-xs text-muted-foreground">{e.duration} min</div>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground truncate">{e.location || 'Meeting'}</div>
-              </Link>
+          <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+            {groups.length === 0 ? (
+              <EmptyState icon={Calendar} title="No upcoming meetings" description="Share your booking link and new meetings show up here." />
+            ) : groups.map(([day, items]) => (
+              <div key={day}>
+                <div className="bg-secondary px-5 py-2.5 text-sm font-bold border-b border-border">{day}</div>
+                {items.map((b) => <BookingRow key={b.id} booking={b} timezone={timezone} color={eventColor(b.event_type_id)} />)}
+              </div>
             ))}
           </div>
-        )}
-      </GlassCard>
-    </div>
-  );
-}
+        </section>
 
-function StatCard({ icon: Icon, label, value }) {
-  return (
-    <GlassCard className="!p-5">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-9 h-9 rounded-xl glass flex items-center justify-center">
-          <Icon className="w-4 h-4 accent-text" />
+        {/* Recent */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold">Recently booked</h2>
+          </div>
+          <div className="rounded-xl border border-border bg-card shadow-card">
+            {recent.length === 0 ? (
+              <p className="px-5 py-10 text-center text-sm text-muted-foreground">New bookings appear here.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {recent.map((b) => (
+                  <li key={b.id} className="flex items-center gap-3 px-5 py-3.5">
+                    <Avatar name={b.guest_name} size={32} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold">{b.guest_name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{b.event_name || 'Meeting'} · {formatMeetingDate(b.start_time, timezone)}</div>
+                    </div>
+                    {b.status === 'cancelled' && <span className="text-xs font-semibold text-destructive">Canceled</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* Event types */}
+      <section className="mt-10">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-bold">Event types</h2>
+          <Link to="/event-types" className="text-sm font-semibold text-link hover:underline">View all</Link>
         </div>
-      </div>
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </GlassCard>
+        {eventTypes.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card shadow-card">
+            <EmptyState icon={Plus} title="No event types" description="Create an event type to start taking bookings." action={<Link to="/event-types?new=true"><GlassButton variant="primary" size="sm" type="button"><Plus className="w-4 h-4" /> New event type</GlassButton></Link>} />
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {eventTypes.slice(0, 3).map((e) => <EventCard key={e.id} event={e} />)}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
-function BookingRow({ booking, timezone, compact }) {
-  const date = formatMeetingDate(booking.start_time, timezone);
-  const time = formatMeetingTime(booking.start_time, timezone);
+function groupByDay(list, timezone) {
+  const map = new Map();
+  list.forEach((b) => {
+    const key = new Date(b.start_time).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', timeZone: timezone });
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(b);
+  });
+  return [...map.entries()];
+}
+
+function Stat({ label, value }) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl glass">
-      <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold shrink-0">
-        {new Date(booking.start_time).getDate()}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-medium text-sm truncate">{booking.guest_name}</div>
-        <div className="text-xs text-muted-foreground truncate">{booking.event_name || 'Meeting'} · {time}</div>
-        {!compact && <div className="text-xs text-muted-foreground">{date}</div>}
-      </div>
-      {booking.status === 'cancelled' && <span className="text-xs text-red-500 font-medium">Cancelled</span>}
+    <div className="bg-card px-5 py-4">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-2xl font-bold tabular">{value}</dd>
     </div>
+  );
+}
+
+function BookingRow({ booking, timezone, color }) {
+  const start = formatMeetingTime(booking.start_time, timezone);
+  const end = booking.end_time ? formatMeetingTime(booking.end_time, timezone) : null;
+  return (
+    <Link to="/bookings" className="flex items-center gap-4 px-5 py-4 border-b border-border last:border-b-0 transition-all duration-200 hover:bg-secondary">
+      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: color || 'var(--primary)' }} />
+      <div className="w-36 shrink-0 text-sm tabular text-muted-foreground">{start}{end && ` – ${end}`}</div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-bold">{booking.guest_name}</div>
+        <div className="truncate text-sm text-muted-foreground">Event type <span className="font-semibold text-foreground">{booking.event_name || 'Meeting'}</span></div>
+      </div>
+    </Link>
   );
 }

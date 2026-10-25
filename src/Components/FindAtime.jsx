@@ -62,10 +62,10 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[85vh] overflow-y-auto p-6 block">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 accent-text" />
-            <DialogTitle className="font-semibold text-lg">Find a Time</DialogTitle>
+            <Clock className="w-5 h-5 text-link" />
+            <DialogTitle>Find a Time</DialogTitle>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
         {loading ? (
@@ -81,7 +81,7 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
                   <button
                     key={e.id}
                     onClick={() => setSelectedEvent(e)}
-                    className={`glass-button rounded-xl px-3 py-2 text-xs font-medium ${selectedEvent?.id === e.id ? 'accent-border accent-text' : ''}`}
+                    className={`rounded-full border px-3.5 h-8 text-sm font-semibold transition-all duration-200 ${selectedEvent?.id === e.id ? 'border-primary bg-primary-soft text-link' : 'border-border hover:border-border-hover'}`}
                   >
                     {e.name}
                   </button>
@@ -101,13 +101,13 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
               <div className="space-y-5">
                 {daySlots.map((day, di) => (
                   <div key={di}>
-                    <div className="text-sm font-medium mb-2 text-muted-foreground">{day.label}</div>
+                    <div className="text-sm font-bold mb-2">{day.label}</div>
                     <div className="grid grid-cols-3 gap-2">
                       {day.slots.map((s, si) => (
                         <button
                           key={si}
                           onClick={() => { onSelectSlot?.(s, selectedEvent); onClose(); }}
-                          className="glass-button rounded-xl py-2.5 text-sm font-medium"
+                          className="rounded-lg border border-primary/50 py-2.5 text-sm font-bold text-link tabular transition-all duration-200 hover:border-primary hover:bg-primary-soft"
                         >
                           {s.label}
                         </button>

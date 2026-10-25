@@ -36,14 +36,14 @@ export default function QRCodeModal({ url, open, onClose }) {
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-sm p-6 text-center block">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <QrCode className="w-5 h-5 accent-text" />
-            <DialogTitle className="font-semibold">QR Code</DialogTitle>
+            <QrCode className="w-5 h-5 text-link" />
+            <DialogTitle>QR Code</DialogTitle>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="glass rounded-2xl p-4 mb-4 inline-block">
-          <img src={qrUrl} alt="QR Code" width={220} height={220} className="rounded-xl" />
+        <div className="rounded-xl border border-border bg-white p-4 mb-4 inline-block">
+          <img src={qrUrl} alt="QR Code" width={220} height={220} className="rounded-md" />
         </div>
 
         <p className="text-xs text-muted-foreground mb-4 break-all">{url}</p>

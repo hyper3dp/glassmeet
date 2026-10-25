@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/localApi';
 import {
-  BookOpen, Calendar, Clock, MessageCircle, Copy, Check, X, Trash2, Mail, Phone, FileText, Video, RefreshCw,
+  BookOpen, Calendar, Clock, MessageCircle, Copy, Check, X, Trash2, Mail, Phone, ChevronRight,
 } from 'lucide-react';
-import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, EmptyState, Spinner } from '@/components/glass';
+import { GlassButton, GlassInput, GlassTextarea, GlassLabel, EmptyState, Spinner, PageHeader, Tabs } from '@/components/glass';
 import {
   formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, buildBookingContext,
 } from '@/lib/whatsapp';
@@ -32,6 +32,7 @@ export default function Bookings({ profile, whatsapp }) {
     let list = bookings;
     if (filter === 'upcoming') list = bookings.filter((b) => b.status === 'confirmed' && new Date(b.start_time) >= now).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
     if (filter === 'past') list = bookings.filter((b) => new Date(b.start_time) < now).sort((a,b)=> new Date(b.start_time)-new Date(a.start_time));
+    if (filter === 'pending') list = bookings.filter((b) => b.approval_status === 'pending' && b.status !== 'cancelled').sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
     if (filter === 'cancelled') list = bookings.filter((b) => b.status === 'cancelled');
     return list;
   }, [bookings, filter]);
@@ -44,30 +45,52 @@ export default function Bookings({ profile, whatsapp }) {
 
   if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Bookings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage all your scheduled meetings.</p>
-      </div>
+  const counts = {
+    upcoming: bookings.filter((b) => b.status === 'confirmed' && new Date(b.start_time) >= now).length,
+    pending: bookings.filter((b) => b.approval_status === 'pending' && b.status !== 'cancelled').length,
+  };
+  const groups = [];
+  filtered.forEach((b) => {
+    const day = new Date(b.start_time).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: timezone });
+    const last = groups[groups.length - 1];
+    if (last && last[0] === day) last[1].push(b); else groups.push([day, [b]]);
+  });
 
-      <div className="flex gap-2 glass rounded-full p-1 w-fit">
-        {['upcoming','past','cancelled'].map((f) => (
-          <button key={f} onClick={()=>setFilter(f)} className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition ${filter===f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
+  return (
+    <div className="animate-fade-in">
+      <PageHeader title="Meetings">
+        <Tabs
+          value={filter}
+          onChange={setFilter}
+          tabs={[
+            { value: 'upcoming', label: 'Upcoming', count: counts.upcoming || null },
+            { value: 'pending', label: 'Pending', count: counts.pending || null },
+            { value: 'past', label: 'Past' },
+            { value: 'cancelled', label: 'Canceled' },
+          ]}
+        />
+      </PageHeader>
+
+      <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5 text-sm text-muted-foreground">
+          <span>Displaying {filtered.length} {filtered.length === 1 ? 'event' : 'events'}</span>
+          <span className="hidden sm:inline">{timezone}</span>
+        </div>
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title={filter === 'upcoming' ? 'No upcoming meetings' : filter === 'pending' ? 'Nothing waiting for approval' : filter === 'past' ? 'No past meetings' : 'No canceled meetings'}
+            description={filter === 'upcoming' ? 'Share your booking link and new meetings show up here.' : undefined}
+          />
+        ) : groups.map(([day, items]) => (
+          <div key={day}>
+            <div className="bg-secondary px-5 py-2.5 text-sm font-bold border-b border-border">{day}</div>
+            {items.map((b) => (
+              <BookingCard key={b.id} booking={b} timezone={timezone} whatsapp={whatsapp} onView={()=>setSelected(b)} onCancel={()=>cancel(b.id)} />
+            ))}
+          </div>
         ))}
       </div>
-
-      {filtered.length === 0 ? (
-        <GlassCard hover={false}>
-          <EmptyState icon={BookOpen} title="No bookings here" description={filter==='upcoming' ? "You're all clear. Share your booking link to get started." : "Nothing to show in this view."} />
-        </GlassCard>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((b) => (
-            <BookingCard key={b.id} booking={b} timezone={timezone} whatsapp={whatsapp} onView={()=>setSelected(b)} onCancel={()=>cancel(b.id)} />
-          ))}
-        </div>
-      )}
 
       {selected && (
         <BookingDetail booking={selected} timezone={timezone} whatsapp={whatsapp} profile={profile} onClose={()=>setSelected(null)} onCancel={()=>{ cancel(selected.id); setSelected(null); }} onChanged={load} />
@@ -79,7 +102,9 @@ export default function Bookings({ profile, whatsapp }) {
 function BookingCard({ booking, timezone, whatsapp, onView, onCancel }) {
   const date = formatMeetingDate(booking.start_time, timezone);
   const time = formatMeetingTime(booking.start_time, timezone);
+  const end = booking.end_time ? formatMeetingTime(booking.end_time, timezone) : null;
   const cancelled = booking.status === 'cancelled';
+  const pending = booking.approval_status === 'pending' && !cancelled;
 
   const sendWhatsApp = () => {
     const ctx = { guestName: booking.guest_name, hostName: '', date, time, duration: '', meetingUrl: booking.meeting_url || '', timezone };
@@ -89,23 +114,27 @@ function BookingCard({ booking, timezone, whatsapp, onView, onCancel }) {
   };
 
   return (
-    <GlassCard className="flex flex-col sm:flex-row sm:items-center gap-4">
-      <div className="flex items-center gap-4 flex-1 min-w-0">
-        <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 ${cancelled ? 'glass' : 'bg-primary text-primary-foreground'}`}>
-          <span className="text-[10px] uppercase">{new Date(booking.start_time).toLocaleString('en-US',{month:'short'})}</span>
-          <span className="text-lg font-semibold leading-none">{new Date(booking.start_time).getDate()}</span>
-        </div>
-        <div className="min-w-0">
-          <div className="font-semibold truncate">{booking.guest_name}</div>
-          <div className="text-sm text-muted-foreground truncate">{booking.event_name} · {time} · {date}</div>
-        </div>
+    <div className="flex flex-col gap-3 border-b border-border last:border-b-0 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
+      <div className="flex items-center gap-4 sm:w-48 sm:shrink-0">
+        <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${cancelled ? 'bg-border-hover' : 'bg-primary'}`} />
+        <span className={`text-sm tabular ${cancelled ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{time}{end && ` – ${end}`}</span>
       </div>
-      <div className="flex gap-2">
-        <GlassButton size="sm" onClick={onView}>Details</GlassButton>
-        {!cancelled && <GlassButton size="sm" variant="primary" onClick={sendWhatsApp}><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</GlassButton>}
-        {!cancelled && <button onClick={onCancel} className="w-9 h-9 rounded-xl glass flex items-center justify-center text-red-500"><X className="w-4 h-4" /></button>}
+      <div className="min-w-0 flex-1 pl-[30px] sm:pl-0">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[15px] font-bold">{booking.guest_name}</span>
+          {pending && <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning">Pending</span>}
+          {cancelled && <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">Canceled</span>}
+        </div>
+        <div className="truncate text-sm text-muted-foreground">Event type <span className="font-semibold text-foreground">{booking.event_name || 'Meeting'}</span></div>
       </div>
-    </GlassCard>
+      <div className="flex items-center gap-1 pl-[30px] sm:pl-0">
+        {!cancelled && <GlassButton size="sm" variant="ghost" type="button" onClick={sendWhatsApp}><MessageCircle className="w-4 h-4" /> WhatsApp</GlassButton>}
+        {!cancelled && <GlassButton size="sm" variant="ghost" type="button" onClick={onCancel} className="text-destructive hover:text-destructive"><X className="w-4 h-4" /> Cancel</GlassButton>}
+        <button type="button" onClick={onView} className="h-8 px-2 text-sm font-semibold text-muted-foreground flex items-center gap-1 hover:text-foreground">
+          Details <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -130,13 +159,13 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[90vh] overflow-y-auto p-6 block">
         <div className="flex items-center justify-between mb-5">
-          <DialogTitle className="text-lg font-semibold">Meeting details</DialogTitle>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
+          <DialogTitle>Meeting details</DialogTitle>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="space-y-4">
-          <div className="glass rounded-2xl p-4">
-            <div className="font-semibold text-lg mb-1">{booking.event_name}</div>
+          <div className="rounded-lg border border-border p-4 space-y-1.5">
+            <div className="font-bold text-lg">{booking.event_name}</div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Calendar className="w-4 h-4" /> {formatMeetingDate(booking.start_time, timezone)}</div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /> {formatMeetingTime(booking.start_time, timezone)} ({timezone})</div>
           </div>
@@ -148,7 +177,7 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
           {booking.guest_notes && (
             <div>
               <GlassLabel>Guest notes</GlassLabel>
-              <div className="glass rounded-xl p-3 text-sm text-muted-foreground">{booking.guest_notes}</div>
+              <div className="rounded-lg bg-secondary p-3 text-sm text-foreground">{booking.guest_notes}</div>
             </div>
           )}
 
@@ -156,7 +185,7 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
             <GlassLabel>Meeting URL</GlassLabel>
             <div className="flex gap-2">
               <GlassInput value={meetingUrl} onChange={(e)=>setMeetingUrl(e.target.value)} placeholder="https://..." />
-              <GlassButton onClick={copyLink}>{copied ? <Check className="w-4 h-4 accent-text" /> : <Copy className="w-4 h-4" />}</GlassButton>
+              <GlassButton onClick={copyLink}>{copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}</GlassButton>
             </div>
           </div>
 
@@ -165,8 +194,8 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
             <GlassTextarea rows={3} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
           </div>
 
-          <div className="glass rounded-2xl p-3">
-            <div className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp message</div>
+          <div className="rounded-lg bg-secondary p-4">
+            <div className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp message</div>
             <pre className="text-sm whitespace-pre-wrap font-body text-foreground">{waMsg}</pre>
           </div>
         </div>
@@ -183,9 +212,9 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
 
 function InfoRow({ icon: Icon, label, value }) {
   return (
-    <div className="glass rounded-xl p-3">
-      <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-0.5"><Icon className="w-3 h-3" /> {label}</div>
-      <div className="font-medium truncate">{value}</div>
+    <div className="rounded-lg border border-border p-3">
+      <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-0.5"><Icon className="w-3 h-3" /> {label}</div>
+      <div className="font-semibold truncate">{value}</div>
     </div>
   );
 }

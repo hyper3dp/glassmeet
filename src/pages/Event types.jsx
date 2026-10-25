@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '@/lib/localApi';
-import { Plus, Clock, Edit3, Trash2, ExternalLink } from 'lucide-react';
-import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, EmptyState, Spinner } from '@/components/glass';
+import { Plus, Clock, ExternalLink, Search, X } from 'lucide-react';
+import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, EmptyState, Spinner, PageHeader, Tabs, Avatar } from '@/components/glass';
+import EventCard from '@/components/eventcard.jsx';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function EventTypes({ profile }) {
@@ -10,6 +11,7 @@ export default function EventTypes({ profile }) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -37,24 +39,49 @@ export default function EventTypes({ profile }) {
     setEventTypes(eventTypes.filter((e) => e.id !== id));
   };
 
+  const handleToggle = async (ev, active) => {
+    await api.entities.EventType.update(ev.id, { active });
+    setEventTypes((list) => list.map((x) => (x.id === ev.id ? { ...x, active } : x)));
+  };
+
+  const q = query.trim().toLowerCase();
+  const shown = q ? eventTypes.filter((e) => (e.name || '').toLowerCase().includes(q)) : eventTypes;
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Event Types</h1>
-          <p className="text-muted-foreground text-sm mt-1">Create meeting types guests can book with you.</p>
+    <div className="animate-fade-in">
+      <PageHeader title="Scheduling" actions={<GlassButton variant="primary" type="button" onClick={openNew}><Plus className="w-4 h-4" strokeWidth={2.5} /> Create</GlassButton>}>
+        <Tabs tabs={[{ value: 'types', label: 'Event types' }]} value="types" onChange={() => {}} />
+      </PageHeader>
+
+      <div className="mb-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <GlassInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search event types" className="pl-10 rounded-full" aria-label="Search event types" />
         </div>
-        <GlassButton variant="primary" onClick={openNew}><Plus className="w-4 h-4" /> New event</GlassButton>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between gap-4 border-b border-border pb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar src={profile?.profile_photo} name={profile?.full_name} size={36} />
+          <div className="text-[15px] font-bold truncate">{profile?.full_name || 'You'}</div>
+        </div>
+        {eventTypes[0] && (
+          <Link to={`/book/${eventTypes[0].id}`} className="shrink-0 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
+            <ExternalLink className="w-4 h-4" /> View landing page
+          </Link>
+        )}
       </div>
 
       {loading ? <div className="flex justify-center py-20"><Spinner /></div> : eventTypes.length === 0 ? (
         <GlassCard hover={false}>
-          <EmptyState icon={Clock} title="No event types yet" description="Create your first event type — like a 30-minute meeting — to start accepting bookings." action={<GlassButton variant="primary" onClick={openNew}><Plus className="w-4 h-4" /> Create event</GlassButton>} />
+          <EmptyState icon={Clock} title="Create your first event type" description="An event type is a meeting guests can book, like a 30 minute call. Share its link and guests pick a time." action={<GlassButton variant="primary" type="button" onClick={openNew}><Plus className="w-4 h-4" /> New event type</GlassButton>} />
         </GlassCard>
+      ) : shown.length === 0 ? (
+        <p className="py-12 text-center text-sm text-muted-foreground">No event types match &ldquo;{query}&rdquo;.</p>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {eventTypes.map((e) => (
-            <EventCard key={e.id} event={e} onEdit={() => openEdit(e)} onDelete={() => handleDelete(e.id)} />
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {shown.map((e) => (
+            <EventCard key={e.id} event={e} onEdit={() => openEdit(e)} onDelete={() => handleDelete(e.id)} onToggle={(active) => handleToggle(e, active)} />
           ))}
         </div>
       )}
@@ -77,32 +104,6 @@ export default function EventTypes({ profile }) {
         />
       )}
     </div>
-  );
-}
-
-function EventCard({ event, onEdit, onDelete }) {
-  return (
-    <GlassCard hover={false} className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate font-semibold">{event.name}</h2>
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{event.description || 'No description'}</p>
-        </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs ${event.active ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
-          {event.active ? 'Active' : 'Paused'}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Clock className="h-4 w-4" /> {event.duration || 30} min <span aria-hidden="true">·</span> {event.location || 'Online'}
-      </div>
-      <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-        <GlassButton size="sm" onClick={onEdit}><Edit3 className="h-4 w-4" /> Edit</GlassButton>
-        <GlassButton size="sm" variant="danger" onClick={onDelete}><Trash2 className="h-4 w-4" /> Delete</GlassButton>
-        <Link className="ml-auto inline-flex items-center gap-1 text-sm accent-text" to={`/book/${event.id}`}>
-          Booking page <ExternalLink className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-    </GlassCard>
   );
 }
 
@@ -134,8 +135,8 @@ function EventModal({ event, onClose, onSave }) {
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl p-6 block">
         <div className="mb-5 flex items-center justify-between">
-          <DialogTitle className="text-lg font-semibold">{event ? 'Edit event type' : 'New event type'}</DialogTitle>
-          <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-2 hover:bg-foreground/5">×</button>
+          <DialogTitle>{event ? 'Edit event type' : 'New event type'}</DialogTitle>
+          <button type="button" aria-label="Close" onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -175,11 +176,11 @@ function EventModal({ event, onClose, onSave }) {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-5 text-sm">
-            <label className="flex items-center gap-2"><input type="checkbox" checked={form.active} onChange={(e) => setField('active', e.target.checked)} /> Active</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={form.requires_approval} onChange={(e) => setField('requires_approval', e.target.checked)} /> Requires approval</label>
+          <div className="flex flex-wrap gap-5 text-sm font-semibold">
+            <label className="flex items-center gap-2"><input type="checkbox" className="w-4 h-4" checked={form.active} onChange={(e) => setField('active', e.target.checked)} /> Active</label>
+            <label className="flex items-center gap-2"><input type="checkbox" className="w-4 h-4" checked={form.requires_approval} onChange={(e) => setField('requires_approval', e.target.checked)} /> Requires approval</label>
           </div>
-          <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <GlassButton type="button" variant="ghost" onClick={onClose}>Cancel</GlassButton>
             <GlassButton type="submit" variant="primary" disabled={saving}>{saving ? 'Saving...' : 'Save event'}</GlassButton>
           </div>

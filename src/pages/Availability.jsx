@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/localApi';
-import { Clock, Plus, Trash2, CalendarOff, X } from 'lucide-react';
-import { GlassCard, GlassButton, GlassInput, GlassSelect, GlassLabel, EmptyState, Spinner } from '@/components/glass';
+import { Plus, Trash2, CalendarOff, X, Globe, RefreshCw } from 'lucide-react';
+import { GlassButton, GlassInput, GlassSelect, GlassLabel, Spinner, PageHeader, Tabs } from '@/components/glass';
 import { formatDate } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 export default function Availability({ profile }) {
   const [rules, setRules] = useState([]);
@@ -63,64 +62,93 @@ export default function Availability({ profile }) {
 
   if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
 
+  const toggleDay = async (dow, on) => {
+    const dayRules = rules.filter((r) => r.day_of_week === dow);
+    if (on) return addRule(dow);
+    await Promise.all(dayRules.map((r) => api.entities.AvailabilityRule.delete(r.id)));
+    setRules((rs) => rs.filter((r) => r.day_of_week !== dow));
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Availability</h1>
-        <p className="text-muted-foreground text-sm mt-1">Set your working hours, breaks, and blocked dates.</p>
-      </div>
+    <div className="animate-fade-in">
+      <PageHeader title="Availability">
+        <Tabs tabs={[{ value: 'schedules', label: 'Schedules' }]} value="schedules" onChange={() => {}} />
+      </PageHeader>
 
-      {/* Weekly */}
-      <GlassCard hover={false}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold flex items-center gap-2"><Clock className="w-4 h-4 accent-text" /> Weekly hours</h2>
-        </div>
-        <div className="space-y-3">
-          {DAYS.map((day, dow) => {
-            const dayRules = rules.filter((r) => r.day_of_week === dow).sort((a,b)=> a.start_time.localeCompare(b.start_time));
-            return (
-              <div key={dow} className="flex flex-col sm:flex-row sm:items-start gap-3 py-3 border-b border-border/50 last:border-0">
-                <div className="w-24 pt-2 font-medium text-sm">{SHORT[dow]}</div>
-                <div className="flex-1 space-y-2">
-                  {dayRules.length === 0 && <div className="text-sm text-muted-foreground py-2">Unavailable</div>}
-                  {dayRules.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2">
-                      <GlassInput type="time" value={r.start_time} onChange={(e)=>updateRule(r.id,'start_time',e.target.value)} className="!py-2 w-32" />
-                      <span className="text-muted-foreground">to</span>
-                      <GlassInput type="time" value={r.end_time} onChange={(e)=>updateRule(r.id,'end_time',e.target.value)} className="!py-2 w-32" />
-                      <button onClick={()=>deleteRule(r.id)} className="w-8 h-8 rounded-lg glass flex items-center justify-center text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-                <GlassButton size="sm" variant="ghost" onClick={()=>addRule(dow)}><Plus className="w-3.5 h-3.5" /> Add</GlassButton>
-              </div>
-            );
-          })}
-        </div>
-      </GlassCard>
-
-      {/* Exceptions */}
-      <GlassCard hover={false}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold flex items-center gap-2"><CalendarOff className="w-4 h-4 accent-text" /> Blocked dates & overrides</h2>
-          <GlassButton size="sm" variant="primary" onClick={()=>setShowExc(true)}><Plus className="w-3.5 h-3.5" /> Add date</GlassButton>
-        </div>
-        {exceptions.length === 0 ? (
-          <EmptyState icon={CalendarOff} title="No blocked dates" description="Add vacation days, holidays, or one-off overrides here." />
-        ) : (
-          <div className="space-y-2">
-            {exceptions.map((e) => (
-              <div key={e.id} className="flex items-center justify-between glass rounded-xl p-3">
-                <div>
-                  <div className="font-medium text-sm">{new Date(e.date+'T00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
-                  <div className="text-xs text-muted-foreground capitalize">{e.type}{e.start_time ? ` · ${e.start_time}–${e.end_time}` : ' · all day'}{e.label ? ` · ${e.label}` : ''}</div>
-                </div>
-                <button onClick={()=>deleteException(e.id)} className="w-8 h-8 rounded-lg glass flex items-center justify-center text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            ))}
+      <div className="rounded-xl border border-border bg-card shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-5">
+          <div>
+            <div className="text-sm text-muted-foreground">Schedule</div>
+            <div className="text-[17px] font-bold text-link">Working hours (default)</div>
           </div>
-        )}
-      </GlassCard>
+          <div className="text-sm text-muted-foreground flex items-center gap-1.5"><Globe className="w-4 h-4" /> {profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}</div>
+        </div>
+
+        <div className="grid lg:grid-cols-[1fr_1fr]">
+          {/* Weekly hours */}
+          <section className="p-6 lg:border-r border-border">
+            <h2 className="text-[15px] font-bold flex items-center gap-2"><RefreshCw className="w-4 h-4 text-muted-foreground" /> Weekly hours</h2>
+            <p className="mt-1 mb-5 text-sm text-muted-foreground">Set when you are typically available for meetings</p>
+            <div className="space-y-4">
+              {DAYS.map((day, dow) => {
+                const dayRules = rules.filter((r) => r.day_of_week === dow).sort((a,b)=> a.start_time.localeCompare(b.start_time));
+                const on = dayRules.length > 0;
+                return (
+                  <div key={dow} className="flex items-start gap-3">
+                    <label className="flex items-center gap-3 pt-1.5 w-[74px] shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={on} onChange={(e) => toggleDay(dow, e.target.checked)} className="w-4 h-4" aria-label={`Available on ${day}`} />
+                      <span className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center ${on ? 'bg-foreground text-background' : 'bg-secondary text-muted-foreground'}`} title={day}>{day[0]}</span>
+                    </label>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {!on && <div className="pt-2.5 text-sm text-muted-foreground">Unavailable</div>}
+                      {dayRules.map((r) => (
+                        <div key={r.id} className="flex items-center gap-2">
+                          <GlassInput type="time" value={r.start_time} onChange={(e)=>updateRule(r.id,'start_time',e.target.value)} className="h-10 w-[118px] px-2.5 tabular" aria-label={`${day} start`} />
+                          <span className="text-muted-foreground">–</span>
+                          <GlassInput type="time" value={r.end_time} onChange={(e)=>updateRule(r.id,'end_time',e.target.value)} className="h-10 w-[118px] px-2.5 tabular" aria-label={`${day} end`} />
+                          <button onClick={()=>deleteRule(r.id)} aria-label="Remove interval" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><X className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={()=>addRule(dow)} aria-label={`Add hours on ${day}`} className="mt-1 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><Plus className="w-4 h-4" /></button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Date-specific hours */}
+          <section className="p-6 border-t lg:border-t-0 border-border">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-[15px] font-bold flex items-center gap-2"><CalendarOff className="w-4 h-4 text-muted-foreground" /> Date-specific hours</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Adjust hours or block days off</p>
+              </div>
+              <GlassButton size="sm" type="button" onClick={()=>setShowExc(true)}><Plus className="w-4 h-4" /> Hours</GlassButton>
+            </div>
+            <div className="mt-5">
+              {exceptions.length === 0 ? (
+                <p className="rounded-lg bg-secondary px-4 py-6 text-center text-sm text-muted-foreground">No date-specific hours yet. Add holidays, days off or one-off hours.</p>
+              ) : (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                  {exceptions.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold">{new Date(e.date+'T00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric', year:'numeric'})}</div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {e.type === 'blocked' && !e.start_time ? 'Unavailable' : e.start_time ? `${e.start_time} – ${e.end_time}` : 'Available all day'}
+                          {e.label ? ` · ${e.label}` : ''}
+                        </div>
+                      </div>
+                      <button onClick={()=>deleteException(e.id)} aria-label="Remove date" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
 
       {showExc && <ExceptionModal onAdd={addException} onClose={()=>setShowExc(false)} />}
     </div>
@@ -143,8 +171,8 @@ function ExceptionModal({ onAdd, onClose }) {
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
         <div className="flex items-center justify-between mb-5">
-          <DialogTitle className="text-lg font-semibold">Add date override</DialogTitle>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg glass flex items-center justify-center"><X className="w-4 h-4" /></button>
+          <DialogTitle>Add date-specific hours</DialogTitle>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
         <div className="space-y-4">
           <div>
@@ -173,9 +201,9 @@ function ExceptionModal({ onAdd, onClose }) {
             <GlassInput value={label} onChange={(e)=>setLabel(e.target.value)} placeholder="Vacation, Holiday..." />
           </div>
         </div>
-        <div className="flex gap-2 mt-6">
-          <GlassButton className="flex-1" onClick={onClose}>Cancel</GlassButton>
-          <GlassButton variant="primary" className="flex-1" onClick={save}>Add</GlassButton>
+        <div className="flex justify-end gap-2 mt-6">
+          <GlassButton type="button" variant="ghost" onClick={onClose}>Cancel</GlassButton>
+          <GlassButton type="button" variant="primary" onClick={save}>Apply</GlassButton>
         </div>
       </DialogContent>
     </Dialog>

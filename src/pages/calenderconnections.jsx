@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Calendar, CalendarCheck, RefreshCw, Plug, Unplug, CheckCircle2,
   Apple, Shield, AlertCircle, Loader2, Settings2, Zap, Link2, ZapOff,
-  Rss, Copy, RotateCcw, Trash2, Bell, Plus, Globe,
+  Rss, Copy, RotateCcw, Trash2, Plus, Globe,
 } from 'lucide-react';
-import { GlassCard, GlassButton, GlassInput } from '@/components/glass';
+import { GlassCard, GlassButton, GlassInput, PageHeader } from '@/components/glass';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/localApi';
 import { useApp } from '@/lib/useprofile.js';
@@ -216,13 +216,10 @@ export default function CalendarConnections() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <header>
-        <h1 className="text-2xl font-semibold">Calendar Connections</h1>
-        <p className="text-sm text-muted-foreground mt-1">Connect your calendars to check availability and sync meetings automatically.</p>
-      </header>
+      <PageHeader title="Calendars" description="Connect your calendars so GlassMeet checks availability and adds new meetings." className="mb-0" />
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border shadow-card">
         <SummaryStat
           icon={Link2}
           label="Connected"
@@ -247,12 +244,12 @@ export default function CalendarConnections() {
       {/* Google Calendar */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-white shadow-xs flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-lg border border-border bg-white flex items-center justify-center shrink-0">
             <GoogleG />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold">Google Calendar</h2>
+              <h2 className="text-[17px] font-bold">Google Calendar</h2>
               <StatusBadge connected={googleConnected} />
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -265,7 +262,7 @@ export default function CalendarConnections() {
               <div className="mt-4 space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {selectedCalendars.length ? selectedCalendars.map((c) => (
-                    <span key={c} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs glass">
+                    <span key={c} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-secondary">
                       <Calendar className="w-3 h-3" /> {c}
                     </span>
                   )) : <span className="text-xs text-muted-foreground">Checking all calendars</span>}
@@ -276,7 +273,7 @@ export default function CalendarConnections() {
                   </div>
                 )}
                 {testResult?.type === 'google' && testResult.ok && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <p className="text-xs text-success flex items-center gap-1.5">
                     <CheckCircle2 className="w-3 h-3" /> Connection verified — token is valid.
                   </p>
                 )}
@@ -317,13 +314,13 @@ export default function CalendarConnections() {
       {/* Apple Calendar */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-black flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-lg bg-black border border-border flex items-center justify-center shrink-0">
             <Apple className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold">Apple Calendar</h2>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs glass text-emerald-600 dark:text-emerald-400">
+              <h2 className="text-[17px] font-bold">Apple Calendar</h2>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-success">
                 <CheckCircle2 className="w-3 h-3" /> Always available
               </span>
             </div>
@@ -331,7 +328,7 @@ export default function CalendarConnections() {
               Add meetings to Apple Calendar on iPhone, iPad, and Mac using a standard <code className="text-xs">.ics</code> calendar file. No account connection required.
             </p>
             {testResult?.type === 'apple' && testResult.ok && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 flex items-center gap-1.5">
+              <p className="text-xs text-success mt-2 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3 h-3" /> Test event downloaded — open it to add to Apple Calendar.
               </p>
             )}
@@ -351,12 +348,12 @@ export default function CalendarConnections() {
       {/* Microsoft Outlook */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-[#0078D4] shadow-xs flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-lg bg-[#0078D4] shadow-xs flex items-center justify-center shrink-0">
             <OutlookIcon className="w-6 h-6" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold">Microsoft Outlook</h2>
+              <h2 className="text-[17px] font-bold">Microsoft Outlook</h2>
               <StatusBadge connected={outlookConnected} />
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -368,12 +365,12 @@ export default function CalendarConnections() {
             {outlookConnected && (
               <div className="mt-4 space-y-3">
                 <div className="text-sm space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-medium uppercase tracking-wide">Account</span> {outlookEmail}</div>
-                  <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-medium uppercase tracking-wide">Type</span> {outlookAccountType === 'microsoft_365' ? 'Microsoft 365 (Work/School)' : 'Personal (Outlook.com)'}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-medium">Account</span> {outlookEmail}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-medium">Type</span> {outlookAccountType === 'microsoft_365' ? 'Microsoft 365 (Work/School)' : 'Personal (Outlook.com)'}</div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {outlookCalendars.length ? outlookCalendars.map((c) => (
-                    <span key={c} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs glass">
+                    <span key={c} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-secondary">
                       <Calendar className="w-3 h-3" /> {c}
                     </span>
                   )) : <span className="text-xs text-muted-foreground">Checking all calendars</span>}
@@ -417,11 +414,11 @@ export default function CalendarConnections() {
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl glass flex items-center justify-center shrink-0">
-              <Globe className="w-5 h-5 accent-text" />
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
+              <Globe className="w-5 h-5 text-link" />
             </div>
             <div>
-              <h2 className="font-semibold">WebCal / iCalendar</h2>
+              <h2 className="text-[17px] font-bold">WebCal / iCalendar</h2>
               <p className="text-sm text-muted-foreground">Subscribe to any external calendar via a WebCal URL (read-only).</p>
             </div>
           </div>
@@ -447,11 +444,11 @@ export default function CalendarConnections() {
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl glass flex items-center justify-center shrink-0">
-              <Rss className="w-5 h-5 accent-text" />
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
+              <Rss className="w-5 h-5 text-link" />
             </div>
             <div>
-              <h2 className="font-semibold">Active Subscriptions</h2>
+              <h2 className="text-[17px] font-bold">Active Subscriptions</h2>
               <p className="text-sm text-muted-foreground">Your GlassMeet feed and WebCal subscriptions.</p>
             </div>
           </div>
@@ -468,13 +465,13 @@ export default function CalendarConnections() {
           ) : (
             <div className="mt-4 space-y-3">
               {subscriptions.filter((s) => s.active).map((sub) => (
-                <div key={sub.id} className="glass rounded-xl p-4">
+                <div key={sub.id} className="rounded-lg border border-border p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <CheckCircle2 className="w-4 h-4 text-success" />
                       <span className="text-sm font-medium">{sub.name || 'Calendar feed'}</span>
                       {sub.subscription_type === 'webcal' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wide">WebCal</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">WebCal</span>
                       )}
                     </div>
                     {sub.last_synced && (
@@ -483,13 +480,13 @@ export default function CalendarConnections() {
                   </div>
                   {sub.webcal_url ? (
                     <div className="flex items-center gap-2 mb-3">
-                      <code className="flex-1 text-xs text-muted-foreground glass rounded-lg px-3 py-2 truncate">
+                      <code className="flex-1 text-xs text-muted-foreground bg-secondary rounded-md px-3 py-2 truncate">
                         {sub.webcal_url}
                       </code>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 mb-3">
-                      <code className="flex-1 text-xs text-muted-foreground glass rounded-lg px-3 py-2 truncate">
+                      <code className="flex-1 text-xs text-muted-foreground bg-secondary rounded-md px-3 py-2 truncate">
                         {window.location.origin}{appPath(`/calendar-feed/${sub.token.slice(0, 12)}…`)}
                       </code>
                     </div>
@@ -497,7 +494,7 @@ export default function CalendarConnections() {
                   <div className="flex flex-wrap gap-2">
                     {!sub.webcal_url && (
                       <GlassButton size="sm" onClick={() => copySubscriptionUrl(sub.token)}>
-                        {copiedSub === sub.token ? <CheckCircle2 className="w-3.5 h-3.5 accent-text" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedSub === sub.token ? <CheckCircle2 className="w-3.5 h-3.5 text-link" /> : <Copy className="w-3.5 h-3.5" />}
                         {copiedSub === sub.token ? 'Copied' : 'Copy Link'}
                       </GlassButton>
                     )}
@@ -521,10 +518,10 @@ export default function CalendarConnections() {
       {/* How availability works */}
       <GlassCard hover={false}>
         <div className="flex items-start gap-3">
-          <Shield className="w-5 h-5 accent-text mt-0.5 shrink-0" />
+          <Shield className="w-5 h-5 text-link mt-0.5 shrink-0" />
 
           <div>
-            <h3 className="font-medium text-sm">Google Calendar sync</h3>
+            <h3 className="font-bold text-sm">Google Calendar sync</h3>
             <ul className="text-sm text-muted-foreground mt-2 space-y-1.5 list-disc list-inside">
               <li>Booking slots avoid busy times from the selected Google calendar and existing GlassMeet bookings.</li>
               <li>Guests receive only available time slots; Google event titles and details stay private.</li>
@@ -573,11 +570,11 @@ export default function CalendarConnections() {
 
 function StatusBadge({ connected }) {
   return connected ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs glass text-emerald-600 dark:text-emerald-400">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-success">
       <CheckCircle2 className="w-3 h-3" /> Connected
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs glass text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">
       <AlertCircle className="w-3 h-3" /> Not connected
     </span>
   );
@@ -585,12 +582,11 @@ function StatusBadge({ connected }) {
 
 function SummaryStat({ icon: Icon, label, value, hint, className }) {
   return (
-    <div className={`glass-panel p-4 ${className || ''}`}>
-      <div className="flex items-center gap-2 text-muted-foreground mb-1">
-        <Icon className="w-3.5 h-3.5" />
-        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+    <div className={`bg-card px-5 py-4 ${className || ''}`}>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-0.5">
+        <Icon className="w-3.5 h-3.5" /> {label}
       </div>
-      <div className="text-lg font-semibold leading-tight">{value}</div>
+      <div className="text-lg font-bold leading-tight">{value}</div>
       {hint && <div className="text-xs text-muted-foreground mt-0.5">{hint}</div>}
     </div>
   );
@@ -603,9 +599,9 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-white shadow-xs flex items-center justify-center"><GoogleG /></div>
+          <div className="w-10 h-10 rounded-lg border border-border bg-white flex items-center justify-center"><GoogleG /></div>
           <div>
-            <DialogTitle className="font-semibold">Google Calendar</DialogTitle>
+            <DialogTitle>Google Calendar</DialogTitle>
             <p className="text-xs text-muted-foreground">{connected ? 'Select calendars to check for conflicts' : 'OAuth authorization required'}</p>
           </div>
         </div>
@@ -615,7 +611,7 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
             <p className="text-sm text-muted-foreground mb-3">Choose the calendar where GlassMeet should create confirmed bookings.</p>
             <div className="space-y-2 mb-5">
               {calendars.map((calendar) => (
-                <label key={calendar.id} className="flex items-center gap-3 p-2.5 rounded-xl glass cursor-pointer">
+                <label key={calendar.id} className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer transition-all duration-200 hover:border-border-hover">
                   <input type="radio" name="google-calendar" checked={selected === calendar.id} onChange={() => setSelected(calendar.id)} className="accent-[hsl(var(--accent-color))]" />
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm">{calendar.summary}{calendar.primary ? ' (primary)' : ''}</span>
@@ -629,8 +625,8 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
           </>
         ) : (
           <>
-            <div className="glass rounded-xl p-4 mb-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="rounded-lg bg-secondary p-4 mb-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
               <div className="text-sm space-y-2">
                 <p className="font-medium">Connect a Google account to choose a calendar.</p>
                 <p className="text-muted-foreground text-xs">GlassMeet stores the Google refresh token encrypted on this server and creates events in the selected calendar.</p>
@@ -668,9 +664,9 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-md p-6 block">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-[#0078D4] shadow-xs flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></div>
+          <div className="w-10 h-10 rounded-lg bg-[#0078D4] shadow-xs flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></div>
           <div>
-            <DialogTitle className="font-semibold">Microsoft Outlook</DialogTitle>
+            <DialogTitle>Microsoft Outlook</DialogTitle>
             <p className="text-xs text-muted-foreground">{connected ? 'Select calendars to check for conflicts' : 'OAuth authorization required'}</p>
           </div>
         </div>
@@ -678,8 +674,8 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
         {connected ? (
           <>
             {accountEmail && (
-              <div className="glass rounded-xl p-3 mb-3 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <div className="rounded-lg bg-secondary p-3 mb-3 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                 <div>
                   <div className="text-sm font-medium">{accountEmail}</div>
                   <div className="text-xs text-muted-foreground">{acctType === 'microsoft_365' ? 'Microsoft 365 (Work/School)' : 'Personal (Outlook.com)'}</div>
@@ -689,7 +685,7 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
             <p className="text-sm text-muted-foreground mb-3">Choose which Outlook calendars GlassMeet checks when showing available slots.</p>
             <div className="space-y-2 mb-5">
               {calendars.map((cal) => (
-                <label key={cal} className="flex items-center gap-3 p-2.5 rounded-xl glass cursor-pointer">
+                <label key={cal} className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer transition-all duration-200 hover:border-border-hover">
                   <input type="checkbox" checked={selected.includes(cal)} onChange={() => toggle(cal)} className="accent-[#0078D4]" />
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm">{cal}</span>
@@ -703,8 +699,8 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
           </>
         ) : (
           <>
-            <div className="glass rounded-xl p-4 mb-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="rounded-lg bg-secondary p-4 mb-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
               <div className="text-sm space-y-2">
                 <p className="font-medium">Microsoft Outlook two-way sync requires OAuth setup.</p>
                 <p className="text-muted-foreground text-xs">
@@ -714,13 +710,13 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
                 </p>
               </div>
             </div>
-            <div className="glass rounded-xl p-3 mb-4">
+            <div className="rounded-lg bg-secondary p-3 mb-4">
               <p className="text-xs font-medium mb-2">Account type</p>
               <div className="flex gap-2">
-                <button onClick={() => setAcctType('microsoft_365')} className={`flex-1 glass-button rounded-xl px-3 py-2.5 text-sm ${acctType === 'microsoft_365' ? 'accent-border accent-text' : ''}`}>
+                <button onClick={() => setAcctType('microsoft_365')} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${acctType === 'microsoft_365' ? 'border-primary bg-primary-soft text-link' : 'border-border hover:border-border-hover'}`}>
                   Microsoft 365<br /><span className="text-xs text-muted-foreground">Work / School</span>
                 </button>
-                <button onClick={() => setAcctType('outlook_com')} className={`flex-1 glass-button rounded-xl px-3 py-2.5 text-sm ${acctType === 'outlook_com' ? 'accent-border accent-text' : ''}`}>
+                <button onClick={() => setAcctType('outlook_com')} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${acctType === 'outlook_com' ? 'border-primary bg-primary-soft text-link' : 'border-border hover:border-border-hover'}`}>
                   Outlook.com<br /><span className="text-xs text-muted-foreground">Personal</span>
                 </button>
               </div>

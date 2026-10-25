@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/localApi';
-import {
-  BarChart3, TrendingUp, CheckCircle2, XCircle, RefreshCw, Clock, Users, Calendar,
-} from 'lucide-react';
-import { GlassCard, GlassButton, EmptyState, Spinner } from '@/components/glass';
+import { BarChart3, TrendingUp, Clock, Users, Calendar } from 'lucide-react';
+import { GlassCard, EmptyState, Spinner, PageHeader } from '@/components/glass';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -89,23 +87,19 @@ export default function Analytics({ profile }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground text-sm mt-1">Booking insights and trends.</p>
-      </div>
+      <PageHeader title="Analytics" description="How guests book with you." className="mb-0" />
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={BarChart3} label="Total booked" value={stats.total} />
-        <StatCard icon={CheckCircle2} label="Confirmed" value={stats.confirmed} />
-        <StatCard icon={XCircle} label="Cancelled" value={stats.cancelled} />
-        <StatCard icon={Clock} label="Avg duration" value={`${stats.avgDuration}m`} />
-      </div>
+      <dl className="grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card">
+        <StatCard label="Total booked" value={stats.total} />
+        <StatCard label="Confirmed" value={stats.confirmed} />
+        <StatCard label="Canceled" value={stats.cancelled} />
+        <StatCard label="Average length" value={`${stats.avgDuration} min`} />
+      </dl>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Insights */}
         <GlassCard hover={false}>
-          <h2 className="font-semibold mb-4">Insights</h2>
+          <h2 className="text-lg font-bold mb-3">Insights</h2>
           <div className="space-y-3">
             <InsightRow icon={TrendingUp} label="Most popular event" value={stats.popularEvent} />
             <InsightRow icon={Clock} label="Most popular time" value={stats.popularHour} />
@@ -116,19 +110,20 @@ export default function Analytics({ profile }) {
 
         {/* Monthly chart */}
         <GlassCard hover={false}>
-          <h2 className="font-semibold mb-4">Bookings over time</h2>
+          <h2 className="text-lg font-bold mb-4">Bookings by month</h2>
           {chartData.length === 0 ? (
-            <EmptyState icon={BarChart3} title="No data yet" description="Bookings will appear here once you have data." />
+            <EmptyState icon={BarChart3} title="No bookings yet" description="This chart fills in as guests book." />
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
-                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
+                <CartesianGrid vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
+                <YAxis axisLine={false} tickLine={false} width={28} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
                 <Tooltip
-                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '12px' }}
+                  cursor={{ fill: 'var(--secondary)' }}
+                  contentStyle={{ background: 'var(--popover)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', boxShadow: 'var(--shadow-pop)' }}
                 />
-                <Bar dataKey="bookings" fill="hsl(var(--accent-color))" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="bookings" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -137,7 +132,8 @@ export default function Analytics({ profile }) {
 
       {/* Heatmap */}
       <GlassCard hover={false}>
-        <h2 className="font-semibold mb-4">Booking heatmap</h2>
+        <h2 className="text-lg font-bold mb-1">Busiest times</h2>
+        <p className="text-sm text-muted-foreground mb-4">Bookings by weekday and hour, 8am to 8pm.</p>
         <div className="overflow-x-auto">
           <div className="min-w-[480px]">
             <div className="flex gap-1 mb-1 ml-10">
@@ -154,11 +150,11 @@ export default function Analytics({ profile }) {
                     return (
                       <div
                         key={hourIdx}
-                        className="flex-1 aspect-square rounded-md transition"
+                        className="flex-1 aspect-square rounded"
                         style={{
                           background: count === 0
                             ? 'var(--muted)'
-                            : `hsl(var(--accent-color) / ${0.2 + intensity * 0.8})`,
+                            : `color-mix(in srgb, var(--primary) ${Math.round(20 + intensity * 80)}%, transparent)`,
                         }}
                         title={`${days[dayIdx]} ${hours[hourIdx]}:00 — ${count} booking${count !== 1 ? 's' : ''}`}
                       />
@@ -174,27 +170,22 @@ export default function Analytics({ profile }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value }) {
+function StatCard({ label, value }) {
   return (
-    <GlassCard className="!p-5">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-9 h-9 rounded-xl glass flex items-center justify-center">
-          <Icon className="w-4 h-4 accent-text" />
-        </div>
-      </div>
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </GlassCard>
+    <div className="bg-card px-5 py-4">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-2xl font-bold tabular">{value}</dd>
+    </div>
   );
 }
 
 function InsightRow({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
+    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Icon className="w-4 h-4" /> {label}
       </div>
-      <div className="text-sm font-medium">{value}</div>
+      <div className="text-sm font-bold">{value}</div>
     </div>
   );
 }
