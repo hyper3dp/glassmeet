@@ -1,20 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/localApi';
-import { MessageCircle, Check, Info } from 'lucide-react';
-import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader } from '@/components/glass';
+import { MessageCircle, Info } from 'lucide-react';
+import { GlassCard, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, SaveStatus } from '@/components/glass';
+import { useAutosave } from '@/lib/useAutosave';
 import {
   DEFAULT_CONFIRMATION_TEMPLATE, DEFAULT_REMINDER_24H, DEFAULT_REMINDER_1H,
 } from '@/lib/whatsapp';
 
 export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
   const [form, setForm] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const idRef = useRef(whatsapp?.id || null);
 
+  // Load once; later updates to `whatsapp` come from our own saves and must not reset typing
   useEffect(() => {
+    if (form) return;
     if (whatsapp) {
       setForm({
-        id: whatsapp.id,
         phone_number: whatsapp.phone_number || profile?.whatsapp_number || '',
         enabled: whatsapp.enabled ?? true,
         confirmation_template: whatsapp.confirmation_template || DEFAULT_CONFIRMATION_TEMPLATE,
@@ -36,32 +37,23 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
     }
   }, [whatsapp, profile]);
 
+  const saveState = useAutosave(form, async (payload) => {
+    if (idRef.current) {
+      setWhatsapp(await api.entities.WhatsAppSetting.update(idRef.current, payload));
+    } else {
+      const created = await api.entities.WhatsAppSetting.create(payload);
+      idRef.current = created.id;
+      setWhatsapp(created);
+    }
+  }, { enabled: !!form, delay: 900 });
+
   if (!form) return <div className="flex justify-center py-24"><Spinner /></div>;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const save = async () => {
-    setSaving(true);
-    try {
-      const { id, ...payload } = form;
-      if (id) {
-        const updated = await api.entities.WhatsAppSetting.update(id, payload);
-        setWhatsapp(updated);
-      } else {
-        const created = await api.entities.WhatsAppSetting.create(payload);
-        setWhatsapp(created);
-      }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch (e) {
-      alert('Could not save: ' + (e.message || ''));
-    }
-    setSaving(false);
-  };
-
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
-      <PageHeader title="WhatsApp" description="How GlassMeet prepares confirmations for your guests." />
+      <PageHeader title="WhatsApp" description="How GlassMeet prepares confirmations for your guests. Changes save automatically." actions={<SaveStatus state={saveState} />} />
 
       <GlassCard hover={false}>
         <div className="flex items-center gap-3 mb-5">
@@ -126,11 +118,6 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
         </GlassCard>
       )}
 
-      <div className="flex gap-3">
-        <GlassButton variant="primary" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : saved ? <><Check className="w-4 h-4" /> Saved</> : 'Save settings'}
-        </GlassButton>
-      </div>
     </div>
   );
 }

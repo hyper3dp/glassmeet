@@ -3,7 +3,8 @@ import { api } from '@/lib/localApi';
 import {
   BookOpen, Calendar, Clock, MessageCircle, Copy, Check, X, Trash2, Mail, Phone, ChevronRight,
 } from 'lucide-react';
-import { GlassButton, GlassInput, GlassTextarea, GlassLabel, EmptyState, Spinner, PageHeader, Tabs } from '@/components/glass';
+import { GlassButton, GlassInput, GlassTextarea, GlassLabel, EmptyState, Spinner, PageHeader, Tabs, SaveStatus } from '@/components/glass';
+import { useAutosave } from '@/lib/useAutosave';
 import {
   formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, buildBookingContext,
 } from '@/lib/whatsapp';
@@ -149,18 +150,16 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
 
   const copyLink = () => { navigator.clipboard.writeText(meetingUrl || booking.meeting_url || ''); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
-  const saveNotes = async () => {
-    await api.entities.Booking.update(booking.id, { notes, meeting_url: meetingUrl });
-    onChanged();
-    onClose();
-  };
+  const saveState = useAutosave({ notes, meeting_url: meetingUrl }, (value) => api.entities.Booking.update(booking.id, value));
+  const close = () => { if (saveState !== 'idle') onChanged(); onClose(); };
 
   return (
-    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) close(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-lg max-h-[90vh] overflow-y-auto p-6 block">
         <div className="flex items-center justify-between mb-5">
           <DialogTitle>Meeting details</DialogTitle>
-          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
+          <div className="ml-auto mr-2"><SaveStatus state={saveState} /></div>
+          <button onClick={close} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="space-y-4">
@@ -171,7 +170,7 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <InfoRow icon={Mail} label="Email" value={booking.guest_email} />
+            <InfoRow icon={Mail} label="Email" value={booking.guest_email || 'Not given'} />
             <InfoRow icon={Phone} label="WhatsApp" value={booking.guest_phone} />
           </div>
           {booking.guest_notes && (
@@ -190,7 +189,7 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
           </div>
 
           <div>
-            <GlassLabel>Host notes</GlassLabel>
+            <GlassLabel>Host notes (saved automatically)</GlassLabel>
             <GlassTextarea rows={3} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
           </div>
 
@@ -202,7 +201,6 @@ function BookingDetail({ booking, timezone, whatsapp, profile, onClose, onCancel
 
         <div className="flex flex-col sm:flex-row gap-2 mt-6">
           <GlassButton variant="primary" className="flex-1" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}><MessageCircle className="w-4 h-4" /> Send on WhatsApp</GlassButton>
-          <GlassButton className="flex-1" onClick={saveNotes}>Save</GlassButton>
           {booking.status !== 'cancelled' && <GlassButton variant="danger" onClick={onCancel}><Trash2 className="w-4 h-4" /> Cancel</GlassButton>}
         </div>
       </DialogContent>

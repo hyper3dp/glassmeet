@@ -80,6 +80,39 @@ export function GlassSelect({ className, children, ...props }) {
   );
 }
 
+// Every 15 minutes, value "HH:MM", label "9:00am" as Calendly writes it
+const TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
+  const h = Math.floor(i / 4), m = (i % 4) * 15;
+  return {
+    value: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+    label: `${h % 12 || 12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`,
+  };
+});
+
+// The one time picker used everywhere (native select: opens the wheel on phones).
+// placeholder adds an empty choice for optional times.
+export function TimeSelect({ value, onChange, placeholder, className, ...props }) {
+  const v = (value || '').slice(0, 5);
+  const known = TIME_OPTIONS.some((o) => o.value === v);
+  return (
+    <GlassSelect value={v} onChange={(e) => onChange(e.target.value)} className={cn('tabular', className)} {...props}>
+      {placeholder && <option value="">{placeholder}</option>}
+      {!known && v && <option value={v}>{v}</option>}
+      {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </GlassSelect>
+  );
+}
+
+// "Saving… / Saved" line shown next to autosaving forms
+export function SaveStatus({ state }) {
+  if (state === 'idle') return null;
+  return (
+    <span role="status" className={cn('inline-flex items-center gap-1.5 text-sm', state === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
+      {state === 'saving' ? 'Saving…' : state === 'error' ? 'Could not save' : 'All changes saved'}
+    </span>
+  );
+}
+
 export function EmptyState({ icon: Icon, title, description, action }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 px-6 animate-fade-in">

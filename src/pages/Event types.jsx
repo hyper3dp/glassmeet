@@ -5,6 +5,7 @@ import { Plus, Clock, ExternalLink, Search, X } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, EmptyState, Spinner, PageHeader, Tabs, Avatar } from '@/components/glass';
 import EventCard from '@/components/eventcard.jsx';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 
 export default function EventTypes({ profile }) {
   const [eventTypes, setEventTypes] = useState([]);
@@ -14,13 +15,15 @@ export default function EventTypes({ profile }) {
   const [query, setQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
+  useEffect(() => { load(); }, []);
+
+  // The top Create button links to ?new=true; react every time it appears, not only on first load
   useEffect(() => {
-    load();
     if (searchParams.get('new') === 'true') {
       openNew();
-      setSearchParams({});
+      setSearchParams({}, { replace: true });
     }
-  }, []);
+  }, [searchParams]);
 
   const load = async () => {
     try {
@@ -96,10 +99,14 @@ export default function EventTypes({ profile }) {
               host_name: profile.full_name || profile.email,
               host_timezone: profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             };
-            if (editing) await api.entities.EventType.update(editing.id, payload);
-            else await api.entities.EventType.create(payload);
+            if (editing) {
+              const saved = await api.entities.EventType.update(editing.id, payload);
+              setEventTypes((list) => list.map((x) => (x.id === saved.id ? saved : x)));
+            } else {
+              const saved = await api.entities.EventType.create(payload);
+              setEventTypes((list) => [saved, ...list]);
+            }
             setShowModal(false);
-            await load();
           }}
         />
       )}
@@ -107,25 +114,71 @@ export default function EventTypes({ profile }) {
   );
 }
 
+const DESCRIPTION_MAX = 500;
+const DURATIONS = [15, 30, 45, 60, 90];
+// value stored in event_types.location; kind decides which extra field shows
+export const LOCATIONS = [
+  { value: 'Google Meet', kind: 'video' },
+  { value: 'Zoom', kind: 'video' },
+  { value: 'Microsoft Teams', kind: 'video' },
+  { value: 'WhatsApp call', kind: 'phone' },
+  { value: 'Phone call', kind: 'phone' },
+  { value: 'In person', kind: 'in_person' },
+  { value: 'Other', kind: 'other' },
+];
+
+function ToggleRow({ id, label, description, checked, onChange }) {
+  return (
+    <label htmlFor={id} className="flex items-start justify-between gap-4 py-3 cursor-pointer">
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-foreground">{label}</span>
+        <span className="block text-sm text-muted-foreground">{description}</span>
+      </span>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} className="mt-0.5" />
+    </label>
+  );
+}
+
 function EventModal({ event, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const known = LOCATIONS.find((l) => l.value === event?.location);
   const [form, setForm] = useState(() => ({
     name: event?.name || '',
-    description: event?.description || '',
+    description: (event?.description || '').slice(0, DESCRIPTION_MAX),
     duration: event?.duration || 30,
-    location: event?.location || 'Online',
+    location: known ? known.value : event?.location ? 'Other' : 'Google Meet',
+    custom_location: known ? '' : event?.location || '',
     meeting_url: event?.meeting_url || '',
+    address: event?.address || '',
     booking_type: event?.booking_type || 'one_on_one',
-    max_attendees: event?.max_attendees || 1,
+    max_attendees: event?.max_attendees || 2,
     active: event?.active ?? true,
     requires_approval: event?.requires_approval ?? false,
+    email_required: event?.email_required ?? true,
   }));
+  const [customDuration, setCustomDuration] = useState(() => !DURATIONS.includes(event?.duration || 30));
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const kind = LOCATIONS.find((l) => l.value === form.location)?.kind;
+
   const submit = async (submitEvent) => {
     submitEvent.preventDefault();
+    setError('');
+    if (kind === 'in_person' && !form.address.trim()) { setError('Add the address where you will meet.'); return; }
+    if (kind === 'other' && !form.custom_location.trim()) { setError('Describe where the meeting happens.'); return; }
     setSaving(true);
     try {
-      await onSave({ ...form, duration: Number(form.duration), max_attendees: Number(form.max_attendees) });
+      const { custom_location, ...rest } = form;
+      await onSave({
+        ...rest,
+        location: kind === 'other' ? custom_location.trim() : form.location,
+        meeting_url: kind === 'video' || kind === 'other' ? form.meeting_url.trim() : '',
+        address: kind === 'in_person' ? form.address.trim() : null,
+        duration: Number(form.duration),
+        max_attendees: form.booking_type === 'group' ? Number(form.max_attendees) : 1,
+      });
+    } catch (e) {
+      setError(e.message || 'Could not save this event type.');
     } finally {
       setSaving(false);
     }
@@ -133,56 +186,104 @@ function EventModal({ event, onClose, onSave }) {
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl p-6 block">
-        <div className="mb-5 flex items-center justify-between">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 block">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-popover px-6 py-4">
           <DialogTitle>{event ? 'Edit event type' : 'New event type'}</DialogTitle>
           <button type="button" aria-label="Close" onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-5 px-6 pt-5">
           <div>
             <GlassLabel htmlFor="event-name">Name</GlassLabel>
-            <GlassInput id="event-name" value={form.name} onChange={(e) => setField('name', e.target.value)} required autoFocus />
+            <GlassInput id="event-name" value={form.name} maxLength={80} onChange={(e) => setField('name', e.target.value)} placeholder="30 minute meeting" required autoFocus />
           </div>
           <div>
-            <GlassLabel htmlFor="event-description">Description</GlassLabel>
-            <GlassTextarea id="event-description" rows={3} value={form.description} onChange={(e) => setField('description', e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <GlassLabel htmlFor="event-duration">Duration (minutes)</GlassLabel>
-              <GlassInput id="event-duration" type="number" min="5" step="5" value={form.duration} onChange={(e) => setField('duration', e.target.value)} required />
+            <div className="flex items-center justify-between">
+              <GlassLabel htmlFor="event-description">Description</GlassLabel>
+              <span className={`mb-2 text-xs tabular ${form.description.length >= DESCRIPTION_MAX ? 'text-destructive' : 'text-muted-foreground'}`}>{form.description.length}/{DESCRIPTION_MAX}</span>
             </div>
-            <div>
-              <GlassLabel htmlFor="event-location">Location</GlassLabel>
-              <GlassInput id="event-location" value={form.location} onChange={(e) => setField('location', e.target.value)} />
-            </div>
+            <GlassTextarea id="event-description" rows={3} maxLength={DESCRIPTION_MAX} value={form.description} onChange={(e) => setField('description', e.target.value.slice(0, DESCRIPTION_MAX))} placeholder="What guests should know before booking" />
           </div>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-foreground">Duration</legend>
+            <div className="flex flex-wrap gap-2">
+              {DURATIONS.map((d) => {
+                const on = !customDuration && Number(form.duration) === d;
+                return (
+                  <button key={d} type="button" aria-pressed={on} onClick={() => { setCustomDuration(false); setField('duration', d); }}
+                    className={`h-9 px-4 rounded-full border text-sm font-semibold transition-all duration-200 ${on ? 'border-primary bg-primary-soft text-link' : 'border-input text-foreground hover:border-border-hover'}`}>
+                    {d < 60 ? `${d} min` : d === 60 ? '1 hr' : '1.5 hr'}
+                  </button>
+                );
+              })}
+              <button type="button" aria-pressed={customDuration} onClick={() => setCustomDuration(true)}
+                className={`h-9 px-4 rounded-full border text-sm font-semibold transition-all duration-200 ${customDuration ? 'border-primary bg-primary-soft text-link' : 'border-input text-foreground hover:border-border-hover'}`}>
+                Custom
+              </button>
+            </div>
+            {customDuration && (
+              <div className="mt-3 flex items-center gap-2">
+                <GlassInput type="number" inputMode="numeric" min="5" max="720" step="5" value={form.duration} onChange={(e) => setField('duration', e.target.value)} className="w-28" aria-label="Custom duration in minutes" required />
+                <span className="text-sm text-muted-foreground">minutes</span>
+              </div>
+            )}
+          </fieldset>
+
           <div>
-            <GlassLabel htmlFor="event-meeting-url">Meeting link</GlassLabel>
-            <GlassInput id="event-meeting-url" type="url" value={form.meeting_url} onChange={(e) => setField('meeting_url', e.target.value)} placeholder="https://" />
+            <GlassLabel htmlFor="event-location">Location</GlassLabel>
+            <GlassSelect id="event-location" value={form.location} onChange={(e) => setField('location', e.target.value)}>
+              {LOCATIONS.map((l) => <option key={l.value} value={l.value}>{l.value}</option>)}
+            </GlassSelect>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          {kind === 'in_person' && (
+            <div>
+              <GlassLabel htmlFor="event-address">Address</GlassLabel>
+              <GlassTextarea id="event-address" rows={2} maxLength={200} value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Street, building, city" required />
+              <p className="mt-1.5 text-xs text-muted-foreground">Shown to guests on the booking page and confirmation.</p>
+            </div>
+          )}
+          {kind === 'other' && (
+            <div>
+              <GlassLabel htmlFor="event-custom-location">Where</GlassLabel>
+              <GlassInput id="event-custom-location" maxLength={80} value={form.custom_location} onChange={(e) => setField('custom_location', e.target.value)} placeholder="e.g. Webex, Signal" required />
+            </div>
+          )}
+          {(kind === 'video' || kind === 'other') && (
+            <div>
+              <GlassLabel htmlFor="event-meeting-url">Meeting link (optional)</GlassLabel>
+              <GlassInput id="event-meeting-url" type="url" inputMode="url" value={form.meeting_url} onChange={(e) => setField('meeting_url', e.target.value)} placeholder="https://" />
+            </div>
+          )}
+          {kind === 'phone' && (
+            <p className="rounded-lg bg-secondary px-3.5 py-3 text-sm text-muted-foreground">You call the guest on the WhatsApp number they give when booking.</p>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <GlassLabel htmlFor="event-booking-type">Booking type</GlassLabel>
               <GlassSelect id="event-booking-type" value={form.booking_type} onChange={(e) => setField('booking_type', e.target.value)}>
-                <option value="one_on_one">One-to-one</option>
+                <option value="one_on_one">One-on-one</option>
                 <option value="group">Group</option>
               </GlassSelect>
             </div>
             {form.booking_type === 'group' && (
               <div>
                 <GlassLabel htmlFor="event-capacity">Maximum attendees</GlassLabel>
-                <GlassInput id="event-capacity" type="number" min="2" value={form.max_attendees} onChange={(e) => setField('max_attendees', e.target.value)} />
+                <GlassInput id="event-capacity" type="number" inputMode="numeric" min="2" max="500" value={form.max_attendees} onChange={(e) => setField('max_attendees', e.target.value)} />
               </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-5 text-sm font-semibold">
-            <label className="flex items-center gap-2"><input type="checkbox" className="w-4 h-4" checked={form.active} onChange={(e) => setField('active', e.target.checked)} /> Active</label>
-            <label className="flex items-center gap-2"><input type="checkbox" className="w-4 h-4" checked={form.requires_approval} onChange={(e) => setField('requires_approval', e.target.checked)} /> Requires approval</label>
+
+          <div className="divide-y divide-border rounded-lg border border-border px-4">
+            <ToggleRow id="ev-active" label="Active" description="Guests can book this event from its link." checked={form.active} onChange={(v) => setField('active', v)} />
+            <ToggleRow id="ev-approval" label="Requires approval" description="You approve each booking before it is confirmed." checked={form.requires_approval} onChange={(v) => setField('requires_approval', v)} />
+            <ToggleRow id="ev-email" label="Ask for email" description="Guests must enter an email address. Off: email is optional." checked={form.email_required} onChange={(v) => setField('email_required', v)} />
           </div>
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
+
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <div className="sticky bottom-0 -mx-6 flex justify-end gap-2 border-t border-border bg-popover px-6 py-4">
             <GlassButton type="button" variant="ghost" onClick={onClose}>Cancel</GlassButton>
-            <GlassButton type="submit" variant="primary" disabled={saving}>{saving ? 'Saving...' : 'Save event'}</GlassButton>
+            <GlassButton type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : event ? 'Save changes' : 'Create event type'}</GlassButton>
           </div>
         </form>
       </DialogContent>

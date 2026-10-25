@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import {
   Clock, Calendar, Globe, ChevronLeft, ChevronRight, ArrowLeft, Loader2, Video, MessageCircle,
-  Users, QrCode, Clock3, CreditCard,
+  Users, QrCode, Clock3, CreditCard, MapPin, Phone,
 } from 'lucide-react';
 import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import {
@@ -46,6 +46,7 @@ export default function BookingPage() {
 
   const guestTz = detectTimezone();
   const hostTz = event?.host_timezone || guestTz;
+  const emailRequired = event?.email_required ?? true;
 
   useEffect(() => {
     if (!event) return;
@@ -109,7 +110,11 @@ export default function BookingPage() {
   };
 
   const confirm = async () => {
-    if (!form.guest_name || !form.guest_email || !form.guest_phone) { setError('Please fill in your name, email, and WhatsApp number.'); return; }
+    if (!form.guest_name.trim() || !form.guest_phone.trim() || (emailRequired && !form.guest_email.trim())) {
+      setError(emailRequired ? 'Please fill in your name, email and WhatsApp number.' : 'Please fill in your name and WhatsApp number.');
+      return;
+    }
+    if (form.guest_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) { setError('That email address doesn’t look right.'); return; }
     if (!selectedSlot) return;
     // Validate required custom questions
     if (event?.custom_questions) {
@@ -142,7 +147,7 @@ export default function BookingPage() {
         event_name: event.name,
         host_id: event.created_by_id,
         guest_name: form.guest_name,
-        guest_email: form.guest_email,
+        guest_email: form.guest_email.trim() || null,
         guest_phone: form.guest_phone,
         guest_notes: form.guest_notes,
         start_time: start,
@@ -217,7 +222,14 @@ export default function BookingPage() {
 
             <ul className="space-y-4 text-[15px] font-semibold text-muted-foreground">
               <li className="flex items-start gap-3"><Clock className="w-5 h-5 mt-0.5 shrink-0" /> {event.duration} min</li>
-              <li className="flex items-start gap-3"><Video className="w-5 h-5 mt-0.5 shrink-0" /> {event.location || 'Meeting details provided upon confirmation'}</li>
+              {event.address ? (
+                <li className="flex items-start gap-3"><MapPin className="w-5 h-5 mt-0.5 shrink-0" /> <span>In person<span className="block font-normal whitespace-pre-line">{event.address}</span></span></li>
+              ) : (
+                <li className="flex items-start gap-3">
+                  {/phone|whatsapp/i.test(event.location || '') ? <Phone className="w-5 h-5 mt-0.5 shrink-0" /> : <Video className="w-5 h-5 mt-0.5 shrink-0" />}
+                  {event.location || 'Meeting details provided upon confirmation'}
+                </li>
+              )}
               {selectedSlot && (
                 <>
                   <li className="flex items-start gap-3"><Calendar className="w-5 h-5 mt-0.5 shrink-0" /> {selectedSlot.label}, {formatMeetingDate(selectedSlot.date, hostTz)}</li>
@@ -346,7 +358,7 @@ export default function BookingPage() {
                   <GlassInput id="g-name" autoComplete="name" value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
                 </div>
                 <div>
-                  <GlassLabel htmlFor="g-email">Email *</GlassLabel>
+                  <GlassLabel htmlFor="g-email">{emailRequired ? 'Email *' : 'Email (optional)'}</GlassLabel>
                   <GlassInput id="g-email" type="email" autoComplete="email" value={form.guest_email} onChange={(e)=>setForm({...form, guest_email: e.target.value})} />
                 </div>
                 <div>

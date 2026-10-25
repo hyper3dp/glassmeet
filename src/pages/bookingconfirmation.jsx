@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
-  CheckCircle2, Calendar, Globe, Video, MessageCircle, Copy, Check,
+  CheckCircle2, Calendar, Globe, Video, MessageCircle, Copy, Check, MapPin,
   CalendarPlus, Download, Users,
 } from 'lucide-react';
 import { GlassButton } from '@/components/glass';
@@ -85,7 +85,9 @@ export default function BookingConfirmation() {
               <li className="flex items-start gap-3"><Users className="w-5 h-5 mt-0.5 shrink-0" /> {hostName}</li>
               <li className="flex items-start gap-3"><Calendar className="w-5 h-5 mt-0.5 shrink-0" /> {time} – {endTime}, {date}</li>
               <li className="flex items-start gap-3"><Globe className="w-5 h-5 mt-0.5 shrink-0" /> {tz}</li>
-              {(event?.location || meetingUrl) && (
+              {event?.address ? (
+                <li className="flex items-start gap-3"><MapPin className="w-5 h-5 mt-0.5 shrink-0" /> <span className="whitespace-pre-line">{event.address}</span></li>
+              ) : (event?.location || meetingUrl) && (
                 <li className="flex items-start gap-3"><Video className="w-5 h-5 mt-0.5 shrink-0" /> <span className="break-all">{meetingUrl || event.location}</span></li>
               )}
             </ul>

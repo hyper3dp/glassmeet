@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes, Outlet, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
 import PageNotFound from './lib/Pagenotfound.jsx';
 import { AuthProvider, useAuth } from '@/lib/Authcontext.jsx';
@@ -12,29 +12,34 @@ import ProtectedRoute from '@/components/protectedroute.jsx';
 import { useProfile, AppContext, useApp } from '@/lib/useprofile.js';
 import Layout from '@/components/Layout';
 import CommandPalette from '@/components/commandpalatte.jsx';
+import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 
-// Auth pages
-import Login from './pages/login.jsx';
-import Register from './pages/register.jsx';
-import Verify from './pages/verify.jsx';
-import ForgotPassword from './pages/forgotpassword.jsx';
-import ResetPassword from './pages/resetpassword.jsx';
+// Pages load on demand, so guests opening a booking link don't download the host app
+const Login = lazy(() => import('./pages/login.jsx'));
+const Register = lazy(() => import('./pages/register.jsx'));
+const ForgotPassword = lazy(() => import('./pages/forgotpassword.jsx'));
+const ResetPassword = lazy(() => import('./pages/resetpassword.jsx'));
+const Landing = lazy(() => import('@/pages/Landing'));
+const Dashboard = lazy(() => import('./pages/dashboard.jsx'));
+const CalendarPage = lazy(() => import('./pages/calenderpage.jsx'));
+const EventTypes = lazy(() => import('./pages/Event types.jsx'));
+const Bookings = lazy(() => import('./pages/bookings.jsx'));
+const Availability = lazy(() => import('./pages/Availability.jsx'));
+const WhatsAppSettings = lazy(() => import('./pages/whatsappsettings.jsx'));
+const Settings = lazy(() => import('./pages/settings.jsx'));
+const BookingPage = lazy(() => import('./pages/bookingpage.jsx'));
+const BookingConfirmation = lazy(() => import('./pages/bookingconfirmation.jsx'));
+const CalendarConnections = lazy(() => import('./pages/calenderconnections.jsx'));
+const Analytics = lazy(() => import('./pages/Analytics.jsx'));
+const Terms = lazy(() => import('@/pages/terms.jsx'));
+const Privacy = lazy(() => import('@/pages/privacy.jsx'));
 
-// App pages
-import Landing from '@/pages/Landing';
-import Dashboard from './pages/dashboard.jsx';
-import CalendarPage from './pages/calenderpage.jsx';
-import EventTypes from './pages/Event types.jsx';
-import Bookings from './pages/bookings.jsx';
-import Availability from './pages/Availability.jsx';
-import WhatsAppSettings from './pages/whatsappsettings.jsx';
-import Settings from './pages/settings.jsx';
-import BookingPage from './pages/bookingpage.jsx';
-import BookingConfirmation from './pages/bookingconfirmation.jsx';
-import CalendarConnections from './pages/calenderconnections.jsx';
-import Analytics from './pages/Analytics.jsx';
-import Terms from '@/pages/terms.jsx';
-import Privacy from '@/pages/privacy.jsx';
+const PageLoader = () => (
+  <div className="flex justify-center py-24" role="status" aria-live="polite">
+    <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin"></div>
+    <span className="sr-only">Loading…</span>
+  </div>
+);
 
 const FullScreenLoader = () => (
   <div 
@@ -80,7 +85,11 @@ function AppShell() {
   return (
     <AppContext.Provider value={{ profile, whatsapp, setWhatsapp, updateProfile, reload }}>
       <Layout profile={profile} onOpenCommandPalette={() => setCmdOpen(true)}>
-        <Outlet />
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </Layout>
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </AppContext.Provider>
@@ -112,6 +121,8 @@ const AuthenticatedApp = () => {
   }
 
   return (
+    <ErrorBoundary>
+    <Suspense fallback={<FullScreenLoader />}>
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<Landing />} />
@@ -143,6 +154,8 @@ const AuthenticatedApp = () => {
 
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </Suspense>
+    </ErrorBoundary>
   );
 };
 

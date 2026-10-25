@@ -41,14 +41,6 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Apply the user's accent colour globally (used for small dots only)
-  useEffect(() => {
-    if (profile?.accent_color) {
-      const hsl = hexToHslString(profile.accent_color);
-      document.documentElement.style.setProperty('--accent-color', hsl);
-    }
-  }, [profile?.accent_color]);
-
   // Close drawer and menus on route change
   useEffect(() => { setDrawerOpen(false); setMenuOpen(false); }, [location.pathname]);
 
@@ -207,25 +199,4 @@ function MobileTab({ item }) {
       {item.label}
     </NavLink>
   );
-}
-
-function hexToHslString(hex) {
-  hex = hex.replace('#', '');
-  let r = parseInt(hex.substring(0, 2), 16) / 255;
-  let g = parseInt(hex.substring(2, 4), 16) / 255;
-  let b = parseInt(hex.substring(4, 6), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }

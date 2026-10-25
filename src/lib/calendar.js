@@ -50,7 +50,7 @@ export const generateIcsEvent = (booking, eventType, host) => {
   const hostName = host?.full_name || eventType?.host_name || 'Host';
   const title = `${eventType?.name || 'Meeting'} with ${hostName}`;
   const description = buildEventDescription(booking, eventType, host);
-  const location = booking.meeting_url || eventType?.meeting_url || eventType?.location || '';
+  const location = eventType?.address || booking.meeting_url || eventType?.meeting_url || eventType?.location || '';
   const tz = booking.timezone || 'UTC';
 
   const lines = [
@@ -107,7 +107,7 @@ export const googleCalendarUrl = (booking, eventType, host) => {
   const hostName = host?.full_name || eventType?.host_name || 'Host';
   const title = `${eventType?.name || 'Meeting'} with ${hostName}`;
   const description = buildEventDescription(booking, eventType, host);
-  const location = booking.meeting_url || eventType?.meeting_url || '';
+  const location = eventType?.address || booking.meeting_url || eventType?.meeting_url || '';
 
   const dates = `${formatIcsDate(booking.start_time)}/${formatIcsDate(booking.end_time)}`;
 

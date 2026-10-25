@@ -3,6 +3,10 @@ import { appPath } from '@/lib/authReturnTo';
 
 const TOKEN_KEY = 'glassmeet_session';
 
+// crypto.randomUUID is missing on iOS Safari before 15.4; fall back to getRandomValues
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
+  (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
+
 async function getProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
@@ -130,7 +134,13 @@ export const api = {
       return { user: await getProfile(data.user.id), access_token: data.session.access_token };
     },
     register: async (value) => {
-      const { data, error } = await supabase.auth.signUp({ email: value.email, password: value.password });
+      // The confirmation link returns to the app root (a page GitHub Pages always serves), which
+      // signs the user in from the link and forwards to the dashboard.
+      const { data, error } = await supabase.auth.signUp({
+        email: value.email,
+        password: value.password,
+        options: { emailRedirectTo: `${window.location.origin}${appPath('/')}` },
+      });
       if (error) throw new Error(error.message);
       return { user: await getProfile(data.user.id), access_token: data.session?.access_token };
     },
@@ -155,7 +165,9 @@ export const api = {
       await supabase.auth.signOut();
     },
     resetPasswordRequest: async (email) => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${appPath('/reset-password')}`,
+      });
       if (error) throw new Error(error.message);
       return { success: true };
     },
@@ -219,11 +231,22 @@ export const api = {
       return { success: true };
     },
   },
+  // Profile photo: uploads to the public avatars bucket under the user's own folder
+  storage: {
+    uploadAvatar: async (file) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
+      if (error) throw new Error(error.message);
+      return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+    },
+  },
   // Guests can create a booking but not read bookings back (RLS), so the id is made here
   // and the row is inserted without returning it.
   bookings: {
     createAsGuest: async (value) => {
-      const row = { id: crypto.randomUUID(), ...value };
+      const row = { id: uuid(), ...value };
       const { error } = await supabase.from('bookings').insert([row]);
       if (error) throw new Error(error.message);
       return { ...row, created_date: new Date().toISOString() };
