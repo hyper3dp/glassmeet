@@ -17,6 +17,20 @@ async function getProfile(userId) {
   return data;
 }
 
+// A write that names a column the database doesn't have yet (a migration not applied) fails with
+// PGRST204. Drop that column and retry so the rest still saves instead of the whole form failing.
+async function writeSkippingMissingColumns(run, value) {
+  let row = { ...value };
+  for (;;) {
+    const result = await run(row);
+    const column = result.error?.code === 'PGRST204' && /'([^']+)' column/.exec(result.error.message)?.[1];
+    if (!column || !(column in row)) return result;
+    console.warn(`GlassMeet: column "${column}" is missing in the database; saved without it.`);
+    const { [column]: _skipped, ...rest } = row;
+    row = rest;
+  }
+}
+
 let meCache = null;
 const sessionUser = async () => (await supabase.auth.getSession()).data.session?.user || null;
 supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'USER_UPDATED') meCache = null; });
@@ -65,7 +79,7 @@ const entities = new Proxy({}, {
         return data;
       },
       create: async (value) => {
-        const { data, error } = await supabase.from(table).insert([value]).select().single();
+        const { data, error } = await writeSkippingMissingColumns((row) => supabase.from(table).insert([row]).select().single(), value);
         if (error) throw new Error(error.message);
         return data;
       },
@@ -75,9 +89,10 @@ const entities = new Proxy({}, {
         return data;
       },
       update: async (id, value) => {
-        const { data, error } = await supabase.from(table).update(value).eq('id', id).select().single();
+        // a row deleted in the meantime updates nothing; that's not an error
+        const { data, error } = await writeSkippingMissingColumns((row) => supabase.from(table).update(row).eq('id', id).select(), value);
         if (error) throw new Error(error.message);
-        return data;
+        return data?.[0] ?? null;
       },
       bulkUpdate: async (values) => {
         // Supabase doesn't support bulk update with different values per ID in one call
@@ -114,7 +129,8 @@ export const api = {
       const promise = (async () => {
         // Try fetching the profile, or auto-create it if missing to prevent login loops
         const profile = await getProfile(user.id);
-        if (profile) return profile;
+        // older profiles were created without a name; show the Google name or email instead of "?"
+        if (profile) return { ...profile, full_name: profile.full_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '' };
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert([{
@@ -133,7 +149,7 @@ export const api = {
     },
     updateMe: async (value) => {
       const user = await sessionUser();
-      const { data, error } = await supabase.from('profiles').update(value).eq('id', user.id).select().single();
+      const { data, error } = await writeSkippingMissingColumns((row) => supabase.from('profiles').update(row).eq('id', user.id).select().single(), value);
       if (error) throw new Error(error.message);
       meCache = { id: user.id, promise: Promise.resolve(data) };
       return data;

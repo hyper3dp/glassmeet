@@ -27,7 +27,7 @@ export default function AddressManager() {
       setItems((list) => [...list, created]);
     } else {
       const updated = await api.entities.Address.update(id, values);
-      setItems((list) => list.map((a) => (a.id === id ? updated : a)));
+      setItems((list) => list.map((a) => (a.id === id ? (updated || { ...a, ...values }) : a)));
     }
     setEditing(null);
   };

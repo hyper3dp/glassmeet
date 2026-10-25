@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone } from 'lucide-react';
+import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone, Sparkles } from 'lucide-react';
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, Avatar, SaveStatus } from '@/components/glass';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { api } from '@/lib/localApi';
@@ -144,12 +144,17 @@ export default function Settings({ profile, updateProfile }) {
           </Section>
 
           {/* Coming soon */}
-          <Section id="coming-soon" title="Coming soon" description="Integrations we're building next.">
+          <Section id="coming-soon" title="Coming soon" description="Features and integrations we're building next.">
             <ul className="divide-y divide-border rounded-lg border border-border">
               <ComingSoonRow
                 icon={<span className="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><Smartphone className="w-5 h-5" /></span>}
                 name="GlassMeet for iPhone and iPad"
                 body="A native app to manage bookings, availability and WhatsApp confirmations on the go."
+              />
+              <ComingSoonRow
+                icon={<span className="w-10 h-10 rounded-lg bg-primary-soft text-link flex items-center justify-center"><Sparkles className="w-5 h-5" /></span>}
+                name="GlassMeet AI assistant"
+                body="An AI agent that helps you plan: finds good times, suggests your week's schedule and drafts messages to guests."
               />
               <ComingSoonRow
                 icon={<span className="w-10 h-10 rounded-lg bg-[#635BFF] text-white text-lg font-bold flex items-center justify-center">S</span>}

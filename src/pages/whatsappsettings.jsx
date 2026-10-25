@@ -3,6 +3,7 @@ import { api } from '@/lib/localApi';
 import { MessageCircle, Info } from 'lucide-react';
 import { GlassCard, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, SaveStatus } from '@/components/glass';
 import { useAutosave } from '@/lib/useAutosave';
+import { Switch } from '@/components/ui/switch';
 import {
   DEFAULT_CONFIRMATION_TEMPLATE, DEFAULT_REMINDER_24H, DEFAULT_REMINDER_1H,
 } from '@/lib/whatsapp';
@@ -75,14 +76,20 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
               <option value="business_api">WhatsApp Business API: automatic sending (not available yet)</option>
             </GlassSelect>
           </div>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={form.enabled} onChange={(e)=>set('enabled', e.target.checked)} className="w-4 h-4" />
-            <span className="text-sm font-semibold">Enable WhatsApp messaging for new bookings</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={form.auto_send_confirmation} onChange={(e)=>set('auto_send_confirmation', e.target.checked)} className="w-4 h-4" />
-            <span className="text-sm font-semibold">Auto-open WhatsApp confirmation after each booking</span>
-          </label>
+          <div className="divide-y divide-border rounded-lg border border-border px-4">
+            <label htmlFor="wa-enabled" className="flex items-center justify-between gap-4 py-3.5 cursor-pointer">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">Enable WhatsApp messaging for new bookings</span>
+              </span>
+              <Switch id="wa-enabled" checked={form.enabled} onCheckedChange={(v) => set('enabled', v)} />
+            </label>
+            <label htmlFor="wa-auto" className="flex items-center justify-between gap-4 py-3.5 cursor-pointer">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">Auto-open WhatsApp confirmation after each booking</span>
+              </span>
+              <Switch id="wa-auto" checked={form.auto_send_confirmation} onCheckedChange={(v) => set('auto_send_confirmation', v)} />
+            </label>
+          </div>
         </div>
       </GlassCard>
 

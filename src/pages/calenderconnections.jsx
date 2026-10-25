@@ -13,6 +13,7 @@ import { downloadICSFeed } from '@/lib/calendarFeed';
 import OutlookIcon from '@/components/outlookicon.jsx';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const SAMPLE_BOOKING = {
   id: 'sample',
@@ -581,7 +582,7 @@ function OutlookSetupModal({ connected, selectedCalendars, accountEmail, account
             <div className="space-y-2 mb-5">
               {calendars.map((cal) => (
                 <label key={cal} className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer transition-all duration-200 hover:border-border-hover">
-                  <input type="checkbox" checked={selected.includes(cal)} onChange={() => toggle(cal)} className="accent-[#0078D4]" />
+                  <Checkbox checked={selected.includes(cal)} onCheckedChange={() => toggle(cal)} />
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm">{cal}</span>
                 </label>

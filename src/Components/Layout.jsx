@@ -141,7 +141,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
                   aria-label="Account menu"
                   className="flex items-center gap-1 rounded-full p-1 pr-2 transition-all duration-200 hover:bg-secondary"
                 >
-                  <Avatar src={profile?.profile_photo} name={profile?.full_name} size={32} />
+                  <Avatar src={profile?.profile_photo || profile?.avatar_url} name={profile?.full_name} size={32} />
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </button>
                 {menuOpen && (

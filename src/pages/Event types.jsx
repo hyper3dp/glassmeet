@@ -101,7 +101,7 @@ export default function EventTypes({ profile }) {
             };
             if (editing) {
               const saved = await api.entities.EventType.update(editing.id, payload);
-              setEventTypes((list) => list.map((x) => (x.id === saved.id ? saved : x)));
+              setEventTypes((list) => list.map((x) => (x.id === editing.id ? (saved || { ...x, ...payload }) : x)));
             } else {
               const saved = await api.entities.EventType.create(payload);
               setEventTypes((list) => [saved, ...list]);
@@ -316,9 +316,10 @@ function EventModal({ event, onClose, onSave }) {
           </div>
 
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <div className="sticky bottom-0 -mx-6 flex justify-end gap-2 border-t border-border bg-popover px-6 py-4">
-            <GlassButton type="button" variant="ghost" onClick={onClose}>Cancel</GlassButton>
-            <GlassButton type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : event ? 'Save changes' : 'Create event type'}</GlassButton>
+          {/* phones: two equal columns so the buttons can never overlap; wider: right-aligned */}
+          <div className="sticky bottom-0 -mx-6 grid grid-cols-2 gap-2 border-t border-border bg-popover px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 sm:flex sm:justify-end">
+            <GlassButton type="button" variant="default" onClick={onClose} className="min-w-0 sm:border-transparent sm:bg-transparent">Cancel</GlassButton>
+            <GlassButton type="submit" variant="primary" disabled={saving} className="min-w-0">{saving ? 'Saving…' : event ? 'Save changes' : 'Create event type'}</GlassButton>
           </div>
         </form>
       </DialogContent>

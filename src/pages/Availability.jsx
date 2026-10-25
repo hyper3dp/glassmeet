@@ -4,6 +4,8 @@ import { Plus, Trash2, CalendarOff, X, Globe, RefreshCw } from 'lucide-react';
 import { GlassButton, GlassInput, GlassLabel, Spinner, PageHeader, Tabs, TimeSelect, SaveStatus } from '@/components/glass';
 import { formatDate } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import DatePicker from '@/components/DatePicker.jsx';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -22,8 +24,11 @@ export default function Availability({ profile }) {
   const [loading, setLoading] = useState(true);
   const [showExc, setShowExc] = useState(false);
   const [saveState, setSaveState] = useState('idle');
+  const [saveError, setSaveError] = useState('');
   const pending = useRef({});   // debounced rule updates, keyed by rule id
   const inflight = useRef(0);
+  const queue = useRef(Promise.resolve()); // saves run one at a time, in the order they were made
+  const failed = useRef(false);
   const rulesRef = useRef(rules);
   rulesRef.current = rules;
 
@@ -45,19 +50,30 @@ export default function Availability({ profile }) {
     setLoading(false);
   };
 
-  // Every change shows immediately; this tracks the background save behind it
-  const track = async (work) => {
+  // Every change shows immediately; this queues the background save behind it. Saves run in
+  // order so a delete can never land before the create it undoes. Only once the queue is empty
+  // does a failure reload the saved state, so in-flight changes aren't overwritten by old data.
+  const track = (work) => {
     inflight.current += 1;
     setSaveState('saving');
-    try {
-      await work();
+    queue.current = queue.current.then(async () => {
+      try {
+        await work();
+      } catch (e) {
+        failed.current = true;
+        setSaveError(e?.message || 'Could not save your hours.');
+      }
       inflight.current -= 1;
-      if (!inflight.current) setSaveState('saved');
-    } catch {
-      inflight.current -= 1;
-      setSaveState('error');
-      load();
-    }
+      if (inflight.current) return;
+      if (failed.current) {
+        failed.current = false;
+        setSaveState('error');
+        await load();
+      } else {
+        setSaveError('');
+        setSaveState('saved');
+      }
+    });
   };
 
   const addRule = (dow) => {
@@ -143,6 +159,11 @@ export default function Availability({ profile }) {
           <section className="p-5 sm:p-6 xl:border-r border-border">
             <h2 className="text-[15px] font-bold flex items-center gap-2"><RefreshCw className="w-4 h-4 text-muted-foreground" /> Weekly hours</h2>
             <p className="mt-1 mb-5 text-sm text-muted-foreground">Set when you are typically available for meetings. Changes save automatically.</p>
+            {saveError && (
+              <p role="alert" className="mb-5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+                Your last change didn't save, so your saved hours were reloaded. {saveError}
+              </p>
+            )}
             <div className="space-y-4">
               {DAYS.map((day, dow) => {
                 const dayRules = rules.filter((r) => r.day_of_week === dow).sort((a, b) => toMin(a.start_time) - toMin(b.start_time));
@@ -150,7 +171,7 @@ export default function Availability({ profile }) {
                 return (
                   <div key={dow} className="flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-2">
                     <label className="flex items-center gap-3 pt-1.5 w-[74px] shrink-0 cursor-pointer">
-                      <input type="checkbox" checked={on} onChange={(e) => toggleDay(dow, e.target.checked)} className="w-4 h-4" aria-label={`Available on ${day}`} />
+                      <Checkbox checked={on} onCheckedChange={(v) => toggleDay(dow, v === true)} aria-label={`Available on ${day}`} />
                       <span className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center ${on ? 'bg-foreground text-background' : 'bg-secondary text-muted-foreground'}`} title={day}>{day[0]}</span>
                     </label>
                     <div className="order-last sm:order-none basis-full sm:basis-auto flex-1 min-w-0 space-y-2">
@@ -243,10 +264,7 @@ function ExceptionModal({ onAdd, onClose }) {
         <form onSubmit={save} className="space-y-5">
           <div>
             <GlassLabel htmlFor="exc-date">Date</GlassLabel>
-            <GlassInput
-              id="exc-date" type="date" value={date} min={formatDate(new Date())} onChange={(e) => setDate(e.target.value)} required
-              className="block appearance-none text-left leading-[2.75rem] [&::-webkit-date-and-time-value]:text-left [&::-webkit-date-and-time-value]:m-0"
-            />
+            <DatePicker id="exc-date" value={date} min={formatDate(new Date())} onChange={setDate} />
           </div>
           <fieldset>
             <legend className="mb-2 text-sm font-semibold text-foreground">On this date</legend>
