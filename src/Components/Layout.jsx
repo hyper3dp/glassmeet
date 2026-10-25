@@ -117,7 +117,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
       </aside>
 
       {/* Tablet / mobile drawer */}
-      <aside className={cn('lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200 shadow-pop', drawerOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <aside className={cn('lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200', drawerOpen ? 'translate-x-0 shadow-pop' : '-translate-x-full invisible')}>
         <Sidebar onClose={() => setDrawerOpen(false)} />
       </aside>
       {drawerOpen && <div className="lg:hidden fixed inset-0 z-40 bg-scrim" onClick={() => setDrawerOpen(false)} />}

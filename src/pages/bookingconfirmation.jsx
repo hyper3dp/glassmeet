@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
   CheckCircle2, Calendar, Globe, Video, MessageCircle, Copy, Check,
-  Apple, Download, Rss, Users,
+  CalendarPlus, Download, Rss, Users,
 } from 'lucide-react';
 import { GlassButton } from '@/components/glass';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, DEFAULT_CONFIRMATION_TEMPLATE } from '@/lib/whatsapp';
 import { downloadIcs, openGoogleCalendar, openAppleCalendar, openOutlookCalendar } from '@/lib/calendar';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
 import { downloadICSFeed } from '@/lib/calendarFeed';
-import OutlookIcon from '@/components/outlookicon.jsx';
 import { appPath } from '@/lib/authReturnTo';
 
 export default function BookingConfirmation() {
@@ -50,9 +49,9 @@ export default function BookingConfirmation() {
   const calendarPriority = getCalendarPriority();
 
   const calendarButtons = {
-    apple: { icon: Apple, label: 'Apple Calendar', action: () => openAppleCalendar(booking, event, host), primary: true },
-    google: { icon: Calendar, label: 'Google Calendar', action: () => openGoogleCalendar(booking, event, host), primary: true },
-    outlook: { icon: OutlookIcon, label: 'Outlook', action: () => openOutlookCalendar(booking, event, host), primary: true },
+    apple: { icon: CalendarPlus, label: 'Apple Calendar', action: () => openAppleCalendar(booking, event, host), primary: true },
+    google: { icon: CalendarPlus, label: 'Google Calendar', action: () => openGoogleCalendar(booking, event, host), primary: true },
+    outlook: { icon: CalendarPlus, label: 'Outlook', action: () => openOutlookCalendar(booking, event, host), primary: true },
     webcal: { icon: Download, label: 'Download .ics', action: () => downloadIcs(booking, event, host), primary: false },
   };
 
