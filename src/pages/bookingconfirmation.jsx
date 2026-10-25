@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
   CheckCircle2, Calendar, Globe, Video, MessageCircle, Copy, Check,
-  CalendarPlus, Download, Rss, Users,
+  CalendarPlus, Download, Users,
 } from 'lucide-react';
 import { GlassButton } from '@/components/glass';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, DEFAULT_CONFIRMATION_TEMPLATE } from '@/lib/whatsapp';
 import { downloadIcs, openGoogleCalendar, openAppleCalendar, openOutlookCalendar } from '@/lib/calendar';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
-import { downloadICSFeed } from '@/lib/calendarFeed';
 import { appPath } from '@/lib/authReturnTo';
 
 export default function BookingConfirmation() {
@@ -102,25 +101,29 @@ export default function BookingConfirmation() {
             <GlassButton variant="primary" size="lg" className="w-full" type="button" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}>
               <MessageCircle className="w-4 h-4" /> Open WhatsApp
             </GlassButton>
-            <div className="pt-3 text-center text-sm font-bold">Add to your calendar</div>
-            <div className="flex flex-wrap justify-center gap-2">
+          </div>
+
+          {/* Add to calendar */}
+          <section aria-labelledby="add-to-cal" className="mx-auto mt-6 max-w-[520px] rounded-xl border border-border p-5">
+            <h2 id="add-to-cal" className="text-[15px] font-bold flex items-center gap-2">
+              <CalendarPlus className="w-4 h-4 text-link" /> Add to your calendar
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {pending ? 'Save the time now; it becomes final once the host approves.' : 'Save this meeting so you get your calendar’s usual reminders.'}
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
               {primaryButtons.map((btn) => (
-                <GlassButton key={btn.label} size="md" type="button" onClick={btn.action}>
-                  <btn.icon className="w-4 h-4" /> {btn.label}
+                <GlassButton key={btn.label} size="md" type="button" onClick={btn.action} className="w-full px-3">
+                  {btn.label}
                 </GlassButton>
               ))}
             </div>
-            <div className="flex flex-wrap justify-center gap-x-5 gap-y-1">
-              {secondaryButtons.map((btn) => (
-                <button key={btn.label} type="button" onClick={btn.action} className="h-9 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
-                  <btn.icon className="w-4 h-4" /> {btn.label}
-                </button>
-              ))}
-              <button type="button" onClick={() => downloadICSFeed([booking], 'glassmeet-event.ics')} className="h-9 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
-                <Rss className="w-4 h-4" /> Subscribe to calendar
+            {secondaryButtons.map((btn) => (
+              <button key={btn.label} type="button" onClick={btn.action} className="mt-3 h-8 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
+                <btn.icon className="w-4 h-4" /> {btn.label} for any other calendar
               </button>
-            </div>
-          </div>
+            ))}
+          </section>
 
           <details className="mx-auto mt-8 max-w-[520px] rounded-xl bg-secondary px-5 py-4 group">
             <summary className="cursor-pointer list-none text-sm font-bold flex items-center gap-2">

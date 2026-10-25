@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, CalendarCheck, RefreshCw, Unplug, CheckCircle2,
-  Apple, Shield, AlertCircle, Loader2, Settings2,
-  Rss, Copy, RotateCcw, Trash2, Plus, Globe, Clock,
+  Apple, AlertCircle, Loader2, Settings2,
+  Rss, Copy, RotateCcw, Clock,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, PageHeader } from '@/components/glass';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/localApi';
 import { useApp } from '@/lib/useprofile.js';
 import { downloadIcs } from '@/lib/calendar';
-import { downloadICSFeed, generateSubscriptionToken } from '@/lib/calendarFeed';
+import { downloadICSFeed } from '@/lib/calendarFeed';
 import OutlookIcon from '@/components/outlookicon.jsx';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
-import { appPath } from '@/lib/authReturnTo';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const SAMPLE_BOOKING = {
@@ -39,9 +38,11 @@ export default function CalendarConnections() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [syncing, setSyncing] = useState(false);
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [subLoading, setSubLoading] = useState(false);
-  const [copiedSub, setCopiedSub] = useState(null);
+  const [feedToken, setFeedToken] = useState('');
+  const [feedState, setFeedState] = useState('loading');
+  const [feedError, setFeedError] = useState('');
+  const [copiedFeed, setCopiedFeed] = useState(false);
+  const [feedResetting, setFeedResetting] = useState(false);
 
   const googleConnected = Boolean(googleAccount.connected);
   const autoSync = googleAccount.auto_sync ?? true;
@@ -58,9 +59,6 @@ export default function CalendarConnections() {
   const outlookLastSynced = profile?.outlook_last_synced;
   const [showOutlookSetup, setShowOutlookSetup] = useState(false);
 
-  // WebCal subscription input
-  const [webcalUrl, setWebcalUrl] = useState('');
-  const [webcalSubscribing, setWebcalSubscribing] = useState(false);
 
   // Device-aware calendar ordering
   const calendarPriority = getCalendarPriority();
@@ -124,27 +122,6 @@ export default function CalendarConnections() {
     }, 1200);
   };
 
-  // WebCal subscription
-  const subscribeWebcal = async () => {
-    if (!webcalUrl || !webcalUrl.startsWith('http')) return;
-    setWebcalSubscribing(true);
-    try {
-      const token = generateSubscriptionToken();
-      await api.entities.CalendarSubscription.create({
-        token,
-        name: 'WebCal Subscription',
-        scope: 'all_events',
-        active: true,
-        webcal_url: webcalUrl,
-        subscription_type: 'webcal',
-        last_synced: new Date().toISOString(),
-      });
-      setWebcalUrl('');
-      await loadSubscriptions();
-    } catch {}
-    setWebcalSubscribing(false);
-  };
-
   const testGoogle = async () => {
     setTesting('google');
     try {
@@ -188,55 +165,97 @@ export default function CalendarConnections() {
     }
   };
 
-  // Calendar subscriptions
-  const loadSubscriptions = async () => {
-    setSubLoading(true);
+  // Subscription feed: created on first visit, one per host
+  const feedUrl = feedToken ? api.calendarFeed.urlFor(feedToken) : '';
+
+  useEffect(() => {
+    api.calendarFeed.mine()
+      .then((token) => { setFeedToken(token); setFeedState('ready'); })
+      .catch((error) => {
+        setFeedError(/cal_feeds|relation|schema cache/i.test(error.message)
+          ? 'Calendar subscriptions are not set up on the server yet.'
+          : `Could not load your subscription link: ${error.message}`);
+        setFeedState('error');
+      });
+  }, []);
+
+  const copyFeedUrl = () => {
+    navigator.clipboard.writeText(feedUrl);
+    setCopiedFeed(true);
+    setTimeout(() => setCopiedFeed(false), 2000);
+  };
+
+  const resetFeed = async () => {
+    if (!confirm('Reset your subscription link? Calendars using the current link will stop updating until you subscribe again with the new one.')) return;
+    setFeedResetting(true);
     try {
-      const subs = await api.entities.CalendarSubscription.filter({}, '-created_date');
-      setSubscriptions(subs);
-    } catch {}
-    setSubLoading(false);
-  };
-
-  useEffect(() => { loadSubscriptions(); }, []);
-
-  const createSubscription = async () => {
-    const token = generateSubscriptionToken();
-    await api.entities.CalendarSubscription.create({
-      token,
-      name: 'My Calendar',
-      scope: 'all_events',
-      active: true,
-    });
-    await loadSubscriptions();
-  };
-
-  const regenerateToken = async (id) => {
-    const newToken = generateSubscriptionToken();
-    await api.entities.CalendarSubscription.update(id, { token: newToken, last_synced: new Date().toISOString() });
-    await loadSubscriptions();
-  };
-
-  const revokeSubscription = async (id) => {
-    await api.entities.CalendarSubscription.update(id, { active: false });
-    await loadSubscriptions();
-  };
-
-  const copySubscriptionUrl = (token) => {
-    const url = `${window.location.origin}${appPath(`/calendar-feed/${token}`)}`;
-    navigator.clipboard.writeText(url);
-    setCopiedSub(token);
-    setTimeout(() => setCopiedSub(null), 2000);
-  };
-
-  const downloadFeed = async (sub) => {
-    const bookings = await api.entities.Booking.filter({ host_id: profile.id, status: 'confirmed' }, '-start_time', 200);
-    downloadICSFeed(bookings);
+      setFeedToken(await api.calendarFeed.rotate());
+    } catch (error) {
+      setFeedError(`Could not reset the link: ${error.message}`);
+      setFeedState('error');
+    }
+    setFeedResetting(false);
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Calendars" description="Add meetings to the calendars you use. Google and Outlook account connections are coming soon." />
+      <PageHeader title="Calendars" description="Keep your meetings in the calendar you already use. Google and Outlook account connections are coming soon." />
+
+      {/* Subscribe: one auto-updating feed per host */}
+      <GlassCard hover={false} className="p-0 overflow-hidden">
+        <div className="p-5 flex items-start gap-4">
+          <div className="w-11 h-11 rounded-full bg-primary-soft flex items-center justify-center shrink-0">
+            <Rss className="w-5 h-5 text-link" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-[17px] font-bold">Subscribe to your GlassMeet calendar</h2>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-success">
+                <RefreshCw className="w-3 h-3" /> Auto-updates
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add this link to your calendar app once. New bookings and cancellations then show up on their own. Apple Calendar refreshes about every hour; Google Calendar can take up to a day.
+            </p>
+
+            {feedState === 'loading' && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Preparing your link…</div>
+            )}
+            {feedState === 'error' && (
+              <p role="alert" className="mt-4 text-sm text-destructive">{feedError}</p>
+            )}
+            {feedState === 'ready' && feedUrl && (
+              <>
+                <div className="mt-4 flex gap-2">
+                  <GlassInput value={feedUrl} readOnly onFocus={(e) => e.target.select()} aria-label="Calendar subscription link" className="flex-1 font-mono text-xs" />
+                  <GlassButton type="button" variant="brand" onClick={copyFeedUrl}>
+                    {copiedFeed ? <><CheckCircle2 className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy</>}
+                  </GlassButton>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Anyone with this link can see your meeting times and guest details. Keep it private, and reset it if it gets shared.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+        {feedState === 'ready' && feedUrl && (
+          <div className="px-5 pb-5 flex flex-wrap gap-2">
+            <a href={feedUrl.replace(/^https:/, 'webcal:')}>
+              <GlassButton size="sm" variant="primary" type="button"><Apple className="w-4 h-4" /> Apple Calendar</GlassButton>
+            </a>
+            <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl.replace(/^https:/, 'webcal:'))}`} target="_blank" rel="noreferrer">
+              <GlassButton size="sm" type="button"><Calendar className="w-4 h-4" /> Google Calendar</GlassButton>
+            </a>
+            <a href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feedUrl)}&name=${encodeURIComponent('GlassMeet')}`} target="_blank" rel="noreferrer">
+              <GlassButton size="sm" type="button"><OutlookIcon className="w-4 h-4" /> Outlook</GlassButton>
+            </a>
+            <GlassButton size="sm" variant="ghost" type="button" onClick={resetFeed} disabled={feedResetting}>
+              {feedResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} Reset link
+            </GlassButton>
+          </div>
+        )}
+      </GlassCard>
 
       {/* Google Calendar */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
@@ -400,128 +419,6 @@ export default function CalendarConnections() {
           ) : (
             <ComingSoonButton label="Microsoft Outlook" />
           )}
-        </div>
-      </GlassCard>
-
-      {/* WebCal / iCalendar Subscription */}
-      <GlassCard hover={false} className="p-0 overflow-hidden">
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-              <Globe className="w-5 h-5 text-link" />
-            </div>
-            <div>
-              <h2 className="text-[17px] font-bold">WebCal / iCalendar</h2>
-              <p className="text-sm text-muted-foreground">Subscribe to any external calendar via a WebCal URL (read-only).</p>
-            </div>
-          </div>
-
-          {/* Add subscription URL */}
-          <div className="mt-4 flex gap-2">
-            <GlassInput
-              value={webcalUrl}
-              onChange={(e) => setWebcalUrl(e.target.value)}
-              placeholder="webcal://example.com/calendar.ics"
-              className="flex-1"
-            />
-            <GlassButton size="sm" variant="primary" onClick={subscribeWebcal} disabled={webcalSubscribing || !webcalUrl}>
-              {webcalSubscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Subscribe
-            </GlassButton>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">Paste a WebCal URL from Outlook, Google, Apple, or any calendar that supports .ics feeds. The subscription is read-only; two-way sync will come with Google and Outlook account connections.</p>
-        </div>
-      </GlassCard>
-
-      {/* Calendar Subscriptions */}
-      <GlassCard hover={false} className="p-0 overflow-hidden">
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-              <Rss className="w-5 h-5 text-link" />
-            </div>
-            <div>
-              <h2 className="text-[17px] font-bold">Active Subscriptions</h2>
-              <p className="text-sm text-muted-foreground">Your GlassMeet feed and WebCal subscriptions.</p>
-            </div>
-          </div>
-
-          {subLoading ? (
-            <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
-          ) : subscriptions.filter((s) => s.active).length === 0 ? (
-            <div className="mt-4 text-center py-6">
-              <p className="text-sm text-muted-foreground mb-4">No active subscriptions. Create a GlassMeet feed or add a WebCal URL above.</p>
-              <GlassButton size="sm" variant="primary" onClick={createSubscription}>
-                <Rss className="w-4 h-4" /> Create GlassMeet Feed
-              </GlassButton>
-            </div>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {subscriptions.filter((s) => s.active).map((sub) => (
-                <div key={sub.id} className="rounded-lg border border-border p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-success" />
-                      <span className="text-sm font-medium">{sub.name || 'Calendar feed'}</span>
-                      {sub.subscription_type === 'webcal' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">WebCal</span>
-                      )}
-                    </div>
-                    {sub.last_synced && (
-                      <span className="text-xs text-muted-foreground">Updated {new Date(sub.last_synced).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                  {sub.webcal_url ? (
-                    <div className="flex items-center gap-2 mb-3">
-                      <code className="flex-1 text-xs text-muted-foreground bg-secondary rounded-md px-3 py-2 truncate">
-                        {sub.webcal_url}
-                      </code>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 mb-3">
-                      <code className="flex-1 text-xs text-muted-foreground bg-secondary rounded-md px-3 py-2 truncate">
-                        {window.location.origin}{appPath(`/calendar-feed/${sub.token.slice(0, 12)}…`)}
-                      </code>
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {!sub.webcal_url && (
-                      <GlassButton size="sm" onClick={() => copySubscriptionUrl(sub.token)}>
-                        {copiedSub === sub.token ? <CheckCircle2 className="w-3.5 h-3.5 text-link" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedSub === sub.token ? 'Copied' : 'Copy Link'}
-                      </GlassButton>
-                    )}
-                    <GlassButton size="sm" onClick={() => downloadFeed(sub)}>
-                      <Calendar className="w-3.5 h-3.5" /> Download .ics
-                    </GlassButton>
-                    <GlassButton size="sm" variant="ghost" onClick={() => regenerateToken(sub.id)}>
-                      <RotateCcw className="w-3.5 h-3.5" /> Regenerate
-                    </GlassButton>
-                    <GlassButton size="sm" variant="ghost" onClick={() => revokeSubscription(sub.id)}>
-                      <Trash2 className="w-3.5 h-3.5" /> Revoke
-                    </GlassButton>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </GlassCard>
-
-      {/* How availability works */}
-      <GlassCard hover={false}>
-        <div className="flex items-start gap-3">
-          <Shield className="w-5 h-5 text-link mt-0.5 shrink-0" />
-
-          <div>
-            <h3 className="font-bold text-sm">Google Calendar sync</h3>
-            <ul className="text-sm text-muted-foreground mt-2 space-y-1.5 list-disc list-inside">
-              <li>Booking slots avoid busy times from the selected Google calendar and existing GlassMeet bookings.</li>
-              <li>Guests receive only available time slots; Google event titles and details stay private.</li>
-              <li>Confirmed bookings can be added automatically to your selected Google calendar.</li>
-              <li>Use Sync now to add existing confirmed bookings that have not been synced yet.</li>
-            </ul>
-          </div>
         </div>
       </GlassCard>
 

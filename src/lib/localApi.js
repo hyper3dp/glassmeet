@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, supabaseUrl } from '@/lib/supabaseClient';
 import { appPath } from '@/lib/authReturnTo';
 
 const TOKEN_KEY = 'glassmeet_session';
@@ -213,6 +213,27 @@ export const api = {
       const { data, error } = await supabase.from('google_accounts').delete().eq('user_id', (await supabase.auth.getUser()).data.user.id);
       if (error) throw new Error(error.message);
       return { success: true };
+    },
+  },
+  // Calendar subscription feed: one secret token per host, served as .ics by the calendar-feed edge function
+  calendarFeed: {
+    urlFor: (token) => `${supabaseUrl}/functions/v1/calendar-feed/${token}.ics`,
+    mine: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.from('cal_feeds').select('token').eq('owner', user.id).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data) return data.token;
+      const { data: created, error: createError } = await supabase.from('cal_feeds').insert({ owner: user.id }).select('token').single();
+      if (createError) throw new Error(createError.message);
+      return created.token;
+    },
+    // New token; calendars subscribed to the old link stop updating
+    rotate: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+      const { data, error } = await supabase.from('cal_feeds').update({ token, rotated_at: new Date().toISOString() }).eq('owner', user.id).select('token').single();
+      if (error) throw new Error(error.message);
+      return data.token;
     },
   },
 };
