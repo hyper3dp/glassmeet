@@ -5,50 +5,105 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * GlassMeet design system — Hilos / modern Calendly dark aesthetic (see CLAUDE.md).
- * Dark-only: :root and .dark share one palette.
- *   #09090b base · #121214 surfaces · #18181b inputs · #27272a borders → #3f3f46 on hover
- *   text #fafafa · labels #a1a1aa · hints #52525b · active = solid white with black text
+ * GlassMeet design system — Calendly look (see CLAUDE.md / DESIGN.md).
+ * The theme follows the OS: :root is light (true Calendly), .dark is its dark mirror.
+ *   light: #f8f9fb page · #ffffff surfaces · navy #0b3558 text · #d4e0ed borders · blue #006bff
+ *   dark:  #0d1117 page · #151b24 surfaces · #e8eef6 text · #273342 borders · blue #1a6be6
+ * Primary = solid blue with white text; selected/active = soft blue with blue text.
  */
 
-:root,
+:root {
+  --background: #f8f9fb;
+  --foreground: #0b3558;
+  --card: #ffffff;
+  --card-foreground: #0b3558;
+  --popover: #ffffff;
+  --popover-foreground: #0b3558;
+  --primary: #006bff;
+  --primary-hover: #0055cc;
+  --primary-foreground: #ffffff;
+  --primary-soft: #e6f0ff;
+  --link: #0060e6;
+  --secondary: #f2f6fb;
+  --secondary-foreground: #0b3558;
+  --field: #ffffff;
+  --muted: #f2f6fb;
+  --muted-foreground: #476788;
+  --hint: #637789;
+  --accent: #f2f6fb;
+  --accent-foreground: #0b3558;
+  --destructive: #c8372d;
+  --success: #0a8a4c;
+  --warning: #b25e00;
+  --border: #d4e0ed;
+  --border-hover: #a6bbd1;
+  --input: #b9cbde;
+  --ring: #006bff;
+  --radius: 0.5rem;
+  --shadow-card: 0 1px 2px rgba(11, 53, 88, 0.04), 0 2px 8px rgba(11, 53, 88, 0.06);
+  --shadow-pop: 0 4px 12px rgba(11, 53, 88, 0.08), 0 12px 32px rgba(11, 53, 88, 0.12);
+  --scrim: rgba(11, 53, 88, 0.45);
+  --chart-1: #006bff;
+  --chart-2: #5fa2ff;
+  --chart-3: #0a8a4c;
+  --chart-4: #b25e00;
+  --chart-5: #a6bbd1;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b3558;
+  --sidebar-primary: #006bff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e6f0ff;
+  --sidebar-accent-foreground: #0060e6;
+  --sidebar-border: #d4e0ed;
+  --sidebar-ring: #006bff;
+  /* user-chosen highlight colour (Settings → Accent color), an HSL triplet; used sparingly for dots */
+  --accent-color: 215 100% 50%;
+  color-scheme: light;
+}
+
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #121214;
-  --card-foreground: #fafafa;
-  --popover: #121214;
-  --popover-foreground: #fafafa;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #18181b;
-  --secondary-foreground: #fafafa;
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
-  --hint: #52525b;
-  --accent: #18181b;
-  --accent-foreground: #fafafa;
-  --destructive: #f87171;
-  --border: #27272a;
-  --border-hover: #3f3f46;
-  --input: #27272a;
-  --ring: #71717a;
-  --radius: 0.75rem;
-  --chart-1: #fafafa;
-  --chart-2: #a1a1aa;
-  --chart-3: #71717a;
-  --chart-4: #52525b;
-  --chart-5: #3f3f46;
-  --sidebar: #121214;
-  --sidebar-foreground: #fafafa;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #18181b;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #71717a;
-  /* user-chosen highlight colour (Settings → Accent color), an HSL triplet; used sparingly for icons */
-  --accent-color: 211 100% 50%;
+  --background: #0d1117;
+  --foreground: #e8eef6;
+  --card: #151b24;
+  --card-foreground: #e8eef6;
+  --popover: #1c2430;
+  --popover-foreground: #e8eef6;
+  --primary: #1a6be6;
+  --primary-hover: #2f7cf2;
+  --primary-foreground: #ffffff;
+  --primary-soft: #1a2a44;
+  --link: #6aa6ff;
+  --secondary: #1c2430;
+  --secondary-foreground: #e8eef6;
+  --field: #1c2430;
+  --muted: #1c2430;
+  --muted-foreground: #9fb2c8;
+  --hint: #7d8fa4;
+  --accent: #1c2430;
+  --accent-foreground: #e8eef6;
+  --destructive: #ff7b72;
+  --success: #3fb97a;
+  --warning: #e3a044;
+  --border: #273342;
+  --border-hover: #3a4a5e;
+  --input: #3a4a5e;
+  --ring: #6aa6ff;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --chart-1: #6aa6ff;
+  --chart-2: #2f7cf2;
+  --chart-3: #3fb97a;
+  --chart-4: #e3a044;
+  --chart-5: #3a4a5e;
+  --sidebar: #151b24;
+  --sidebar-foreground: #e8eef6;
+  --sidebar-primary: #1a6be6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a2a44;
+  --sidebar-accent-foreground: #6aa6ff;
+  --sidebar-border: #273342;
+  --sidebar-ring: #6aa6ff;
   color-scheme: dark;
 }
 
@@ -60,19 +115,26 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-link: var(--link);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-field: var(--field);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-hint: var(--hint);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-border: var(--border);
   --color-border-hover: var(--border-hover);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -86,7 +148,9 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  /* sm–lg follow --radius; xl (12px) and 2xl (16px) keep Tailwind's defaults */
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  /* sm–lg follow --radius (8px); xl (12px) and 2xl (16px) keep Tailwind's defaults */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -110,10 +174,12 @@
   body {
     @apply bg-background text-foreground;
     min-height: 100vh;
+    caret-color: var(--primary);
   }
 
   h1, h2, h3, h4 {
-    @apply font-semibold tracking-tight;
+    @apply font-bold tracking-tight text-foreground;
+    text-wrap: balance;
   }
 
   button:not(:disabled),
@@ -122,31 +188,41 @@
   }
 
   ::selection {
-    background: #fafafa;
-    color: #09090b;
-  }
-
-  /* native pickers and dropdown lists render dark to match */
-  input,
-  select,
-  textarea {
-    color-scheme: dark;
-  }
-
-  option {
-    background: var(--secondary);
+    background: var(--primary-soft);
     color: var(--foreground);
   }
 
-  /* ultra-thin, track-transparent scrollbars with rounded thumbs */
+  /* keyboard focus: Calendly's blue ring */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  textarea {
+    color-scheme: inherit;
+    accent-color: var(--primary);
+  }
+
+  option {
+    background: var(--popover);
+    color: var(--foreground);
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
+
+  /* thin, track-transparent scrollbars with rounded thumbs */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--border-hover) transparent;
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
@@ -163,16 +239,19 @@
   }
 }
 
-/*
- * The glass-* class names are kept so existing pages pick up the theme;
- * they render as flat matte surfaces with razor-thin borders.
- */
-/* very faint grain so #121214 surfaces read as matte rather than flat */
+/* kept as an alias so older markup still resolves; surfaces are flat white/dark cards now */
 @utility matte {
   background-color: var(--card);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The glass-* class names are kept so existing pages pick up the theme;
+ * they render as Calendly cards, fields and nav items.
+ */
 @layer components {
   .glass {
     background: var(--card);
@@ -181,15 +260,17 @@
 
   .glass-panel,
   .liquid-glass {
-    @apply matte;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-card);
   }
 
   .glass-card {
-    @apply matte;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-card);
     transition: all 200ms ease;
   }
 
@@ -198,20 +279,20 @@
   }
 
   .glass-button {
-    background: var(--secondary);
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
     transition: all 200ms ease;
   }
 
   .glass-button:hover {
-    border-color: var(--border-hover);
+    border-color: var(--primary);
   }
 
   .glass-input {
-    background: var(--secondary);
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    background: var(--field);
+    border: 1px solid var(--input);
+    border-radius: 0.5rem;
     transition: all 200ms ease;
   }
 
@@ -221,6 +302,7 @@
 
   .glass-input:focus {
     border-color: var(--ring);
+    box-shadow: 0 0 0 1px var(--ring);
     outline: none;
   }
 
@@ -233,7 +315,7 @@
   }
 
   .accent-border {
-    border-color: var(--foreground) !important;
+    border-color: var(--primary) !important;
   }
 
   .glass-nav-item {
@@ -245,19 +327,19 @@
     color: var(--foreground);
   }
 
-  /* active states invert to solid white with black text */
+  /* active nav: soft blue fill with blue text, as in Calendly's sidebar */
   .glass-nav-item.active {
-    background: var(--primary);
-    color: var(--primary-foreground);
+    background: var(--primary-soft);
+    color: var(--link);
   }
 
   .meta-label {
-    @apply text-xs font-medium uppercase tracking-wider text-muted-foreground;
+    @apply text-sm font-semibold text-foreground;
   }
 
   /* long-form text on the Privacy Policy / Terms pages */
   .legal-prose {
-    @apply space-y-4 text-sm leading-relaxed text-muted-foreground sm:text-[15px];
+    @apply space-y-4 text-[15px] leading-7 text-muted-foreground;
   }
 
   .legal-prose ul {
@@ -265,11 +347,11 @@
   }
 
   .legal-prose strong {
-    @apply font-medium text-foreground;
+    @apply font-semibold text-foreground;
   }
 
   .legal-prose a {
-    @apply text-foreground underline underline-offset-4 transition-all duration-200 hover:opacity-80;
+    @apply font-medium text-link underline-offset-4 transition-all duration-200 hover:underline;
   }
 }
 
@@ -282,15 +364,19 @@
 }
 
 @utility animate-fade-in {
-  animation: fadeIn 0.3s ease both;
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @utility animate-slide-up {
-  animation: slideUp 0.35s ease both;
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @utility animate-scale-in {
-  animation: scaleIn 0.25s ease both;
+  animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes fadeIn {
@@ -304,4 +390,15 @@
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

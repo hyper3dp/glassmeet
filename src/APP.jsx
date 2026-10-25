@@ -43,7 +43,7 @@ const FullScreenLoader = () => (
     role="status" 
     aria-live="polite"
   >
-    <div className="w-8 h-8 border-2 border-border border-t-foreground rounded-full animate-spin"></div>
+    <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin"></div>
     <span className="sr-only">Loading application...</span>
   </div>
 );
@@ -72,7 +72,7 @@ function AppShell() {
   if (!profile) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-4">
-        <div className="w-8 h-8 border-2 border-border border-t-foreground rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin"></div>
         <p className="text-sm text-muted-foreground">Setting up your profile...</p>
       </div>
     );
@@ -149,7 +149,7 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false} disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>

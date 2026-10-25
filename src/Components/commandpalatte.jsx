@@ -56,7 +56,7 @@ export default function CommandPalette({ open, onClose }) {
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="max-w-xl overflow-hidden block top-[15vh] translate-y-0 data-[state=open]:slide-in-from-top-[13%] p-0 gap-0">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground" />
           <input
             ref={inputRef}
@@ -66,7 +66,7 @@ export default function CommandPalette({ open, onClose }) {
             placeholder="Type a command or search…"
             className="flex-1 bg-transparent outline-hidden text-sm text-foreground placeholder:text-muted-foreground"
           />
-          <button onClick={onClose} className="w-6 h-6 rounded-lg glass flex items-center justify-center"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={onClose} aria-label="Close" className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-3.5 h-3.5" /></button>
         </div>
         <div className="max-h-80 overflow-y-auto p-2">
           {filtered.length === 0 ? (
@@ -77,13 +77,13 @@ export default function CommandPalette({ open, onClose }) {
                 key={cmd.label}
                 onClick={() => { navigate(cmd.path); onClose(); }}
                 onMouseEnter={() => setSelected(i)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${i === selected ? 'bg-foreground/5' : ''}`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${i === selected ? 'bg-primary-soft' : ''}`}
               >
-                <div className="w-8 h-8 rounded-lg glass flex items-center justify-center shrink-0">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${i === selected ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
                   <cmd.icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{cmd.label}</div>
+                  <div className="text-sm font-semibold">{cmd.label}</div>
                   <div className="text-xs text-muted-foreground">{cmd.desc}</div>
                 </div>
                 {i === selected && <CornerDownLeft className="w-3.5 h-3.5 text-muted-foreground" />}

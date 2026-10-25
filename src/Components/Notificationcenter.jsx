@@ -60,22 +60,23 @@ export default function NotificationCenter() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative w-10 h-10 rounded-xl glass flex items-center justify-center transition hover:scale-105"
+        aria-label="Notifications"
+        className="relative w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"
       >
         <Bell className="w-[18px] h-[18px]" />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 w-80 glass-panel overflow-hidden animate-scale-in z-50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-            <h3 className="font-semibold text-sm">Notifications</h3>
+        <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-popover shadow-pop overflow-hidden animate-scale-in z-50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <h3 className="font-bold text-sm">Notifications</h3>
             {unread > 0 && (
-              <button onClick={markAllRead} className="text-xs accent-text font-medium flex items-center gap-1">
+              <button onClick={markAllRead} className="text-xs text-link font-semibold flex items-center gap-1 hover:underline">
                 <Check className="w-3 h-3" /> Mark all read
               </button>
             )}
@@ -90,9 +91,9 @@ export default function NotificationCenter() {
                 <button
                   key={n.id}
                   onClick={() => handleClick(n)}
-                  className={cn('w-full flex items-start gap-3 px-4 py-3 text-left border-b border-border/40 transition hover:bg-foreground/5', !n.read && 'bg-accent/5')}
+                  className={cn('w-full flex items-start gap-3 px-4 py-3 text-left border-b border-border last:border-b-0 transition-all duration-200 hover:bg-secondary', !n.read && 'bg-primary-soft/50')}
                 >
-                  <div className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', n.read ? 'bg-transparent' : 'accent-bg')} />
+                  <div className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', n.read ? 'bg-transparent' : 'bg-primary')} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{n.title}</div>
                     {n.message && <div className="text-xs text-muted-foreground line-clamp-2">{n.message}</div>}
