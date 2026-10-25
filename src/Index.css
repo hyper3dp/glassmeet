@@ -182,6 +182,12 @@
     caret-color: var(--primary);
   }
 
+  /* inside another site's iframe (public/embed.js): no page fill, height follows content */
+  html.embed body {
+    background: transparent;
+    min-height: 0;
+  }
+
   h1, h2, h3, h4 {
     @apply font-bold tracking-tight text-foreground;
     text-wrap: balance;
@@ -405,4 +411,10 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Unlayered so it beats the early dark-mode page fill in index.html (layered rules lose to
+   unlayered ones whatever their specificity): an embedded booking page must be see-through. */
+html.embed {
+  background: transparent;
 }

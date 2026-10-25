@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/APP.jsx'
 import '@/Index.css'
+import { isEmbed } from '@/lib/embed.js'
 
 const route = new URLSearchParams(window.location.search).get('__gh_pages_route');
 if (route) {
@@ -10,6 +11,8 @@ if (route) {
   const routePath = restored.pathname.replace(/^\/+/, '');
   window.history.replaceState(null, '', `${basePath}${routePath}${restored.search}${restored.hash}`);
 }
+
+if (isEmbed()) document.documentElement.classList.add('embed');
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />

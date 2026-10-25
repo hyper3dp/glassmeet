@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
   CheckCircle2, Calendar, Globe, Video, MessageCircle, Copy, Check, MapPin,
@@ -9,11 +9,16 @@ import { formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, 
 import { downloadIcs, openGoogleCalendar, openAppleCalendar, openOutlookCalendar } from '@/lib/calendar';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
 import { appPath } from '@/lib/authReturnTo';
+import { isEmbed, useEmbedResize, announceBooked } from '@/lib/embed.js';
 
 export default function BookingConfirmation() {
   const location = useLocation();
   const { booking, event, host } = (location.state || {});
   const [copied, setCopied] = useState(false);
+  const [embed] = useState(isEmbed);
+  useEmbedResize(embed);
+  // tells the website hosting the embed that a booking was made (times only, no guest details)
+  useEffect(() => { if (embed && booking) announceBooked({ booking, event }); }, []);
 
   if (!booking) {
     return (
@@ -21,7 +26,7 @@ export default function BookingConfirmation() {
         <div className="w-14 h-14 rounded-full bg-primary-soft flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-link" /></div>
         <h1 className="text-xl font-bold">You're all set</h1>
         <p className="text-sm text-muted-foreground">Your booking went through.</p>
-        <Link to="/"><GlassButton variant="primary" size="sm">Back to home</GlassButton></Link>
+        {!embed && <Link to="/"><GlassButton variant="primary" size="sm">Back to home</GlassButton></Link>}
       </div>
     );
   }
@@ -59,9 +64,9 @@ export default function BookingConfirmation() {
   const secondaryButtons = orderedButtons.filter((b) => !b.primary);
 
   return (
-    <div className="min-h-screen bg-background sm:px-4 sm:py-10 lg:py-16">
+    <div className={embed ? 'sm:p-2' : 'min-h-screen bg-background sm:px-4 sm:py-10 lg:py-16'}>
       <div className="relative mx-auto max-w-[860px] overflow-hidden bg-card sm:rounded-xl sm:border sm:border-border sm:shadow-card animate-scale-in">
-        <a href={appPath('/')} className="absolute right-0 top-0 z-10 hidden sm:block w-28 h-28 overflow-hidden" aria-label="Powered by GlassMeet">
+        <a href={appPath('/')} {...(embed ? { target: '_blank', rel: 'noreferrer' } : {})} className="absolute right-0 top-0 z-10 hidden sm:block w-28 h-28 overflow-hidden" aria-label="Powered by GlassMeet">
           <span className="absolute right-[-36px] top-[22px] w-[150px] rotate-45 bg-foreground py-1 text-center text-[9px] font-bold leading-tight text-background">
             POWERED BY<br />GLASSMEET
           </span>

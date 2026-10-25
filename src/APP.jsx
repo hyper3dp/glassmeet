@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
+import { embedTheme } from '@/lib/embed.js';
 import { AuthProvider, useAuth } from '@/lib/Authcontext.jsx';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './Components/scrolltotop.jsx';
@@ -107,7 +108,7 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem forcedTheme={embedTheme()} disableTransitionOnChange>
       <AuthProvider>
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <ScrollToTop />

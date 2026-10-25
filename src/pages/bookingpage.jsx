@@ -13,6 +13,7 @@ import { formatMeetingDate } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
 import QRCodeModal from '@/components/QrcodeModal.jsx';
 import { appPath } from '@/lib/authReturnTo';
+import { isEmbed, useEmbedResize } from '@/lib/embed.js';
 
 export default function BookingPage() {
   const { eventTypeId } = useParams();
@@ -28,6 +29,10 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [pendingSlot, setPendingSlot] = useState(null);
+  const [embed] = useState(isEmbed);
+  useEmbedResize(embed);
+  // inside an iframe, links that leave the booking flow open in a new tab
+  const outLink = embed ? { target: '_blank', rel: 'noreferrer' } : {};
   // On one-column layouts the times and the form open below the fold; bring them into view
   const slotsRef = useRef(null);
   const formRef = useRef(null);
@@ -176,7 +181,7 @@ export default function BookingPage() {
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
-      navigate(`/confirm/${booking.id}`, { state: { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } } });
+      navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state: { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } } });
     } catch (e) {
       setError('Could not complete booking. ' + (e.message || 'Please try again.'));
     }
@@ -204,14 +209,14 @@ export default function BookingPage() {
 
   return (
     <div
-      className="min-h-screen bg-background sm:px-4 sm:py-10 lg:py-16"
+      className={embed ? 'sm:p-2' : 'min-h-screen bg-background sm:px-4 sm:py-10 lg:py-16'}
       style={{ ['--accent-color']: hexToHsl(color), ['--ev']: color, ['--ev-fg']: readableOn(color) }}
     >
       <div
         className={`relative mx-auto overflow-hidden bg-card sm:rounded-xl sm:border sm:border-border sm:shadow-card transition-[max-width] duration-300 ease-out animate-fade-in
           ${wide ? 'max-w-[1060px]' : 'max-w-[860px]'}`}
       >
-        <a href={appPath('/')} className="absolute right-0 top-0 z-10 hidden sm:block w-28 h-28 overflow-hidden" aria-label="Powered by GlassMeet">
+        <a href={appPath('/')} {...outLink} className="absolute right-0 top-0 z-10 hidden sm:block w-28 h-28 overflow-hidden" aria-label="Powered by GlassMeet">
           <span className="absolute right-[-36px] top-[22px] w-[150px] rotate-45 bg-foreground py-1 text-center text-[9px] font-bold leading-tight text-background">
             POWERED BY<br />GLASSMEET
           </span>
@@ -417,8 +422,8 @@ export default function BookingPage() {
 
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   Your details are shared with the host. By proceeding, you agree to GlassMeet&rsquo;s{' '}
-                  <Link to="/terms" className="font-semibold text-link hover:underline">Terms of Service</Link> and{' '}
-                  <Link to="/privacy" className="font-semibold text-link hover:underline">Privacy Policy</Link>.
+                  <Link to="/terms" {...outLink} className="font-semibold text-link hover:underline">Terms of Service</Link> and{' '}
+                  <Link to="/privacy" {...outLink} className="font-semibold text-link hover:underline">Privacy Policy</Link>.
                 </p>
                 {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
                 <button

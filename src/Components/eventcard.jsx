@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Link2, Check, Settings2, Pencil, Trash2, Power } from 'lucide-react';
+import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2 } from 'lucide-react';
 import { buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { appPath } from '@/lib/authReturnTo';
 import { cn } from '@/lib/utils';
+
+const EmbedDialog = lazy(() => import('@/components/EmbedDialog.jsx'));
 
 export const bookingUrlFor = (id) => `${window.location.origin}${appPath(`/book/${id}`)}`;
 
@@ -11,6 +13,7 @@ export const bookingUrlFor = (id) => `${window.location.origin}${appPath(`/book/
 export default function EventCard({ event, onEdit, onDelete, onToggle }) {
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [embedding, setEmbedding] = useState(false);
   const url = bookingUrlFor(event.id);
   const active = event.active ?? true;
   const kind = event.booking_type === 'group' ? `Group, up to ${event.max_attendees || 2}` : 'One-on-One';
@@ -46,6 +49,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle }) {
                   <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
                   <div className="absolute right-0 top-9 z-40 w-48 rounded-lg border border-border bg-popover py-1.5 shadow-pop animate-scale-in">
                     {onEdit && <MenuItem icon={Pencil} onClick={() => { setMenu(false); onEdit(); }}>Edit</MenuItem>}
+                    <MenuItem icon={Code2} onClick={() => { setMenu(false); setEmbedding(true); }}>Add to website</MenuItem>
                     {onToggle && <MenuItem icon={Power} onClick={() => { setMenu(false); onToggle(!active); }}>{active ? 'Turn off' : 'Turn on'}</MenuItem>}
                     {onDelete && <MenuItem icon={Trash2} danger onClick={() => { setMenu(false); onDelete(); }}>Delete</MenuItem>}
                   </div>
@@ -73,6 +77,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle }) {
           <span className="text-sm font-semibold text-muted-foreground">Turned off</span>
         )}
       </div>
+      {embedding && <Suspense fallback={null}><EmbedDialog event={event} onClose={() => setEmbedding(false)} /></Suspense>}
     </div>
   );
 }
