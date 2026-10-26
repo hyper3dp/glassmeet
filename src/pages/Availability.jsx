@@ -6,23 +6,37 @@ import { formatDate } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import DatePicker from '@/components/DatePicker.jsx';
+import HolidaySettings from '@/components/HolidaySettings.jsx';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-// "17:00" -> "5:00pm"
+// "17:00" -> "5:00pm" ("24:00", the end of the day, -> "12:00am")
 const fmt = (t) => {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')}${h % 24 < 12 ? 'am' : 'pm'}`;
 };
+const DAY_END = 24 * 60; // an end time may be midnight, stored as "24:00"
 const toMin = (t) => { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; };
-const fromMin = (n) => `${String(Math.floor(n / 60) % 24).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+const fromMin = (n) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+let tempSeq = 0;
+const tempId = () => `tmp-${Date.now()}-${tempSeq++}`;
 
-export default function Availability({ profile }) {
+// Where a day's next range goes: an hour after its last one ends, for an hour (shorter near
+// midnight, or right after it when there's no room for the gap). null: the day is full.
+const nextRange = (dayRules) => {
+  const lastEnd = Math.max(0, ...dayRules.map((r) => toMin(r.end_time)));
+  if (lastEnd >= DAY_END) return null;
+  const start = lastEnd + 60 < DAY_END ? lastEnd + 60 : lastEnd;
+  return { start_time: fromMin(start), end_time: fromMin(Math.min(start + 60, DAY_END)) };
+};
+
+export default function Availability({ profile, updateProfile }) {
   const [rules, setRules] = useState([]);
   const [exceptions, setExceptions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showExc, setShowExc] = useState(false);
+  // the command palette's "Block time off" links here with ?block=true
+  const [showExc, setShowExc] = useState(() => new URLSearchParams(window.location.search).get('block') === 'true');
   const [saveState, setSaveState] = useState('idle');
   const [saveError, setSaveError] = useState('');
   const pending = useRef({});   // debounced rule updates, keyed by rule id
@@ -49,14 +63,8 @@ export default function Availability({ profile }) {
         api.entities.AvailabilityException.filter({ created_by_id: profile.id }, 'date'),
       ]);
       // First-run Mon–Fri 9–17 hours are seeded once by useProfile when the app loads.
-      // One range per day: keep each day's earliest range and remove any extras left from
-      // before (they'd still open booking times without showing here).
-      const keep = new Map();
-      [...r].sort((a, b) => toMin(a.start_time) - toMin(b.start_time)).forEach((rule) => { if (!keep.has(rule.day_of_week)) keep.set(rule.day_of_week, rule); });
-      const kept = [...keep.values()];
-      const extras = r.filter((rule) => !kept.includes(rule));
-      if (extras.length) Promise.all(extras.map((rule) => api.entities.AvailabilityRule.delete(rule.id))).catch(() => {});
-      setRules(kept);
+      // Each day shows all its ranges, earliest first; reading never changes them.
+      setRules([...r].sort((a, b) => toMin(a.start_time) - toMin(b.start_time)));
       setExceptions(e);
     } catch {}
     setLoading(false);
@@ -88,18 +96,23 @@ export default function Availability({ profile }) {
     });
   };
 
-  // Turning a day on gives it 9:00–5:00; each day has at most one range
-  const addRule = (dow) => {
-    if (rulesRef.current.some((r) => r.day_of_week === dow)) return;
-    const values = { day_of_week: dow, start_time: '09:00', end_time: '17:00' };
-    const tempId = `tmp-${Date.now()}`;
-    setRules((rs) => [...rs, { id: tempId, ...values }]);
+  // Turning a day on gives it 9:00–5:00; "+" adds another range after the day's last one
+  const addRule = (dow, extra = false) => {
+    const dayRules = rulesRef.current.filter((r) => r.day_of_week === dow);
+    if (!extra && dayRules.length) return;
+    const range = extra ? nextRange(dayRules) : { start_time: '09:00', end_time: '17:00' };
+    if (!range) return;
+    const values = { day_of_week: dow, ...range };
+    const id = tempId();
+    // rulesRef follows right away, so a quick second "+" sees this range too
+    rulesRef.current = [...rulesRef.current, { id, ...values }];
+    setRules((rs) => [...rs, { id, ...values }]);
     track(async () => {
       const saved = await api.entities.AvailabilityRule.create(values);
       // edits or a delete made while the row was saving
-      const local = rulesRef.current.find((x) => x.id === tempId);
+      const local = rulesRef.current.find((x) => x.id === id);
       if (!local) { await api.entities.AvailabilityRule.delete(saved.id); return; }
-      setRules((rs) => rs.map((r) => (r.id === tempId ? { ...r, id: saved.id } : r)));
+      setRules((rs) => rs.map((r) => (r.id === id ? { ...r, id: saved.id } : r)));
       if (local.start_time !== values.start_time || local.end_time !== values.end_time) {
         await api.entities.AvailabilityRule.update(saved.id, { start_time: local.start_time, end_time: local.end_time });
       }
@@ -107,10 +120,12 @@ export default function Availability({ profile }) {
   };
 
   const updateRule = (id, field, value) => {
+    // 12:00am as an end time means midnight at the end of the day
+    if (field === 'end_time' && toMin(value) === 0) value = fromMin(DAY_END);
     // keep the range valid: moving one end past the other pushes the other end along
     const row = rulesRef.current.find((r) => r.id === id);
     const change = { [field]: value };
-    if (row && field === 'start_time' && toMin(value) >= toMin(row.end_time)) change.end_time = fromMin(Math.min(toMin(value) + 60, 23 * 60 + 45));
+    if (row && field === 'start_time' && toMin(value) >= toMin(row.end_time)) change.end_time = fromMin(Math.min(toMin(value) + 60, DAY_END));
     if (row && field === 'end_time' && toMin(value) <= toMin(row.start_time)) change.start_time = fromMin(Math.max(toMin(value) - 60, 0));
     setRules((rs) => rs.map((r) => (r.id === id ? { ...r, ...change } : r)));
     if (String(id).startsWith('tmp-')) return; // saved with its final values once created
@@ -185,22 +200,36 @@ export default function Availability({ profile }) {
             )}
             <div className="space-y-4">
               {DAYS.map((day, dow) => {
-                const r = rules.find((x) => x.day_of_week === dow);
-                const on = !!r;
+                const dayRules = rules.filter((x) => x.day_of_week === dow);
+                const on = dayRules.length > 0;
+                const canAdd = on && !!nextRange(dayRules);
+                const iconBtn = 'w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary disabled:opacity-40 disabled:pointer-events-none';
                 return (
-                  <div key={dow} className="flex flex-wrap min-[420px]:flex-nowrap items-center gap-x-3 gap-y-2 min-h-10">
-                    <label className="flex items-center gap-3 w-[74px] shrink-0 cursor-pointer">
+                  <div key={dow} className="flex flex-wrap min-[420px]:flex-nowrap items-start gap-x-3 gap-y-2 min-h-10">
+                    <label className="flex items-center gap-3 w-[74px] h-10 shrink-0 cursor-pointer">
                       <Checkbox checked={on} onCheckedChange={(v) => toggleDay(dow, v === true)} aria-label={`Available on ${day}`} />
                       <span className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center ${on ? 'bg-foreground text-background' : 'bg-secondary text-muted-foreground'}`} title={day}>{day[0]}</span>
                     </label>
                     {on ? (
-                      <div className="flex basis-full min-[420px]:basis-auto flex-1 min-w-0 items-center gap-2">
-                        <TimeSelect value={r.start_time} onChange={(v) => updateRule(r.id, 'start_time', v)} aria-label={`${day} start`} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
-                        <span className="text-muted-foreground">–</span>
-                        <TimeSelect value={r.end_time} onChange={(v) => updateRule(r.id, 'end_time', v)} aria-label={`${day} end`} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
+                      <div className="basis-full min-[420px]:basis-auto flex-1 min-w-0 space-y-2">
+                        {dayRules.map((r, i) => {
+                          // "Monday start", or "Monday start, range 2" once a day has several
+                          const name = (part) => (dayRules.length > 1 ? `${day} ${part}, range ${i + 1}` : `${day} ${part}`);
+                          return (
+                            <div key={r.id} className="flex items-center gap-1 sm:gap-2">
+                              <TimeSelect value={r.start_time} onChange={(v) => updateRule(r.id, 'start_time', v)} aria-label={name('start')} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
+                              <span className="text-muted-foreground" aria-hidden="true">–</span>
+                              <TimeSelect midnight value={r.end_time} onChange={(v) => updateRule(r.id, 'end_time', v)} aria-label={name('end')} className="h-10 flex-1 sm:flex-none sm:w-[120px] min-w-0" />
+                              <button type="button" onClick={() => deleteRule(r.id)} aria-label={`Remove ${name('hours')}`} title="Remove" className={`${iconBtn} hover:text-destructive`}><X className="w-4 h-4" /></button>
+                              {i === 0
+                                ? <button type="button" onClick={() => addRule(dow, true)} disabled={!canAdd} aria-label={`Add hours on ${day}`} title="Add hours" className={`${iconBtn} hover:text-foreground`}><Plus className="w-4 h-4" /></button>
+                                : <span className="w-10 shrink-0" aria-hidden="true" />}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground">Unavailable</div>
+                      <div className="h-10 flex items-center text-sm text-muted-foreground">Unavailable</div>
                     )}
                   </div>
                 );
@@ -227,7 +256,7 @@ export default function Availability({ profile }) {
                       <div className="min-w-0">
                         <div className="text-sm font-bold">{new Date(e.date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
                         <div className="text-sm text-muted-foreground truncate tabular">
-                          {e.type === 'blocked' && !e.start_time ? 'Unavailable' : e.start_time ? `${fmt(e.start_time)} – ${fmt(e.end_time)}` : 'Available all day'}
+                          {e.type === 'blocked' && !e.start_time ? 'Unavailable' : e.type === 'blocked' ? `Blocked ${fmt(e.start_time)} – ${fmt(e.end_time)}` : e.start_time ? `${fmt(e.start_time)} – ${fmt(e.end_time)}` : 'Available all day'}
                           {e.label ? ` · ${e.label}` : ''}
                         </div>
                       </div>
@@ -240,6 +269,8 @@ export default function Availability({ profile }) {
           </section>
         </div>
       </div>
+
+      <HolidaySettings profile={profile} updateProfile={updateProfile} />
 
       {showExc && <ExceptionModal onAdd={addException} onClose={() => setShowExc(false)} />}
     </div>
@@ -257,10 +288,11 @@ function ExceptionModal({ onAdd, onClose }) {
   const save = (e) => {
     e.preventDefault();
     if (!date) { setError('Pick a date.'); return; }
-    if (mode === 'available' && toMin(endTime) <= toMin(startTime)) { setError('End time must be after the start time.'); return; }
+    if (mode !== 'blocked' && toMin(endTime) <= toMin(startTime)) { setError('End time must be after the start time.'); return; }
     onAdd(mode === 'blocked'
       ? { date, type: 'blocked', start_time: null, end_time: null, label: label.trim() || null }
-      : { date, type: 'available', start_time: startTime, end_time: endTime, label: label.trim() || null });
+      // 'hours' blocks part of the day and keeps the rest of the usual hours
+      : { date, type: mode === 'hours' ? 'blocked' : 'available', start_time: startTime, end_time: endTime, label: label.trim() || null });
   };
 
   const pill = (value, text) => (
@@ -274,7 +306,7 @@ function ExceptionModal({ onAdd, onClose }) {
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-md p-6 block">
         <div className="flex items-center justify-between mb-5">
-          <DialogTitle>Add date-specific hours</DialogTitle>
+          <DialogTitle>Change hours on a date</DialogTitle>
           <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={save} className="space-y-5">
@@ -284,12 +316,16 @@ function ExceptionModal({ onAdd, onClose }) {
           </div>
           <fieldset>
             <legend className="mb-2 text-sm font-semibold text-foreground">On this date</legend>
-            <div className="grid grid-cols-2 gap-2">
-              {pill('blocked', 'Unavailable')}
+            <div className="grid grid-cols-3 gap-2">
+              {pill('blocked', 'All day off')}
+              {pill('hours', 'Block hours')}
               {pill('available', 'Custom hours')}
             </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {mode === 'blocked' ? 'No bookings on this date.' : mode === 'hours' ? 'Close these hours; the rest of the day stays open.' : 'These hours replace your usual hours on this date.'}
+            </p>
           </fieldset>
-          {mode === 'available' && (
+          {mode !== 'blocked' && (
             <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
               <div className="min-w-0">
                 <GlassLabel htmlFor="exc-start">From</GlassLabel>
@@ -298,7 +334,7 @@ function ExceptionModal({ onAdd, onClose }) {
               <span className="pb-3 text-muted-foreground" aria-hidden="true">–</span>
               <div className="min-w-0">
                 <GlassLabel htmlFor="exc-end">To</GlassLabel>
-                <TimeSelect id="exc-end" value={endTime} onChange={setEndTime} />
+                <TimeSelect id="exc-end" midnight value={endTime} onChange={setEndTime} />
               </div>
             </div>
           )}

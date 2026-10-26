@@ -1,71 +1,123 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { api } from '@/lib/localApi';
 import {
-  BookOpen, Calendar, Clock, MessageCircle, Copy, Check, X, Trash2, Mail, Phone, ChevronRight, CheckCircle2,
+  BookOpen, Calendar, Clock, MessageCircle, Copy, Check, X, Trash2, Mail, Phone, ChevronRight, CheckCircle2, Search, Video,
 } from 'lucide-react';
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel, EmptyState, Spinner, PageHeader, Tabs, SaveStatus } from '@/components/glass';
 import { useAutosave } from '@/lib/useAutosave';
 import {
   formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, buildBookingContext, DEFAULT_CONFIRMATION_TEMPLATE,
+  DEFAULT_REMINDER_24H, DEFAULT_REMINDER_1H, DEFAULT_CANCELLATION_TEMPLATE, DEFAULT_DECLINE_TEMPLATE,
 } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/Availability.js';
 import { withoutExpiredCancellations } from '@/lib/bookings';
+import { appPath } from '@/lib/authReturnTo';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
+const TABS = ['upcoming', 'pending', 'past', 'cancelled'];
+// the messages a host can send from a meeting; the default follows what just happened
+const MESSAGE_KINDS = [
+  { value: 'confirmation', label: 'Confirmation' },
+  { value: 'reminder', label: 'Reminder (day before)' },
+  { value: 'reminder_1h', label: 'Reminder (hour before)' },
+  { value: 'cancellation', label: 'Cancellation' },
+  { value: 'decline', label: 'Decline' },
+];
+const defaultKind = (b) => (b.approval_status === 'declined' ? 'decline' : b.status === 'cancelled' ? 'cancellation' : 'confirmation');
+
 export default function Bookings({ profile, whatsapp }) {
+  const [params, setParams] = useSearchParams();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('upcoming');
+  const [loadError, setLoadError] = useState('');
+  const filter = TABS.includes(params.get('tab')) ? params.get('tab') : 'upcoming';
+  const query = params.get('q') || '';
   const [selected, setSelected] = useState(null);
+  const [confirming, setConfirming] = useState(null); // { kind: 'cancel' | 'decline', booking }
   const timezone = profile?.timezone || detectTimezone();
+
+  const setParam = (key, value) => setParams((p) => { const next = new URLSearchParams(p); if (value) next.set(key, value); else next.delete(key); return next; }, { replace: true });
+  const setFilter = (tab) => setParam('tab', tab === 'upcoming' ? '' : tab);
 
   useEffect(() => { load(); }, []);
 
   const load = async () => {
+    setLoadError('');
     try {
-      const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 100);
+      const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000);
       setBookings(withoutExpiredCancellations(b));
-    } catch (e) {}
+    } catch (e) {
+      setLoadError(e?.message || 'Your meetings could not be loaded.');
+    }
     setLoading(false);
   };
+
+  // notifications and the dashboard link straight to a meeting with ?id=
+  useEffect(() => {
+    const id = params.get('id');
+    if (!id || loading) return;
+    const b = bookings.find((x) => x.id === id);
+    if (b) setSelected({ booking: b, kind: defaultKind(b) });
+    setParam('id', '');
+  }, [params, loading, bookings]);
 
   const now = new Date();
   // a meeting stays upcoming until it ends, so one in progress is still listed
   const isUpcoming = (b) => b.status === 'confirmed' && new Date(b.end_time || b.start_time) >= now;
   const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    // searching looks through every tab
+    if (q) {
+      const digits = q.replace(/\D/g, '');
+      return bookings.filter((b) => [b.guest_name, b.guest_email, b.event_name].some((v) => v?.toLowerCase().includes(q))
+        || (digits.length >= 3 && (b.guest_phone || '').replace(/\D/g, '').includes(digits)));
+    }
     let list = bookings;
     if (filter === 'upcoming') list = bookings.filter(isUpcoming).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
     if (filter === 'past') list = bookings.filter((b) => !isUpcoming(b) && b.status !== 'cancelled').sort((a,b)=> new Date(b.start_time)-new Date(a.start_time));
     if (filter === 'pending') list = bookings.filter((b) => b.approval_status === 'pending' && b.status !== 'cancelled').sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
     if (filter === 'cancelled') list = bookings.filter((b) => b.status === 'cancelled');
     return list;
-  }, [bookings, filter]);
+  }, [bookings, filter, query]);
 
-  const change = async (id, fields, failMessage) => {
+  // after a change the guest usually needs to hear about it, so the meeting opens with that message
+  const change = async (b, fields, failMessage, thenMessage) => {
     try {
-      await api.entities.Booking.update(id, fields);
-      setBookings((list) => list.map((b) => (b.id === id ? { ...b, ...fields } : b)));
-      setSelected((cur) => (cur?.id === id ? { ...cur, ...fields } : cur));
+      await api.entities.Booking.update(b.id, fields);
+      const updated = { ...b, ...fields };
+      setBookings((list) => list.map((x) => (x.id === b.id ? updated : x)));
+      if (thenMessage) setSelected({ booking: updated, kind: thenMessage, justChanged: true });
+      else setSelected((cur) => (cur?.booking.id === b.id ? { ...cur, booking: updated } : cur));
     } catch (e) {
-      alert(`${failMessage} ${e.message || ''}`.trim());
+      toast.error(`${failMessage} ${e.message || ''}`.trim());
     }
   };
-  const cancel = (id) => {
-    if (!confirm('Cancel this meeting? The guest will need to be notified.')) return;
-    change(id, { status: 'cancelled' }, 'Could not cancel this meeting.');
-  };
-  const approve = (id) => change(id, { approval_status: 'approved' }, 'Could not approve this request.');
+  const approve = (b) => change(b, { approval_status: 'approved' }, 'Could not approve this request.', 'confirmation');
+  const askCancel = (b) => setConfirming({ kind: 'cancel', booking: b });
   // a declined request frees its time again
-  const decline = (id) => {
-    if (!confirm('Decline this request? The guest will need to be notified.')) return;
-    change(id, { approval_status: 'declined', status: 'cancelled' }, 'Could not decline this request.');
+  const askDecline = (b) => setConfirming({ kind: 'decline', booking: b });
+  const confirmChange = () => {
+    const { kind, booking } = confirming;
+    setConfirming(null);
+    if (kind === 'cancel') change(booking, { status: 'cancelled' }, 'Could not cancel this meeting.', 'cancellation');
+    else change(booking, { approval_status: 'declined', status: 'cancelled' }, 'Could not decline this request.', 'decline');
   };
 
-  // the WhatsApp message to the guest, from the host's template
-  const messageFor = (b) => {
+  // the WhatsApp message to the guest, from the host's templates
+  const messageFor = (b, kind = defaultKind(b)) => {
     const minutes = b.end_time ? Math.round((new Date(b.end_time) - new Date(b.start_time)) / 60000) : 30;
-    const ctx = buildBookingContext(b, { duration: minutes }, profile, timezone);
-    return fillTemplate(whatsapp?.confirmation_template || DEFAULT_CONFIRMATION_TEMPLATE, ctx);
+    const bookingLink = b.event_type_id ? `${window.location.origin}${appPath(`/book/${b.event_type_id}`)}` : '';
+    const ctx = buildBookingContext(b, { duration: minutes, bookingLink }, profile, timezone);
+    const template = {
+      confirmation: whatsapp?.confirmation_template || DEFAULT_CONFIRMATION_TEMPLATE,
+      reminder: whatsapp?.reminder_24h_template || DEFAULT_REMINDER_24H,
+      reminder_1h: whatsapp?.reminder_1h_template || DEFAULT_REMINDER_1H,
+      cancellation: DEFAULT_CANCELLATION_TEMPLATE,
+      decline: DEFAULT_DECLINE_TEMPLATE,
+    }[kind];
+    return fillTemplate(template, ctx);
   };
 
   if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
@@ -85,8 +137,8 @@ export default function Bookings({ profile, whatsapp }) {
     <div className="animate-fade-in">
       <PageHeader title="Meetings">
         <Tabs
-          value={filter}
-          onChange={setFilter}
+          value={query ? '' : filter}
+          onChange={(tab) => { setParam('q', ''); setFilter(tab); }}
           tabs={[
             { value: 'upcoming', label: 'Upcoming', count: counts.upcoming || null },
             { value: 'pending', label: 'Pending', count: counts.pending || null },
@@ -97,31 +149,57 @@ export default function Bookings({ profile, whatsapp }) {
       </PageHeader>
 
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5 text-sm text-muted-foreground">
+          <label className="relative w-full sm:w-72">
+            <span className="sr-only">Search meetings</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-hint" />
+            <GlassInput type="search" value={query} onChange={(e) => setParam('q', e.target.value)} placeholder="Search by name, phone or email" className="pl-9 h-10" />
+          </label>
           <span>
-            Displaying {filtered.length} {filtered.length === 1 ? 'event' : 'events'}
-            {filter === 'cancelled' && '. Canceled meetings disappear 2 days after they’re canceled.'}
+            {query ? `${filtered.length} ${filtered.length === 1 ? 'match' : 'matches'}` : `Displaying ${filtered.length} ${filtered.length === 1 ? 'event' : 'events'}`}
+            {!query && filter === 'cancelled' && '. Canceled meetings disappear 2 days after they’re canceled.'}
+            <span className="hidden sm:inline"> · {timezone}</span>
           </span>
-          <span className="hidden sm:inline">{timezone}</span>
         </div>
-        {filtered.length === 0 ? (
+        {loadError ? (
+          <div className="px-5 py-12 text-center">
+            <p className="text-sm text-destructive">Your meetings couldn't be loaded. {loadError}</p>
+            <GlassButton type="button" className="mt-4" onClick={() => { setLoading(true); load(); }}>Try again</GlassButton>
+          </div>
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title={filter === 'upcoming' ? 'No upcoming meetings' : filter === 'pending' ? 'Nothing waiting for approval' : filter === 'past' ? 'No past meetings' : 'No canceled meetings'}
-            description={filter === 'upcoming' ? 'Share your booking link and new meetings show up here.' : undefined}
+            title={query ? 'No meetings match' : filter === 'upcoming' ? 'No upcoming meetings' : filter === 'pending' ? 'Nothing waiting for approval' : filter === 'past' ? 'No past meetings' : 'No canceled meetings'}
+            description={query ? 'Try a guest’s first name or the last digits of their number.' : filter === 'upcoming' ? 'Share your booking link and new meetings show up here.' : undefined}
           />
         ) : groups.map(([day, items]) => (
           <div key={day}>
             <div className="bg-secondary px-5 py-2.5 text-sm font-bold border-b border-border">{day}</div>
             {items.map((b) => (
-              <BookingCard key={b.id} booking={b} timezone={timezone} message={messageFor(b)} onView={()=>setSelected(b)} onCancel={()=>cancel(b.id)} onApprove={()=>approve(b.id)} onDecline={()=>decline(b.id)} />
+              <BookingCard key={b.id} booking={b} timezone={timezone} message={messageFor(b)} onView={()=>setSelected({ booking: b, kind: defaultKind(b) })} onCancel={()=>askCancel(b)} onApprove={()=>approve(b)} onDecline={()=>askDecline(b)} />
             ))}
           </div>
         ))}
       </div>
 
       {selected && (
-        <BookingDetail booking={selected} timezone={timezone} message={messageFor(selected)} onClose={()=>setSelected(null)} onCancel={()=>cancel(selected.id)} onApprove={()=>approve(selected.id)} onDecline={()=>decline(selected.id)} onChanged={load} />
+        <BookingDetail key={selected.booking.id} booking={selected.booking} initialKind={selected.kind} justChanged={selected.justChanged} timezone={timezone} messageFor={messageFor}
+          onClose={()=>setSelected(null)} onCancel={()=>askCancel(selected.booking)} onApprove={()=>approve(selected.booking)} onDecline={()=>askDecline(selected.booking)} onChanged={load} />
+      )}
+
+      {confirming && (
+        <Dialog open onOpenChange={(next) => { if (!next) setConfirming(null); }}>
+          <DialogContent showCloseButton={false} className="sm:max-w-sm p-6 block">
+            <DialogTitle>{confirming.kind === 'cancel' ? 'Cancel this meeting?' : 'Decline this request?'}</DialogTitle>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {confirming.booking.guest_name}, {formatMeetingDate(confirming.booking.start_time, timezone)} at {formatMeetingTime(confirming.booking.start_time, timezone)}. The time opens up again, and you can message {confirming.booking.guest_name?.split(' ')[0] || 'the guest'} next.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <GlassButton type="button" variant="ghost" onClick={() => setConfirming(null)}>Keep it</GlassButton>
+              <GlassButton type="button" variant="danger" onClick={confirmChange}>{confirming.kind === 'cancel' ? 'Cancel meeting' : 'Decline'}</GlassButton>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
@@ -158,11 +236,11 @@ function BookingCard({ booking, timezone, message, onView, onCancel, onApprove, 
           </>
         ) : !cancelled && (
           <>
-            <GlassButton size="sm" variant="ghost" type="button" onClick={sendWhatsApp}><MessageCircle className="w-4 h-4" /> WhatsApp</GlassButton>
+            {booking.guest_phone && <GlassButton size="sm" variant="ghost" type="button" onClick={sendWhatsApp}><MessageCircle className="w-4 h-4" /> WhatsApp</GlassButton>}
             <GlassButton size="sm" variant="ghost" type="button" onClick={onCancel} className="text-destructive hover:text-destructive"><X className="w-4 h-4" /> Cancel</GlassButton>
           </>
         )}
-        <button type="button" onClick={onView} className="h-8 px-2 text-sm font-semibold text-muted-foreground flex items-center gap-1 hover:text-foreground">
+        <button type="button" onClick={onView} className="h-10 px-2 text-sm font-semibold text-muted-foreground flex items-center gap-1 hover:text-foreground">
           Details <ChevronRight className="w-4 h-4" />
         </button>
       </div>
@@ -170,78 +248,99 @@ function BookingCard({ booking, timezone, message, onView, onCancel, onApprove, 
   );
 }
 
-function BookingDetail({ booking, timezone, message, onClose, onCancel, onApprove, onDecline, onChanged }) {
+function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor, onClose, onCancel, onApprove, onDecline, onChanged }) {
   const [notes, setNotes] = useState(booking.notes || '');
   const [copied, setCopied] = useState(false);
   const [meetingUrl, setMeetingUrl] = useState(booking.meeting_url || '');
+  const [kind, setKind] = useState(initialKind || defaultKind(booking));
   const cancelled = booking.status === 'cancelled';
   const pending = booking.approval_status === 'pending' && !cancelled;
-  // the message picks up a meeting link typed here before it's sent
-  const waMsg = meetingUrl && meetingUrl !== booking.meeting_url
-    ? message.replace(booking.meeting_url || 'TBD', meetingUrl)
-    : message;
+  const message = messageFor({ ...booking, meeting_url: meetingUrl || booking.meeting_url }, kind);
+  const [draft, setDraft] = useState(null); // the host's own edits to the message
+  useEffect(() => { setDraft(null); }, [kind]);
+  const waMsg = draft ?? message;
 
-  const copyLink = () => { navigator.clipboard.writeText(meetingUrl || booking.meeting_url || ''); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(meetingUrl || booking.meeting_url || ''); setCopied(true); setTimeout(()=>setCopied(false),2000); }
+    catch { toast.error('Could not copy the link.'); }
+  };
 
   const saveState = useAutosave({ notes, meeting_url: meetingUrl }, (value) => api.entities.Booking.update(booking.id, value));
   const close = () => { if (saveState !== 'idle') onChanged(); onClose(); };
+  const link = meetingUrl || booking.meeting_url;
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) close(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-lg p-6 block">
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-lg p-6 block max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <DialogTitle>Meeting details</DialogTitle>
           <div className="ml-auto mr-2"><SaveStatus state={saveState} /></div>
           <button onClick={close} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
+        {justChanged && (
+          <p role="status" className="mb-4 rounded-lg bg-primary-soft px-3.5 py-2.5 text-sm text-link">
+            {kind === 'confirmation' ? 'Approved.' : kind === 'decline' ? 'Request declined.' : 'Meeting canceled.'} Let {booking.guest_name?.split(' ')[0] || 'the guest'} know below.
+          </p>
+        )}
+
         <div className="space-y-4">
           <div className="rounded-lg border border-border p-4 space-y-1.5">
             <div className="font-bold text-lg">{booking.event_name}</div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Calendar className="w-4 h-4" /> {formatMeetingDate(booking.start_time, timezone)}</div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /> {formatMeetingTime(booking.start_time, timezone)} ({timezone})</div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /> {formatMeetingTime(booking.start_time, timezone)}{booking.end_time && ` – ${formatMeetingTime(booking.end_time, timezone)}`} ({timezone})</div>
+            {link && !cancelled && (
+              <a href={link} target="_blank" rel="noreferrer" className="mt-2 inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:opacity-90"><Video className="w-4 h-4" /> Join meeting</a>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <InfoRow icon={Mail} label="Email" value={booking.guest_email || 'Not given'} />
-            <InfoRow icon={Phone} label="WhatsApp" value={booking.guest_phone} />
+            <InfoRow icon={Mail} label="Email" value={booking.guest_email || 'Not given'} href={booking.guest_email && `mailto:${booking.guest_email}`} />
+            <InfoRow icon={Phone} label="WhatsApp" value={booking.guest_phone || 'Not given'} href={booking.guest_phone && `tel:${booking.guest_phone}`} />
           </div>
           {booking.guest_notes && (
             <div>
-              <GlassLabel>Guest notes</GlassLabel>
+              <div className="mb-1.5 text-sm font-semibold">Guest notes</div>
               <div className="rounded-lg bg-secondary p-3 text-sm text-foreground">{booking.guest_notes}</div>
             </div>
           )}
 
           <div>
-            <GlassLabel>Meeting URL</GlassLabel>
+            <GlassLabel htmlFor="bd-url">Meeting URL</GlassLabel>
             <div className="flex gap-2">
-              <GlassInput value={meetingUrl} onChange={(e)=>setMeetingUrl(e.target.value)} placeholder="https://..." />
-              <GlassButton onClick={copyLink}>{copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}</GlassButton>
+              <GlassInput id="bd-url" value={meetingUrl} onChange={(e)=>setMeetingUrl(e.target.value)} placeholder="https://..." />
+              <GlassButton type="button" onClick={copyLink} aria-label="Copy meeting link">{copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}</GlassButton>
             </div>
           </div>
 
           <div>
-            <GlassLabel>Host notes (saved automatically)</GlassLabel>
-            <GlassTextarea rows={3} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
+            <GlassLabel htmlFor="bd-notes">Host notes (saved automatically)</GlassLabel>
+            <GlassTextarea id="bd-notes" rows={3} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
           </div>
 
-          <div className="rounded-lg bg-secondary p-4">
-            <div className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp message</div>
-            <pre className="text-sm whitespace-pre-wrap font-body text-foreground">{waMsg}</pre>
-          </div>
+          {booking.guest_phone && (
+            <div className="rounded-lg bg-secondary p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="bd-msg" className="text-sm font-semibold flex items-center gap-1.5"><MessageCircle className="w-4 h-4" /> WhatsApp message</label>
+                <select aria-label="Message type" value={kind} onChange={(e) => setKind(e.target.value)} className="h-8 rounded-full border border-input bg-field px-3 text-sm font-semibold">
+                  {MESSAGE_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                </select>
+              </div>
+              <GlassTextarea id="bd-msg" rows={6} value={waMsg} onChange={(e) => setDraft(e.target.value)} />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 mt-6">
           {pending ? (
             <>
-              <GlassButton variant="primary" className="sm:flex-1" onClick={onApprove}><CheckCircle2 className="w-4 h-4" /> Approve request</GlassButton>
-              <GlassButton variant="danger" onClick={onDecline}><X className="w-4 h-4" /> Decline</GlassButton>
+              <GlassButton type="button" variant="primary" className="sm:flex-1" onClick={onApprove}><CheckCircle2 className="w-4 h-4" /> Approve request</GlassButton>
+              <GlassButton type="button" variant="danger" onClick={onDecline}><X className="w-4 h-4" /> Decline</GlassButton>
             </>
           ) : (
             <>
-              <GlassButton variant="primary" className="sm:flex-1" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}><MessageCircle className="w-4 h-4" /> Send on WhatsApp</GlassButton>
-              {!cancelled && <GlassButton variant="danger" onClick={onCancel}><Trash2 className="w-4 h-4" /> Cancel</GlassButton>}
+              {booking.guest_phone && <GlassButton type="button" variant="primary" className="sm:flex-1" onClick={()=>window.open(buildWhatsAppLink(booking.guest_phone, waMsg), '_blank')}><MessageCircle className="w-4 h-4" /> Send on WhatsApp</GlassButton>}
+              {!cancelled && <GlassButton type="button" variant="danger" onClick={onCancel}><Trash2 className="w-4 h-4" /> Cancel</GlassButton>}
             </>
           )}
         </div>
@@ -250,11 +349,11 @@ function BookingDetail({ booking, timezone, message, onClose, onCancel, onApprov
   );
 }
 
-function InfoRow({ icon: Icon, label, value }) {
+function InfoRow({ icon: Icon, label, value, href }) {
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-0.5"><Icon className="w-3 h-3" /> {label}</div>
-      <div className="font-semibold truncate">{value}</div>
+      {href ? <a href={href} className="block font-semibold truncate text-link hover:underline">{value}</a> : <div className="font-semibold truncate">{value}</div>}
     </div>
   );
 }

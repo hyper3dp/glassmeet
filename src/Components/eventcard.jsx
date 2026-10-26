@@ -1,5 +1,4 @@
 import React, { Suspense, lazy, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2, Copy } from 'lucide-react';
 import { buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { appPath } from '@/lib/authReturnTo';
@@ -46,8 +45,8 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
   const active = event.active ?? true;
   const kind = event.booking_type === 'group' ? `Group, up to ${event.max_attendees || 2}` : 'One-on-One';
 
-  const copy = () => {
-    navigator.clipboard.writeText(url);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); } catch { return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -71,7 +70,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
                 onClick={() => setMenu((v) => !v)}
                 aria-label="Event options"
                 aria-expanded={menu}
-                className="w-8 h-8 -mr-1 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"
+                className="w-10 h-10 -mr-2 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"
               >
                 <Settings2 className="w-[18px] h-[18px]" />
               </button>
@@ -90,7 +89,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
             </div>
           )}
         </div>
-        <Link to={`/book/${event.id}`} className="mt-3 inline-block text-sm font-semibold text-link hover:underline">View booking page</Link>
+        <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-semibold text-link hover:underline">Preview booking page</a>
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
         <button type="button" onClick={copy} className="flex items-center gap-1.5 text-sm font-semibold text-link hover:underline">
@@ -101,7 +100,13 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
             href={buildWhatsAppShareLink(`Book a time with me: ${url}`)}
             target="_blank"
             rel="noreferrer"
-            className="h-8 px-4 rounded-full border border-primary text-link text-sm font-semibold flex items-center transition-all duration-200 hover:bg-primary-soft"
+            onClick={(e) => {
+              // phones: the system share sheet (WhatsApp, Instagram, SMS…); elsewhere wa.me
+              if (!navigator.share) return;
+              e.preventDefault();
+              navigator.share({ title: event.name, text: `Book a time with me: ${event.name} (${event.duration} min)`, url }).catch(() => {});
+            }}
+            className="h-10 px-4 rounded-full border border-primary text-link text-sm font-semibold flex items-center transition-all duration-200 hover:bg-primary-soft"
           >
             Share
           </a>

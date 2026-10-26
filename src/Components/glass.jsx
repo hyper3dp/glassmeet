@@ -235,15 +235,18 @@ const TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
 });
 
 // The one time picker used everywhere (native select: opens the wheel on phones).
-// placeholder adds an empty choice for optional times.
-export function TimeSelect({ value, onChange, placeholder, className, ...props }) {
+// placeholder adds an empty choice for optional times. midnight adds "24:00" (the end of the
+// day) as a last choice, for end times only.
+const MIDNIGHT = { value: '24:00', label: '12:00am (midnight)' };
+export function TimeSelect({ value, onChange, placeholder, midnight = false, className, ...props }) {
   const v = (value || '').slice(0, 5);
-  const known = TIME_OPTIONS.some((o) => o.value === v);
+  const options = midnight ? [...TIME_OPTIONS, MIDNIGHT] : TIME_OPTIONS;
+  const known = options.some((o) => o.value === v);
   return (
     <GlassSelect value={v} onChange={(e) => onChange(e.target.value)} className={cn('tabular', className)} {...props}>
       {placeholder && <option value="">{placeholder}</option>}
       {!known && v && <option value={v}>{v}</option>}
-      {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </GlassSelect>
   );
 }

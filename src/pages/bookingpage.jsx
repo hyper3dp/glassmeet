@@ -11,6 +11,7 @@ import {
 } from '@/lib/Availability.js';
 import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
+import { holidayExceptions } from '@/lib/holidays.js';
 import QRCodeModal from '@/components/QrcodeModal.jsx';
 import { appPath } from '@/lib/authReturnTo';
 import { isEmbed, useEmbedResize } from '@/lib/embed.js';
@@ -105,6 +106,8 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showQR, setShowQR] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const device = getDevice();
   const bookingUrl = `${window.location.origin}${appPath(`/book/${eventTypeId}`)}`;
@@ -118,8 +121,10 @@ export default function BookingPage() {
   const spotsLeftAt = (date) => Math.max(0, maxAttendees - bookedSlots.filter((b) => sameStart(b, date.getTime())).length);
 
   const guestTz = detectTimezone();
+  const dialCode = DIAL_CODES[guestTz];
+  const phoneExample = PHONE_EXAMPLES[dialCode] || '+971 50 123 4567';
   // weekly hours are in the host's zone; everything the guest sees is in the guest's zone
-  const hostTz = event?.host_timezone || guestTz;
+  const hostTz = event?.host_timezone || 'UTC'; // same fallback as the server's booking check
   const emailRequired = event?.email_required ?? true;
 
   useEffect(() => {
@@ -136,22 +141,31 @@ export default function BookingPage() {
   useEffect(() => { load(); }, []);
 
   const load = async () => {
+    let found = false;
     try {
       const ev = await api.events.getPublic(eventTypeId);
       // a switched-off event can't be booked; say so up front rather than at the last click
       if (ev.active === false) { setError('This event isn’t taking bookings right now.'); setLoading(false); return; }
-      setEvent(ev);
+      found = true;
       const hostId = ev.created_by_id;
-      const [r, e, b] = await Promise.all([
+      const [r, e, b, h] = await Promise.all([
         api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
         api.entities.AvailabilityException.filter({ created_by_id: hostId }),
         api.entities.BookedSlot.filter({ host_id: hostId, status: 'confirmed' }),
+        api.holidays.forHost(hostId).catch(() => []),
       ]);
       setRules(r);
-      setExceptions(e);
+      // the host's public holidays are whole days off
+      setExceptions([...e, ...holidayExceptions(h)]);
       setBookedSlots(b);
+      // shown only once its times are in, so a half load never looks like a fully booked event
+      setEvent(ev);
+      setLoadFailed(false);
     } catch (err) {
-      setError('This booking page could not be found.');
+      // offline, a slow network or a failure after the event was found isn't a missing page
+      const retryable = found || !navigator.onLine || /fetch|network|timeout|load failed/i.test(err?.message || '');
+      setLoadFailed(retryable);
+      setError(retryable ? 'We couldn’t load this page. Check your connection and try again.' : 'This booking page could not be found. Ask the host for a new link.');
     }
     setLoading(false);
   };
@@ -216,14 +230,17 @@ export default function BookingPage() {
     setCursor(new Date(nextOpen.getFullYear(), nextOpen.getMonth(), 1));
   }, [nextOpen]);
 
-  const confirm = async () => {
+  const confirm = async (e) => {
+    e?.preventDefault();
     if (!form.guest_name.trim() || !form.guest_phone.trim() || (emailRequired && !form.guest_email.trim())) {
       setError(emailRequired ? 'Please fill in your name, email and WhatsApp number.' : 'Please fill in your name and WhatsApp number.');
       return;
     }
     // the host reaches the guest on WhatsApp, so the number has to be dialable
-    if (!/^\+?\d{7,15}$/.test(normalizePhone(form.guest_phone))) {
-      setError('Enter your WhatsApp number with the country code, e.g. +971 50 123 4567.');
+    const phone = withDialCode(form.guest_phone, dialCode);
+    if (!/^\+?\d{7,15}$/.test(normalizePhone(phone))) {
+      setError(`Enter your WhatsApp number with the country code, e.g. ${phoneExample}.`);
+      document.getElementById('g-phone')?.focus();
       return;
     }
     if (form.guest_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) { setError('That email address doesn’t look right.'); return; }
@@ -263,7 +280,7 @@ export default function BookingPage() {
         host_id: event.created_by_id,
         guest_name: form.guest_name.trim(),
         guest_email: form.guest_email.trim() || null,
-        guest_phone: form.guest_phone.trim(),
+        guest_phone: phone,
         guest_notes: form.guest_notes.trim(),
         start_time: start,
         end_time: end.toISOString(),
@@ -280,7 +297,7 @@ export default function BookingPage() {
       const state = { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } };
       // kept for this tab so the confirmation survives a refresh (guests can't read bookings back)
       try { sessionStorage.setItem(`gm-booking-${booking.id}`, JSON.stringify(state)); } catch { /* storage unavailable */ }
-      navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state });
+      navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state, replace: true });
     } catch (e) {
       setError('Could not complete booking. ' + (e.message || 'Please try again.'));
     }
@@ -295,6 +312,9 @@ export default function BookingPage() {
       <div className="w-14 h-14 rounded-full bg-primary-soft flex items-center justify-center"><Calendar className="w-6 h-6 text-link" /></div>
       <h1 className="text-xl font-bold">Booking page unavailable</h1>
       <p className="text-sm text-muted-foreground">{error}</p>
+      {loadFailed && (
+        <button type="button" onClick={() => { setError(''); setLoading(true); load(); }} className="mt-2 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold transition-all duration-200 hover:brightness-110">Try again</button>
+      )}
     </div>
   );
 
@@ -302,6 +322,8 @@ export default function BookingPage() {
   const monthLabel = cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const now = new Date();
   const atCurrentMonth = cursor.getFullYear() === now.getFullYear() && cursor.getMonth() === now.getMonth();
+  const lastDay = lastBookableDay(event);
+  const atLastMonth = lastDay && (cursor.getFullYear() * 12 + cursor.getMonth() >= lastDay.getFullYear() * 12 + lastDay.getMonth());
   const shiftMonth = (n) => { const d = new Date(cursor); d.setDate(1); d.setMonth(d.getMonth() + n); setCursor(d); };
   const wide = !selectedSlot && selectedDate;
   const evText = 'color-mix(in oklab, var(--ev) 72%, var(--foreground))';
@@ -363,9 +385,16 @@ export default function BookingPage() {
               <li className="flex items-start gap-3"><MessageCircle className="w-5 h-5 mt-0.5 shrink-0" /> Confirmed on WhatsApp</li>
             </ul>
 
-            {event.description && <p className="mt-6 text-[15px] leading-relaxed text-foreground whitespace-pre-line">{event.description}</p>}
+            {event.description && (
+              <>
+                <p className={`mt-6 text-[15px] leading-relaxed text-foreground whitespace-pre-line ${showMore ? '' : 'max-md:line-clamp-3'}`}>{event.description}</p>
+                {event.description.length > 140 && (
+                  <button type="button" onClick={() => setShowMore((v) => !v)} className="md:hidden mt-2 h-10 text-sm font-semibold text-link hover:underline">{showMore ? 'Show less' : 'Show more'}</button>
+                )}
+              </>
+            )}
 
-            <button onClick={() => setShowQR(true)} className="mt-8 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
+            <button onClick={() => setShowQR(true)} className="mt-8 text-sm font-semibold text-link hidden md:flex items-center gap-1.5 hover:underline">
               <QrCode className="w-4 h-4" /> Show QR code
             </button>
           </section>
@@ -374,7 +403,7 @@ export default function BookingPage() {
             <>
               {/* Calendar */}
               <section className="p-6 sm:p-8">
-                <h2 className="text-xl font-bold mb-6">Select a Date &amp; Time</h2>
+                <h2 className="text-xl font-bold mb-6">Select a date and time</h2>
 
                 <div className="max-w-[420px] mx-auto">
                   <div className="flex items-center justify-center gap-6 mb-6">
@@ -389,15 +418,16 @@ export default function BookingPage() {
                     <div className="w-40 text-center text-[15px] font-semibold">{monthLabel}</div>
                     <button
                       onClick={() => shiftMonth(1)}
+                      disabled={!!atLastMonth}
                       aria-label="Next month"
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-link bg-primary-soft transition-all duration-200 hover:brightness-95"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-link bg-primary-soft transition-all duration-200 hover:brightness-95 disabled:bg-transparent disabled:text-hint disabled:cursor-not-allowed"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
 
                   <div className="grid grid-cols-7 mb-2">
-                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                       <div key={d} className="text-center text-[11px] font-semibold text-muted-foreground py-1">{d}</div>
                     ))}
                   </div>
@@ -491,8 +521,8 @@ export default function BookingPage() {
           ) : (
             // Details form
             <section ref={formRef} className="scroll-mt-4 p-6 sm:p-8 animate-slide-in-right">
-              <h2 className="text-xl font-bold mb-6">Enter Details</h2>
-              <div className="max-w-[440px] space-y-5">
+              <h2 className="text-xl font-bold mb-6">Enter details</h2>
+              <form onSubmit={confirm} noValidate className="max-w-[440px] space-y-5">
                 {autofilled && (
                   <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary px-3.5 py-2.5 text-sm" role="status">
                     <span className="min-w-0 text-muted-foreground">Filled in from your GlassMeet account{user?.email ? <> (<span className="text-foreground">{user.email}</span>)</> : ''}.</span>
@@ -501,7 +531,7 @@ export default function BookingPage() {
                 )}
                 <div>
                   <GlassLabel htmlFor="g-name">Name *</GlassLabel>
-                  <GlassInput id="g-name" autoComplete="name" maxLength={100} value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
+                  <GlassInput id="g-name" autoComplete="name" enterKeyHint="next" maxLength={100} value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-email">{emailRequired ? 'Email *' : 'Email (optional)'}</GlassLabel>
@@ -509,8 +539,8 @@ export default function BookingPage() {
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-phone">WhatsApp number *</GlassLabel>
-                  <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: e.target.value})} placeholder="+1 555 000 0000" />
-                  <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.</p>
+                  <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: e.target.value})} placeholder={phoneExample} />
+                  <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.{dialCode ? ` Numbers without a country code get +${dialCode}.` : ''}</p>
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-notes" className="leading-snug">Please share anything that will help prepare for our meeting.</GlassLabel>
@@ -531,7 +561,7 @@ export default function BookingPage() {
                     ) : q.type === 'multiple_choice' ? (
                       <div className="space-y-2.5">
                         {(q.options || []).map((opt, oi) => (
-                          <label key={oi} className="flex items-center gap-3 cursor-pointer text-[15px]">
+                          <label key={oi} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 cursor-pointer text-[15px]">
                             <input type="radio" name={`q-${qi}`} checked={customAnswers[qi] === opt} onChange={()=>setCustomAnswers({...customAnswers, [qi]: opt})} className="w-4 h-4" style={{ accentColor: 'var(--ev)' }} />
                             {opt}
                           </label>
@@ -550,14 +580,14 @@ export default function BookingPage() {
                 </p>
                 {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
                 <button
-                  onClick={confirm}
+                  type="submit"
                   disabled={submitting}
                   className="h-11 px-6 rounded-full text-[15px] font-bold inline-flex items-center gap-2 transition-all duration-200 hover:brightness-110 disabled:opacity-60"
                   style={{ background: 'var(--ev)', color: 'var(--ev-fg)' }}
                 >
-                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Scheduling…</> : event?.requires_approval ? 'Request booking' : 'Schedule Event'}
+                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Scheduling…</> : event?.requires_approval ? 'Request booking' : 'Schedule event'}
                 </button>
-              </div>
+              </form>
             </section>
           )}
         </div>
@@ -566,6 +596,30 @@ export default function BookingPage() {
       {showQR && <QRCodeModal url={bookingUrl} open={showQR} onClose={() => setShowQR(false)} />}
     </div>
   );
+}
+
+// Country dial codes for the guest's time zone: a local number ("050 123 4567") gets the code
+const DIAL_CODES = {
+  'Asia/Dubai': '971', 'Asia/Riyadh': '966', 'Asia/Qatar': '974', 'Asia/Kuwait': '965', 'Asia/Bahrain': '973',
+  'Asia/Muscat': '968', 'Asia/Amman': '962', 'Asia/Beirut': '961', 'Africa/Cairo': '20', 'Asia/Kolkata': '91',
+  'Asia/Calcutta': '91', 'Asia/Karachi': '92', 'Asia/Dhaka': '880', 'Asia/Manila': '63', 'Europe/London': '44',
+  'Africa/Lagos': '234', 'Africa/Nairobi': '254', 'Africa/Johannesburg': '27', 'America/Sao_Paulo': '55', 'America/Mexico_City': '52',
+};
+const PHONE_EXAMPLES = { 971: '+971 50 123 4567', 966: '+966 50 123 4567', 91: '+91 98765 43210', 44: '+44 7700 900123' };
+const withDialCode = (raw, code) => {
+  const v = (raw || '').trim();
+  if (!code || /^(\+|00)/.test(v)) return v.replace(/^00/, '+');
+  return `+${code}${v.replace(/^0+/, '')}`;
+};
+
+// last day guests may book: the booking window, the event's end date or its last listed date
+function lastBookableDay(event) {
+  if (!event) return null;
+  if (event.schedule === 'dates') { const last = [...(event.dates || [])].sort().pop(); return last ? new Date(`${last}T00:00`) : null; }
+  if (event.end_date) return new Date(`${event.end_date}T00:00`);
+  const days = bookingWindowDays(event);
+  if (!days) return null;
+  const d = new Date(); d.setDate(d.getDate() + days); return d;
 }
 
 // Navy or white text, whichever reads on the event colour

@@ -3,7 +3,6 @@ import { api } from '@/lib/localApi';
 import { MessageCircle, Info } from 'lucide-react';
 import { GlassCard, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, SaveStatus } from '@/components/glass';
 import { useAutosave } from '@/lib/useAutosave';
-import { Switch } from '@/components/ui/switch';
 import {
   DEFAULT_CONFIRMATION_TEMPLATE, DEFAULT_REMINDER_24H, DEFAULT_REMINDER_1H,
 } from '@/lib/whatsapp';
@@ -75,7 +74,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
         <div className="space-y-5">
           <div>
             <GlassLabel htmlFor="wa-phone">WhatsApp phone number</GlassLabel>
-            <GlassInput id="wa-phone" type="tel" value={form.phone_number} onChange={(e)=>set('phone_number', e.target.value)} placeholder="+1 555 000 0000" />
+            <GlassInput id="wa-phone" type="tel" value={form.phone_number} onChange={(e)=>set('phone_number', e.target.value)} placeholder="+971 50 123 4567" />
           </div>
           <div>
             <GlassLabel htmlFor="wa-mode">Messaging mode</GlassLabel>
@@ -87,39 +86,25 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
               {form.provider === 'business_api' ? 'Automatic sending through the WhatsApp Business API is not available yet.' : 'Opens WhatsApp with the message filled in; you press send.'}
             </p>
           </div>
-          <div className="divide-y divide-border rounded-lg border border-border px-4">
-            <label htmlFor="wa-enabled" className="flex items-center justify-between gap-4 py-3.5 cursor-pointer">
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">Enable WhatsApp messaging for new bookings</span>
-              </span>
-              <Switch id="wa-enabled" checked={form.enabled} onCheckedChange={(v) => set('enabled', v)} />
-            </label>
-            <label htmlFor="wa-auto" className="flex items-center justify-between gap-4 py-3.5 cursor-pointer">
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">Auto-open WhatsApp confirmation after each booking</span>
-              </span>
-              <Switch id="wa-auto" checked={form.auto_send_confirmation} onCheckedChange={(v) => set('auto_send_confirmation', v)} />
-            </label>
-          </div>
         </div>
       </GlassCard>
 
       <GlassCard hover={false}>
         <h2 className="text-lg font-bold mb-1">Message templates</h2>
-        <p className="text-sm text-muted-foreground">GlassMeet fills these in and opens WhatsApp; you send them. Automatic reminders are coming next.</p>
-        <p className="text-sm text-muted-foreground mb-5">Use placeholders: [Name], [Host], [Date], [Time], [Duration], [Meeting Link], [Timezone].</p>
+        <p className="text-sm text-muted-foreground">GlassMeet fills these in and opens WhatsApp; you press send. Send any of them from a meeting’s details on the Meetings page.</p>
+        <p className="text-sm text-muted-foreground mb-5">Use placeholders: [Name], [Host], [Date], [Time], [Duration], [Meeting Link], [Booking Link], [Timezone]. A line whose placeholder is empty is left out.</p>
         <div className="space-y-5">
           <div>
-            <GlassLabel>Confirmation message</GlassLabel>
-            <GlassTextarea rows={6} value={form.confirmation_template} onChange={(e)=>set('confirmation_template', e.target.value)} />
+            <GlassLabel htmlFor="wa-confirm">Confirmation message</GlassLabel>
+            <GlassTextarea id="wa-confirm" rows={6} value={form.confirmation_template} onChange={(e)=>set('confirmation_template', e.target.value)} />
           </div>
           <div>
-            <GlassLabel>24-hour reminder (you send it)</GlassLabel>
-            <GlassTextarea rows={4} value={form.reminder_24h_template} onChange={(e)=>set('reminder_24h_template', e.target.value)} />
+            <GlassLabel htmlFor="wa-r24">Reminder the day before</GlassLabel>
+            <GlassTextarea id="wa-r24" rows={4} value={form.reminder_24h_template} onChange={(e)=>set('reminder_24h_template', e.target.value)} />
           </div>
           <div>
-            <GlassLabel>1-hour reminder (you send it)</GlassLabel>
-            <GlassTextarea rows={4} value={form.reminder_1h_template} onChange={(e)=>set('reminder_1h_template', e.target.value)} />
+            <GlassLabel htmlFor="wa-r1">Reminder an hour before</GlassLabel>
+            <GlassTextarea id="wa-r1" rows={4} value={form.reminder_1h_template} onChange={(e)=>set('reminder_1h_template', e.target.value)} />
           </div>
         </div>
       </GlassCard>
@@ -130,7 +115,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
             <Info className="w-5 h-5 text-warning shrink-0" />
             <div className="text-sm space-y-1">
               <div className="font-bold">WhatsApp Business API credentials</div>
-              <p className="text-muted-foreground">Production automated sending requires a Meta Business account, a verified phone number ID, and a permanent access token. Store these as environment secrets — never hardcode them. Deep-link mode works without credentials and is recommended to start.</p>
+              <p className="text-muted-foreground">Automatic sending needs a WhatsApp Business account from Meta. Until it’s available, deep link mode works with your normal WhatsApp.</p>
             </div>
           </div>
         </GlassCard>

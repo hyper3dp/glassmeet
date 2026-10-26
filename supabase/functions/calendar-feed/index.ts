@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
   if (!feed) return notFound();
 
   const [{ data: profile }, { data: bookings, error }] = await Promise.all([
-    supabase.from('profiles').select('full_name').eq('id', feed.owner).maybeSingle(),
+    supabase.from('profiles').select('*').eq('id', feed.owner).maybeSingle(),
     supabase
       .from('bookings')
       .select('*')
@@ -65,6 +65,12 @@ Deno.serve(async (req) => {
     console.error('bookings query failed', error.code, error.message);
     return new Response('Feed temporarily unavailable', { status: 503 });
   }
+
+  // public holidays the host blocks, as all-day events (none until the holidays migration is applied)
+  const { data: holidays } = profile?.holidays
+    ? await supabase.from('holidays').select('date, name').eq('region', profile.holidays)
+      .gte('date', new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)).order('date')
+    : { data: [] };
 
   const name = profile?.full_name ? `GlassMeet: ${profile.full_name}` : 'GlassMeet';
   const lines = [
@@ -96,6 +102,22 @@ Deno.serve(async (req) => {
     );
     if (b.meeting_url) lines.push(`LOCATION:${esc(b.meeting_url)}`);
     lines.push('END:VEVENT');
+  }
+  for (const h of holidays ?? []) {
+    const day = h.date.replace(/-/g, '');
+    const next = new Date(`${h.date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:glassmeet-holiday-${profile.holidays}-${day}@glassmeet.app`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${day}`,
+      `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, '')}`,
+      `SUMMARY:${esc(`${h.name} (holiday)`)}`,
+      'DESCRIPTION:Bookings are closed on this day.',
+      'TRANSP:TRANSPARENT',
+      'END:VEVENT',
+    );
   }
   lines.push('END:VCALENDAR');
 

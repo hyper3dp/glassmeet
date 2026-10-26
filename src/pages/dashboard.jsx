@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/localApi';
-import { Calendar, Plus, MessageCircle, CheckCircle2, Link2 } from 'lucide-react';
+import { Calendar, Plus, MessageCircle, CheckCircle2, Link2, Hourglass, ChevronRight } from 'lucide-react';
 import { GlassButton, EmptyState, Spinner, PageHeader, Avatar } from '@/components/glass';
 import EventCard from '@/components/eventcard.jsx';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/lib/whatsapp';
@@ -13,6 +13,7 @@ const BOOKINGS_LIMIT = 200;
 
 export default function Dashboard({ profile }) {
   const [bookings, setBookings] = useState([]);
+  const [ahead, setAhead] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -21,17 +22,28 @@ export default function Dashboard({ profile }) {
   useEffect(() => {
     (async () => {
       try {
-        const [b, e] = await Promise.all([
+        // from a day back, so today's earlier meetings count in any time zone
+        const since = new Date(Date.now() - 86400000).toISOString();
+        const [b, u, e] = await Promise.all([
           // newest bookings first, so "Recently booked" really is the latest ones
           api.entities.Booking.filter({ host_id: profile.id }, '-created_date', BOOKINGS_LIMIT),
+          // meetings still ahead, however long ago they were booked
+          api.entities.Booking.filter({ host_id: profile.id, start_time: { gte: since } }, 'start_time', BOOKINGS_LIMIT),
           api.entities.EventType.filter({ created_by_id: profile.id }, '-created_date', 20),
         ]);
         setBookings(b);
+        setAhead(u);
         setEventTypes(e);
       } catch (e) {}
       setLoading(false);
     })();
   }, [profile.id]);
+
+  // recent and upcoming lists together, each booking once
+  const known = useMemo(() => {
+    const ids = new Set(bookings.map((b) => b.id));
+    return [...bookings, ...ahead.filter((b) => !ids.has(b.id))];
+  }, [bookings, ahead]);
 
   const now = new Date();
   // calendar days in the host's zone (not UTC), so late-evening and early-morning meetings
@@ -39,13 +51,16 @@ export default function Dashboard({ profile }) {
   const dayKey = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: timezone });
   const todayKey = dayKey(now);
 
+  // requests waiting for approval aren't meetings yet; they get their own card
+  const isOn = (b) => b.status === 'confirmed' && b.approval_status !== 'pending' && b.approval_status !== 'declined';
+  const pendingCount = known.filter((b) => b.approval_status === 'pending' && b.status !== 'cancelled').length;
   const upcoming = useMemo(
-    () => bookings.filter((b) => b.status === 'confirmed' && new Date(b.end_time || b.start_time) >= now).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time)),
-    [bookings]
+    () => known.filter((b) => isOn(b) && new Date(b.end_time || b.start_time) >= now).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time)),
+    [known]
   );
   const todays = useMemo(
-    () => bookings.filter((b) => b.status === 'confirmed' && dayKey(b.start_time) === todayKey),
-    [bookings, todayKey]
+    () => known.filter((b) => isOn(b) && dayKey(b.start_time) === todayKey),
+    [known, todayKey]
   );
   const recent = useMemo(() => bookings.filter((b) => !isExpiredCancellation(b)).slice(0, 5), [bookings]);
 
@@ -55,15 +70,10 @@ export default function Dashboard({ profile }) {
   const firstEvent = eventTypes.find((e) => e.active ?? true);
   const bookingLink = firstEvent ? `${window.location.origin}${appPath(`/book/${firstEvent.id}`)}` : '';
 
-  const shareOnWhatsApp = () => {
-    const msg = firstEvent
-      ? `Book a time with me on GlassMeet: ${bookingLink}`
-      : 'Check out GlassMeet — WhatsApp-first scheduling';
-    window.open(buildWhatsAppShareLink(msg), '_blank');
-  };
+  const shareOnWhatsApp = () => window.open(buildWhatsAppShareLink(`Book a time with me: ${bookingLink}`), '_blank');
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(bookingLink);
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(bookingLink); } catch { return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -80,7 +90,7 @@ export default function Dashboard({ profile }) {
         description={todays.length ? `You have ${todays.length} meeting${todays.length === 1 ? '' : 's'} today.` : 'No meetings today.'}
         actions={
           <>
-            <GlassButton type="button" onClick={shareOnWhatsApp}><MessageCircle className="w-4 h-4" /> Share on WhatsApp</GlassButton>
+            {firstEvent && <GlassButton type="button" onClick={shareOnWhatsApp}><MessageCircle className="w-4 h-4" /> Share on WhatsApp</GlassButton>}
             <Link to="/event-types?new=true"><GlassButton variant="primary" type="button"><Plus className="w-4 h-4" strokeWidth={2.5} /> Create</GlassButton></Link>
           </>
         }
@@ -97,6 +107,14 @@ export default function Dashboard({ profile }) {
             {copied ? <><CheckCircle2 className="w-4 h-4" /> Copied</> : <><Link2 className="w-4 h-4" /> Copy link</>}
           </GlassButton>
         </div>
+      )}
+
+      {pendingCount > 0 && (
+        <Link to="/bookings?tab=pending" className="mb-6 flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 px-5 py-4 transition-all duration-200 hover:border-warning/60">
+          <Hourglass className="w-5 h-5 text-warning shrink-0" />
+          <span className="flex-1 text-sm font-semibold">{pendingCount === 1 ? '1 booking request is' : `${pendingCount} booking requests are`} waiting for your approval</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
       )}
 
       {/* Summary strip */}
@@ -137,13 +155,16 @@ export default function Dashboard({ profile }) {
             ) : (
               <ul className="divide-y divide-border">
                 {recent.map((b) => (
-                  <li key={b.id} className="flex items-center gap-3 px-5 py-3.5">
-                    <Avatar name={b.guest_name} size={32} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold">{b.guest_name}</div>
-                      <div className="truncate text-xs text-muted-foreground">{b.event_name || 'Meeting'} · {formatMeetingDate(b.start_time, timezone)}</div>
-                    </div>
-                    {b.status === 'cancelled' && <span className="text-xs font-semibold text-destructive">Canceled</span>}
+                  <li key={b.id}>
+                    <Link to={`/bookings?id=${b.id}`} className="flex items-center gap-3 px-5 py-3.5 transition-all duration-200 hover:bg-secondary">
+                      <Avatar name={b.guest_name} size={32} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-bold">{b.guest_name}</div>
+                        <div className="truncate text-xs text-muted-foreground">{b.event_name || 'Meeting'} · {formatMeetingDate(b.start_time, timezone)}</div>
+                      </div>
+                      {b.status === 'cancelled' && <span className="text-xs font-semibold text-destructive">Canceled</span>}
+                      {b.approval_status === 'pending' && b.status !== 'cancelled' && <span className="text-xs font-semibold text-warning">Pending</span>}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -195,7 +216,7 @@ function BookingRow({ booking, timezone, color }) {
   const start = formatMeetingTime(booking.start_time, timezone);
   const end = booking.end_time ? formatMeetingTime(booking.end_time, timezone) : null;
   return (
-    <Link to="/bookings" className="flex items-start sm:items-center gap-4 px-5 py-4 border-b border-border last:border-b-0 transition-all duration-200 hover:bg-secondary">
+    <Link to={`/bookings?id=${booking.id}`} className="flex items-start sm:items-center gap-4 px-5 py-4 border-b border-border last:border-b-0 transition-all duration-200 hover:bg-secondary">
       <span className="mt-1 sm:mt-0 w-3.5 h-3.5 rounded-full shrink-0" style={{ background: color || 'var(--primary)' }} />
       <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4">
       <div className="sm:w-40 shrink-0 text-sm tabular text-muted-foreground">{start}{end && ` – ${end}`}</div>

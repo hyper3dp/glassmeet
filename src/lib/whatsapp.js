@@ -45,10 +45,11 @@ export const formatMeetingTime = (date, timezone) => {
   }
 };
 
-// Fill a template with booking context
+// Fill a template with booking context. A line whose placeholder has no value ("Meeting: ")
+// is left out rather than sent half empty.
 export const fillTemplate = (template, ctx) => {
   if (!template) return '';
-  return template
+  const filled = template
     .replace(/\[Name\]/g, ctx.guestName || '')
     .replace(/\[Host\]/g, ctx.hostName || '')
     .replace(/\[Date\]/g, ctx.date || '')
@@ -57,6 +58,7 @@ export const fillTemplate = (template, ctx) => {
     .replace(/\[Meeting Link\]/g, ctx.meetingUrl || '')
     .replace(/\[Booking Link\]/g, ctx.bookingLink || '')
     .replace(/\[Timezone\]/g, ctx.timezone || '');
+  return filled.split('\n').filter((line) => !/^[^:\n]{1,20}:\s*(\(\s*\))?\s*$/.test(line)).join('\n');
 };
 
 export const DEFAULT_CONFIRMATION_TEMPLATE = `Hi [Name]! Your meeting with [Host] is confirmed.
@@ -76,6 +78,14 @@ export const DEFAULT_REMINDER_1H = `Starting soon: Your meeting with [Host] is i
 
 Meeting: [Meeting Link]`;
 
+export const DEFAULT_CANCELLATION_TEMPLATE = `Hi [Name], I'm sorry, I need to cancel our meeting on [Date] at [Time] ([Timezone]).
+
+You can pick a new time here: [Booking Link]`;
+
+export const DEFAULT_DECLINE_TEMPLATE = `Hi [Name], thanks for your request for [Date] at [Time]. Unfortunately I can't make that time.
+
+Please pick another time here: [Booking Link]`;
+
 // Build the full booking context object for templates
 export const buildBookingContext = (booking, eventType, host, timezone) => {
   const date = formatMeetingDate(booking.start_time, timezone);
@@ -86,8 +96,8 @@ export const buildBookingContext = (booking, eventType, host, timezone) => {
     date,
     time,
     duration: `${eventType?.duration || 30} min`,
-    meetingUrl: booking.meeting_url || eventType?.meeting_url || 'TBD',
-    bookingLink: '',
+    meetingUrl: booking.meeting_url || eventType?.meeting_url || '',
+    bookingLink: eventType?.bookingLink || '',
     timezone: timezone || '',
   };
 };

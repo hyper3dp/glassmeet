@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import { Plus, Clock, ExternalLink, Search, X, FileText, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import DatePicker, { MultiDatePicker } from '@/components/DatePicker.jsx';
 import { formatDate, eventRunsOn } from '@/lib/Availability.js';
 import { cn } from '@/lib/utils';
 import { BUILT_IN_TEMPLATES, templateData, templateSummary } from '@/lib/templates';
+import { appPath } from '@/lib/authReturnTo';
 
 export default function EventTypes({ profile }) {
   const [eventTypes, setEventTypes] = useState([]);
@@ -110,9 +111,9 @@ export default function EventTypes({ profile }) {
           <div className="text-[15px] font-bold truncate">{profile?.full_name || 'You'}</div>
         </div>
         {eventTypes[0] && (
-          <Link to={`/book/${eventTypes[0].id}`} className="shrink-0 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
-            <ExternalLink className="w-4 h-4" /> View landing page
-          </Link>
+          <a href={appPath(`/book/${eventTypes[0].id}`)} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
+            <ExternalLink className="w-4 h-4" /> Preview booking page
+          </a>
         )}
       </div>
 
@@ -147,16 +148,23 @@ export default function EventTypes({ profile }) {
             const payload = {
               ...values,
               host_name: profile.full_name || profile.email,
+              host_photo: profile.profile_photo || null,
               host_timezone: profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             };
+            let saved;
             if (editing) {
-              const saved = await api.entities.EventType.update(editing.id, payload);
+              saved = await api.entities.EventType.update(editing.id, payload);
               setEventTypes((list) => list.map((x) => (x.id === editing.id ? (saved || { ...x, ...payload }) : x)));
             } else {
-              const saved = await api.entities.EventType.create(payload);
+              saved = await api.entities.EventType.create(payload);
               setEventTypes((list) => [saved, ...list]);
             }
             setShowModal(false);
+            const id = saved?.id || editing?.id;
+            const link = id ? `${window.location.origin}${appPath(`/book/${id}`)}` : '';
+            toast.success(editing ? 'Event saved' : 'Event created', link ? {
+              action: { label: 'Copy link', onClick: () => navigator.clipboard.writeText(link).then(() => toast.success('Link copied'), () => toast.error('Could not copy the link')) },
+            } : undefined);
           }}
         />
       )}
@@ -197,18 +205,17 @@ function TemplatePicker({ templates, onPick, onDelete, onClose }) {
           <ul className="grid gap-3 sm:grid-cols-2">
             <TemplateTile icon={Plus} name="Start from scratch" summary="A blank event type" onPick={() => onPick(null)} />
           </ul>
-          <section>
-            <h3 className="mb-1 text-sm font-semibold">Your templates</h3>
-            {templates.length ? (
-              <ul className="mt-2 grid gap-3 sm:grid-cols-2">
+          {/* the host's own templates, once they've saved some */}
+          {templates.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold">Your templates</h3>
+              <ul className="grid gap-3 sm:grid-cols-2">
                 {templates.map((t) => (
                   <TemplateTile key={t.id} name={t.name} summary={templateSummary(t.data || {})} onPick={() => onPick(t)} onDelete={() => onDelete(t)} />
                 ))}
               </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">Save any event type as a template from its form or its menu, and it appears here.</p>
-            )}
-          </section>
+            </section>
+          )}
           <section>
             <h3 className="mb-2 text-sm font-semibold">Templates</h3>
             <ul className="grid gap-3 sm:grid-cols-2">
@@ -261,6 +268,7 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
   const today = formatDate(new Date());
   const src = event || template?.data || {};
   const known = LOCATIONS.find((l) => l.value === src.location);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [form, setForm] = useState(() => ({
     name: src.name || '',
     description: (src.description || '').slice(0, DESCRIPTION_MAX),
@@ -283,11 +291,15 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
     end_date: event?.end_date || '',
     dates: event?.dates ? [...event.dates].sort() : [],
   }));
+  const initialForm = useRef(null);
+  if (initialForm.current === null) initialForm.current = JSON.stringify(form);
+  const dirty = JSON.stringify(form) !== initialForm.current;
+  const requestClose = () => { if (dirty && !saving) setConfirmDiscard(true); else onClose(); };
   const [customDuration, setCustomDuration] = useState(() => !DURATIONS.includes(Number(src.duration) || 30));
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const kind = LOCATIONS.find((l) => l.value === form.location)?.kind;
   const every = Math.max(1, Number(form.every) || 1);
-  const toggleDay = (dow) => setField('days', form.days.includes(dow) ? form.days.filter((d) => d !== dow) : [...form.days, dow].sort());
+  const toggleDay = (dow) => { pickedDays.current = true; setField('days', form.days.includes(dow) ? form.days.filter((d) => d !== dow) : [...form.days, dow].sort()); };
 
   // The host's hours, to flag days the event would run on but nobody can book
   const [hours, setHours] = useState(null);
@@ -300,6 +312,13 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
       dates: new Set(exceptions.filter((e) => e.type === 'available').map((e) => e.date)),
     })).catch(() => {});
   }, []);
+  const pickedDays = useRef(false);
+  useEffect(() => {
+    if (!hours || event || src.days?.length || pickedDays.current || !hours.days.size) return;
+    const days = [...hours.days].sort();
+    setForm((f) => ({ ...f, days }));
+    initialForm.current = JSON.stringify({ ...JSON.parse(initialForm.current), days });
+  }, [hours]);
   const dateHasHours = (key) => !hours || hours.dates.has(key) || hours.days.has(new Date(`${key}T00:00`).getDay());
   const closedDays = hours && form.freq === 'week' ? form.days.filter((d) => !hours.days.has(d)) : [];
 
@@ -396,11 +415,12 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
   };
 
   return (
-    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+    <>
+    <Dialog open onOpenChange={(next) => { if (!next) requestClose(); }}>
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-xl p-0 sm:pb-0 block">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-popover px-6 py-4">
           <DialogTitle>{event ? 'Edit event type' : 'New event type'}</DialogTitle>
-          <button type="button" aria-label="Close" onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
+          <button type="button" aria-label="Close" onClick={requestClose} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={submit} className="space-y-5 px-6 pt-5">
           <div>
@@ -597,11 +617,24 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
                 <FileText className="w-4 h-4" /> {savingTemplate ? 'Saving…' : 'Save as template'}
               </GlassButton>
             )}
-            <GlassButton type="button" variant="default" onClick={onClose} className="min-w-0 sm:border-transparent sm:bg-transparent">Cancel</GlassButton>
+            <GlassButton type="button" variant="default" onClick={requestClose} className="min-w-0 sm:border-transparent sm:bg-transparent">Cancel</GlassButton>
             <GlassButton type="submit" variant="primary" disabled={saving} className="min-w-0">{saving ? 'Saving…' : event ? 'Save changes' : 'Create event type'}</GlassButton>
           </div>
         </form>
       </DialogContent>
     </Dialog>
+    {confirmDiscard && (
+      <Dialog open onOpenChange={(next) => { if (!next) setConfirmDiscard(false); }}>
+        <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-sm p-6 block">
+          <DialogTitle>Discard your changes?</DialogTitle>
+          <p className="mt-2 text-sm text-muted-foreground">You have changes to this event that aren't saved yet.</p>
+          <div className="mt-6 flex justify-end gap-2">
+            <GlassButton type="button" variant="ghost" onClick={() => setConfirmDiscard(false)}>Keep editing</GlassButton>
+            <GlassButton type="button" variant="danger" onClick={onClose}>Discard</GlassButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }

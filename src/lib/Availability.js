@@ -1,6 +1,6 @@
 // Availability & slot computation utilities for GlassMeet
 
-// Convert "HH:MM" to minutes
+// Convert "HH:MM" to minutes ("24:00", midnight at the end of the day, is 1440)
 export const timeToMinutes = (t) => {
   if (!t) return 0;
   const [h, m] = t.split(':').map(Number);
@@ -13,31 +13,25 @@ export const rulesForDay = (rules, dayOfWeek) =>
     .filter((r) => r.day_of_week === dayOfWeek)
     .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
 
-// Build available intervals (in minutes from midnight) for a specific date
-// considering weekly rules + exceptions (blocked/available overrides)
+// Build available intervals (in minutes from midnight) for a specific date.
+// Custom hours on the date ('available' with times) replace that weekday's rules; 'blocked'
+// ones are then taken out (with times: those hours; without: the whole day).
+// Mirrored by the database's slot check.
 export const intervalsForDate = (date, rules, exceptions) => {
-  const dayOfWeek = date.getDay();
-  let intervals = rulesForDay(rules, dayOfWeek).map((r) => ({
-    start: timeToMinutes(r.start_time),
-    end: timeToMinutes(r.end_time),
-  }));
-
   const dateStr = formatDate(date);
   const dayExceptions = exceptions.filter((e) => e.date === dateStr);
+  const custom = dayExceptions.filter((e) => e.type === 'available' && e.start_time && e.end_time);
+
+  let intervals = mergeIntervals((custom.length ? custom : rulesForDay(rules, date.getDay())).map((r) => ({
+    start: timeToMinutes(r.start_time),
+    end: timeToMinutes(r.end_time),
+  })));
 
   for (const exc of dayExceptions) {
-    if (exc.type === 'blocked') {
-      const blockStart = exc.start_time ? timeToMinutes(exc.start_time) : 0;
-      const blockEnd = exc.end_time ? timeToMinutes(exc.end_time) : 24 * 60;
-      intervals = subtractInterval(intervals, blockStart, blockEnd);
-    } else if (exc.type === 'available') {
-      if (exc.start_time && exc.end_time) {
-        intervals = mergeIntervals([
-          ...intervals,
-          { start: timeToMinutes(exc.start_time), end: timeToMinutes(exc.end_time) },
-        ]);
-      }
-    }
+    if (exc.type !== 'blocked') continue;
+    const blockStart = exc.start_time ? timeToMinutes(exc.start_time) : 0;
+    const blockEnd = exc.end_time ? timeToMinutes(exc.end_time) : 24 * 60;
+    intervals = subtractInterval(intervals, blockStart, blockEnd);
   }
 
   return intervals;

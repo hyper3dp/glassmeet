@@ -8,9 +8,11 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const COMMANDS = [
   { label: 'Create event', icon: Plus, path: '/event-types?new=true', desc: 'New event type' },
-  { label: 'Find a time', icon: Clock, path: '/calendar?find=true', desc: 'Compare availability' },
+  { label: 'Find a time', icon: Clock, path: '/calendar?find=true', desc: 'See your next open times' },
   { label: 'View calendar', icon: Calendar, path: '/calendar', desc: 'Open calendar view' },
-  { label: 'Search bookings', icon: BookOpen, path: '/bookings', desc: 'Browse all bookings' },
+  { label: 'Meetings', icon: BookOpen, path: '/bookings', desc: 'Browse all meetings' },
+  { label: 'Pending requests', icon: Bell, path: '/bookings?tab=pending', desc: 'Approve or decline' },
+  { label: 'Block time off', icon: CalendarClock, path: '/availability?block=true', desc: 'Close a day or a few hours' },
   { label: 'Open WhatsApp', icon: MessageCircle, path: '/whatsapp', desc: 'WhatsApp settings' },
   { label: 'Calendar connections', icon: CalendarCheck, path: '/calendar-connections', desc: 'Manage calendar sync' },
   { label: 'Availability', icon: Clock, path: '/availability', desc: 'Edit working hours' },
@@ -32,10 +34,15 @@ export default function CommandPalette({ open, onClose }) {
     }
   }, [open]);
 
-  const filtered = COMMANDS.filter((c) =>
+  const matches = COMMANDS.filter((c) =>
     c.label.toLowerCase().includes(query.toLowerCase()) ||
     c.desc.toLowerCase().includes(query.toLowerCase())
   );
+  // anything typed can also be a guest's name, phone or email
+  const q = query.trim();
+  const filtered = q
+    ? [...matches, { label: `Search meetings for “${q}”`, icon: Search, path: `/bookings?q=${encodeURIComponent(q)}`, desc: 'Guest name, phone or email' }]
+    : matches;
 
   useEffect(() => { setSelected(0); }, [query]);
 

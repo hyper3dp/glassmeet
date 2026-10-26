@@ -57,7 +57,7 @@ const DashboardPage = () => { const { profile } = useApp(); return <Dashboard pr
 const CalendarPagePage = () => { const { profile } = useApp(); return <CalendarPage profile={profile} />; };
 const EventTypesPage = () => { const { profile } = useApp(); return <EventTypes profile={profile} />; };
 const BookingsPage = () => { const { profile, whatsapp } = useApp(); return <Bookings profile={profile} whatsapp={whatsapp} />; };
-const AvailabilityPage = () => { const { profile } = useApp(); return <Availability profile={profile} />; };
+const AvailabilityPage = () => { const { profile, updateProfile } = useApp(); return <Availability profile={profile} updateProfile={updateProfile} />; };
 const WhatsAppPage = () => { const { profile, whatsapp, setWhatsapp } = useApp(); return <WhatsAppSettings profile={profile} whatsapp={whatsapp} setWhatsapp={setWhatsapp} />; };
 const SettingsPage = () => { const { profile, updateProfile } = useApp(); return <Settings profile={profile} updateProfile={updateProfile} />; };
 const CalendarConnectionsPage = () => { return <CalendarConnections />; };

@@ -33,6 +33,7 @@ async function writeSkippingMissingColumns(run, value) {
 
 const notDeployed = (error) => error && (error.code === 'PGRST202' || error.code === '42883' || /could not find the function|does not exist/i.test(error.message || ''));
 
+let googleBusyMissing = false; // the google-calendar edge function isn't there (see google.busy)
 let meCache = null;
 const sessionUser = async () => (await supabase.auth.getSession()).data.session?.user || null;
 supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'USER_UPDATED') meCache = null; });
@@ -72,10 +73,13 @@ const entities = new Proxy({}, {
       filter: async (where = {}, sort, limit) => {
         let query = supabase.from(table).select('*');
         
-        // Simple filter mapping
+        // Simple filter mapping: a value matches exactly, an array is "one of", and
+        // { gte: x } is "x or later"
         Object.entries(where).forEach(([key, value]) => {
           if (Array.isArray(value)) {
             query = query.in(key, value);
+          } else if (value && typeof value === 'object' && 'gte' in value) {
+            query = query.gte(key, value.gte);
           } else {
             query = query.eq(key, value);
           }
@@ -173,6 +177,16 @@ export const api = {
       meCache = { id: user.id, promise: Promise.resolve(data) };
       return data;
     },
+    // First-run working hours: flips profiles.hours_seeded from false to true and says whether
+    // this call did it, so only one tab (or effect run) ever seeds the default hours.
+    claimHoursSeeding: async () => {
+      const user = await sessionUser();
+      const { data, error } = await supabase.from('profiles').update({ hours_seeded: true })
+        .eq('id', user.id).eq('hours_seeded', false).select();
+      if (error) throw new Error(error.message);
+      meCache = null;
+      return data.length > 0;
+    },
     loginViaEmailPassword: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
@@ -184,7 +198,7 @@ export const api = {
       const { data, error } = await supabase.auth.signUp({
         email: value.email,
         password: value.password,
-        options: { emailRedirectTo: `${window.location.origin}${appPath('/')}` },
+        options: { emailRedirectTo: `${window.location.origin}${appPath('/')}`, data: value.full_name ? { full_name: value.full_name } : undefined },
       });
       if (error) throw new Error(error.message);
       return { user: await getProfile(data.user.id), access_token: data.session?.access_token };
@@ -241,11 +255,18 @@ export const api = {
       if (error) throw new Error(error.message);
       return data;
     },
+    // Booking pages ask on every month change. Once the function turns out to be missing (not
+    // deployed, or unreachable), stop asking for the rest of the session.
     busy: async (hostId, timeMin, timeMax) => {
+      if (googleBusyMissing) return [];
       const { data, error } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'freeBusy', hostId, timeMin, timeMax }
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        const status = error.context?.status;
+        if (error.name === 'FunctionsFetchError' || status === 404 || /not found/i.test(error.message || '')) googleBusyMissing = true;
+        throw new Error(error.message);
+      }
       return data;
     },
     saveSettings: async (value) => {
@@ -310,6 +331,23 @@ export const api = {
       const { data, error } = await supabase.rpc('booking_meeting_link', { p_booking: id });
       if (error) return undefined; // older database: the page already has the link
       return data || null;
+    },
+  },
+  // Public holidays a host blocks (profiles.holidays). Until the migration is applied, none.
+  holidays: {
+    forRegion: async (region) => {
+      if (!region) return [];
+      const { data, error } = await supabase.from('holidays').select('date, name').eq('region', region).order('date');
+      if (notDeployed(error) || error?.code === 'PGRST205') return [];
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+    // booking pages: the host's holidays, without reading their profile
+    forHost: async (hostId) => {
+      const { data, error } = await supabase.rpc('host_holidays', { p_host: hostId });
+      if (notDeployed(error)) return [];
+      if (error) throw new Error(error.message);
+      return data || [];
     },
   },
   // Calendar subscription feed: one secret token per host, served as .ics by the calendar-feed edge function

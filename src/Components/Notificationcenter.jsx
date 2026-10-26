@@ -19,6 +19,8 @@ export default function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [markError, setMarkError] = useState(false);
+  const loaded = useRef(false);
   const ref = useRef(null);
   const navigate = useNavigate();
 
@@ -40,11 +42,14 @@ export default function NotificationCenter() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // the interval keeps the first render's function, so "loaded once" lives in a ref: only the
+  // very first load shows the spinner, later checks refresh the list in place
   const loadNotifications = async () => {
-    setLoading((was) => was || notifications.length === 0);
+    if (!loaded.current) setLoading(true);
     try {
       const list = await api.entities.Notification.filter({}, '-created_date', 20);
       setNotifications(list);
+      loaded.current = true;
     } catch {}
     setLoading(false);
   };
@@ -52,8 +57,13 @@ export default function NotificationCenter() {
   const markAllRead = async () => {
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     if (!unreadIds.length) return;
-    await api.entities.Notification.bulkUpdate(unreadIds.map((id) => ({ id, read: true })));
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setMarkError(false);
+    try {
+      await api.entities.Notification.bulkUpdate(unreadIds.map((id) => ({ id, read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch {
+      setMarkError(true);
+    }
   };
 
   const handleClick = (n) => {
@@ -90,6 +100,7 @@ export default function NotificationCenter() {
               </button>
             )}
           </div>
+          {markError && <p role="alert" className="px-4 py-2 border-b border-border text-xs text-destructive">Couldn’t mark them read. Try again.</p>}
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading…</div>

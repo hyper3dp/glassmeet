@@ -56,15 +56,17 @@ export default function Settings({ profile, updateProfile }) {
     }
   }, [profile]);
 
-  // Booking pages read the zone from each event type (guests can't read profiles), so a new
-  // time zone is copied onto the host's event types too.
-  const savedTz = useRef(profile?.timezone || null);
+  // Booking pages read the host's zone, name and photo from each event type (guests can't read
+  // profiles), so changes to them are copied onto the host's event types too.
+  const savedHost = useRef({ host_timezone: profile?.timezone || null, host_name: profile?.full_name || null, host_photo: profile?.profile_photo || null });
   const save = async (value) => {
     await updateProfile({ ...value, username: value.username.trim() || null });
-    if (value.timezone && value.timezone !== savedTz.current) {
+    const host = { host_timezone: value.timezone || null, host_name: value.full_name.trim() || null, host_photo: value.profile_photo || null };
+    const changed = Object.fromEntries(Object.entries(host).filter(([k, v]) => v !== savedHost.current[k] && (v || k !== 'host_timezone')));
+    if (Object.keys(changed).length) {
       const events = await api.entities.EventType.filter({ created_by_id: profile.id });
-      await Promise.all(events.filter((e) => e.host_timezone !== value.timezone).map((e) => api.entities.EventType.update(e.id, { host_timezone: value.timezone })));
-      savedTz.current = value.timezone;
+      await Promise.all(events.map((e) => api.entities.EventType.update(e.id, changed)));
+      savedHost.current = { ...savedHost.current, ...changed };
     }
   };
   const saveState = useAutosave(form, save, { enabled: !!form, delay: 900 });
@@ -150,7 +152,7 @@ export default function Settings({ profile, updateProfile }) {
               </div>
               <div>
                 <GlassLabel htmlFor="s-wa">WhatsApp number</GlassLabel>
-                <GlassInput id="s-wa" type="tel" inputMode="tel" value={form.whatsapp_number} onChange={(e) => set('whatsapp_number', e.target.value)} placeholder="+1 555 000 0000" />
+                <GlassInput id="s-wa" type="tel" inputMode="tel" value={form.whatsapp_number} onChange={(e) => set('whatsapp_number', e.target.value)} placeholder="+971 50 123 4567" />
               </div>
             </div>
             <div className="mt-5">
