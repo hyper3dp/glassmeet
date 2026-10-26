@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import {
   Clock, Calendar, Globe, ChevronLeft, ChevronRight, ArrowLeft, Loader2, Video, MessageCircle,
@@ -18,6 +18,7 @@ import { isEmbed, useEmbedResize } from '@/lib/embed.js';
 export default function BookingPage() {
   const { eventTypeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [event, setEvent] = useState(null);
   const [rules, setRules] = useState([]);
   const [exceptions, setExceptions] = useState([]);
@@ -43,6 +44,39 @@ export default function BookingPage() {
   useEffect(() => {
     if (selectedSlot && stacked()) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [selectedSlot]);
+
+  // Keyboard focus follows each step: the picked time's Next button, then the form's first field,
+  // and back on the picked time when returning to the list.
+  const nextRef = useRef(null);
+  const lastPicked = useRef(null);
+  useEffect(() => { if (pendingSlot !== null) nextRef.current?.focus(); }, [pendingSlot]);
+  useEffect(() => {
+    if (selectedSlot) {
+      lastPicked.current = selectedSlot.date.getTime();
+      document.getElementById('g-name')?.focus({ preventScroll: stacked() });
+    } else if (lastPicked.current) {
+      document.querySelector(`[data-slot-time="${lastPicked.current}"]`)?.focus({ preventScroll: stacked() });
+    }
+  }, [selectedSlot]);
+
+  // The form is its own history step, so the browser's Back button returns to the times.
+  const chooseSlot = (slot) => {
+    setSelectedSlot(slot);
+    setPendingSlot(null);
+    // one form step in history at most (after Forward, the current entry already is one)
+    navigate(`${location.pathname}${location.search}`, { state: { ...(location.state || {}), bookingForm: true }, replace: !!location.state?.bookingForm });
+  };
+  const backToTimes = () => {
+    setSelectedSlot(null);
+    if (location.state?.bookingForm) navigate(-1);
+  };
+  useEffect(() => {
+    if (!location.state?.bookingForm) setSelectedSlot(null);
+  }, [location.state]);
+  // a reload keeps history state but not the picked time: drop the stale form step
+  useEffect(() => {
+    if (location.state?.bookingForm) navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...location.state, bookingForm: false } });
+  }, []);
   const [form, setForm] = useState({ guest_name: '', guest_email: '', guest_phone: '', guest_notes: '' });
   const [customAnswers, setCustomAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -80,7 +114,7 @@ export default function BookingPage() {
 
   const load = async () => {
     try {
-      const ev = await api.entities.EventType.get(eventTypeId);
+      const ev = await api.events.getPublic(eventTypeId);
       // a switched-off event can't be booked; say so up front rather than at the last click
       if (ev.active === false) { setError('This event isn’t taking bookings right now.'); setLoading(false); return; }
       setEvent(ev);
@@ -187,6 +221,9 @@ export default function BookingPage() {
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
+      // the meeting link is private until booked; ask for it now (null while awaiting approval)
+      const link = await api.bookings.meetingLink(booking.id);
+      if (link !== undefined) booking.meeting_url = link || '';
       const state = { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } };
       // kept for this tab so the confirmation survives a refresh (guests can't read bookings back)
       try { sessionStorage.setItem(`gm-booking-${booking.id}`, JSON.stringify(state)); } catch { /* storage unavailable */ }
@@ -236,7 +273,7 @@ export default function BookingPage() {
           <section className="border-b md:border-b-0 md:border-r border-border p-6 sm:p-8">
             {selectedSlot && (
               <button
-                onClick={() => setSelectedSlot(null)}
+                onClick={backToTimes}
                 aria-label="Back to times"
                 className="mb-6 w-11 h-11 rounded-full border border-border text-link flex items-center justify-center transition-all duration-200 hover:bg-primary-soft"
               >
@@ -354,10 +391,12 @@ export default function BookingPage() {
                   ) : (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-1 gap-2.5 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1">
                       {slots.map((s, i) => (pendingSlot === i ? (
-                        <div key={i} className="grid grid-cols-2 gap-2 animate-fade-in">
-                          <div className="h-[52px] rounded-lg bg-muted-foreground text-background text-[15px] font-bold flex items-center justify-center tabular">{s.label}</div>
+                        <div key={s.date.getTime()} className="grid grid-cols-2 gap-2 animate-fade-in">
+                          <div className="h-[52px] rounded-lg bg-muted-foreground text-background text-[15px] font-bold flex items-center justify-center tabular" aria-hidden="true">{s.label}</div>
                           <button
-                            onClick={() => { setSelectedSlot(s); setPendingSlot(null); }}
+                            ref={nextRef}
+                            onClick={() => chooseSlot(s)}
+                            aria-label={`Next: book ${s.label}`}
                             className="h-[52px] rounded-lg text-[15px] font-bold transition-all duration-200 hover:brightness-110"
                             style={{ background: 'var(--ev)', color: 'var(--ev-fg)' }}
                           >
@@ -366,7 +405,8 @@ export default function BookingPage() {
                         </div>
                       ) : (
                         <button
-                          key={i}
+                          key={s.date.getTime()}
+                          data-slot-time={s.date.getTime()}
                           onClick={() => setPendingSlot(i)}
                           className="w-full h-[52px] rounded-lg border bg-card text-[15px] font-bold tabular transition-all duration-200 hover:shadow-[inset_0_0_0_1px_var(--ev)] flex flex-col items-center justify-center leading-tight"
                           style={{ borderColor: 'color-mix(in srgb, var(--ev) 55%, transparent)', color: evText }}

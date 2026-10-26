@@ -31,6 +31,8 @@ async function writeSkippingMissingColumns(run, value) {
   }
 }
 
+const notDeployed = (error) => error && (error.code === 'PGRST202' || error.code === '42883' || /could not find the function|does not exist/i.test(error.message || ''));
+
 let meCache = null;
 const sessionUser = async () => (await supabase.auth.getSession()).data.session?.user || null;
 supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'USER_UPDATED') meCache = null; });
@@ -285,12 +287,28 @@ export const api = {
   },
   // Guests can create a booking but not read bookings back (RLS), so the id is made here
   // and the row is inserted without returning it.
+  // Public booking pages: an active event's public fields (no meeting link or host email).
+  events: {
+    getPublic: async (id) => {
+      const { data, error } = await supabase.rpc('public_event_type', { p_id: id });
+      if (notDeployed(error)) return entities.EventType.get(id);
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('This booking page could not be found.');
+      return data;
+    },
+  },
   bookings: {
     createAsGuest: async (value) => {
       const row = { id: uuid(), ...value };
       const { error } = await supabase.from('bookings').insert([row]);
       if (error) throw new Error(error.message);
       return { ...row, created_date: new Date().toISOString() };
+    },
+    // the meeting link for a booking the guest just made (null while it waits for approval)
+    meetingLink: async (id) => {
+      const { data, error } = await supabase.rpc('booking_meeting_link', { p_booking: id });
+      if (error) return undefined; // older database: the page already has the link
+      return data || null;
     },
   },
   // Calendar subscription feed: one secret token per host, served as .ics by the calendar-feed edge function
@@ -306,12 +324,16 @@ export const api = {
       return created.token;
     },
     // New token; calendars subscribed to the old link stop updating
+    // the server makes the new token (rotate_cal_feed); older databases took it from here
     rotate: async () => {
+      const { data, error } = await supabase.rpc('rotate_cal_feed');
+      if (!error) return data;
+      if (!notDeployed(error)) throw new Error(error.message);
       const user = await sessionUser();
       const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
-      const { data, error } = await supabase.from('cal_feeds').update({ token, rotated_at: new Date().toISOString() }).eq('owner', user.id).select('token').single();
-      if (error) throw new Error(error.message);
-      return data.token;
+      const fallback = await supabase.from('cal_feeds').update({ token, rotated_at: new Date().toISOString() }).eq('owner', user.id).select('token').single();
+      if (fallback.error) throw new Error(fallback.error.message);
+      return fallback.data.token;
     },
   },
 };

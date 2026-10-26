@@ -63,6 +63,7 @@
   var lastFocus = null;
   var savedOverflow = '';
   var onClosed = null;
+  var inerted = []; // page elements made unreachable while the pop-up is open
 
   function close() {
     if (!overlay) return;
@@ -70,6 +71,9 @@
     overlay = null;
     document.documentElement.style.overflow = savedOverflow;
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('focusin', keepFocus);
+    for (var i = 0; i < inerted.length; i++) inerted[i].removeAttribute('inert');
+    inerted = [];
     if (lastFocus && lastFocus.focus) lastFocus.focus();
     var done = onClosed;
     onClosed = null;
@@ -77,6 +81,15 @@
   }
 
   function onKey(e) { if (e.key === 'Escape') close(); }
+
+  // aria-modal: keyboard focus stays in the pop-up. Tabbing past the end of the booking page
+  // inside the frame (or before the close button) lands on the page behind; bring it back.
+  function keepFocus(e) {
+    if (overlay && !overlay.contains(e.target)) {
+      var closeBtn = overlay.querySelector('button[aria-label="Close"]');
+      if (closeBtn) closeBtn.focus();
+    }
+  }
 
   function open(url, opts) {
     opts = opts || {};
@@ -117,6 +130,12 @@
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('focusin', keepFocus);
+    // everything behind the pop-up (other frames included) leaves the tab order
+    var kids = document.body.children;
+    for (var k = 0; k < kids.length; k++) {
+      if (kids[k] !== overlay && !kids[k].hasAttribute('inert')) { kids[k].setAttribute('inert', ''); inerted.push(kids[k]); }
+    }
     btn.focus();
   }
 
