@@ -9,6 +9,7 @@ import {
   formatMeetingDate, formatMeetingTime, buildWhatsAppLink, fillTemplate, buildBookingContext, DEFAULT_CONFIRMATION_TEMPLATE,
 } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/Availability.js';
+import { withoutExpiredCancellations } from '@/lib/bookings';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function Bookings({ profile, whatsapp }) {
@@ -23,7 +24,7 @@ export default function Bookings({ profile, whatsapp }) {
   const load = async () => {
     try {
       const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 100);
-      setBookings(b);
+      setBookings(withoutExpiredCancellations(b));
     } catch (e) {}
     setLoading(false);
   };
@@ -97,7 +98,10 @@ export default function Bookings({ profile, whatsapp }) {
 
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5 text-sm text-muted-foreground">
-          <span>Displaying {filtered.length} {filtered.length === 1 ? 'event' : 'events'}</span>
+          <span>
+            Displaying {filtered.length} {filtered.length === 1 ? 'event' : 'events'}
+            {filter === 'cancelled' && '. Canceled meetings disappear 2 days after they’re canceled.'}
+          </span>
           <span className="hidden sm:inline">{timezone}</span>
         </div>
         {filtered.length === 0 ? (

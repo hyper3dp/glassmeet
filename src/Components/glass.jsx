@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
+import { Check, ChevronDown, Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -67,8 +69,121 @@ export function GlassBadge({ className, children, color, ...props }) {
 // Chevron drawn in the muted slate, which reads on both themes' fields
 const SELECT_CHEVRON = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23708aa6' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`;
 
-// Native <select> (pages pass <option> children) styled to match the shadcn SelectTrigger
-export function GlassSelect({ className, children, ...props }) {
+// Phones and tablets keep the native picker (wheel or sheet); mouse-and-keyboard browsers get
+// a styled menu. Pages pass <option> children and read e.target.value either way.
+const finePointer = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
+
+export function GlassSelect(props) {
+  const [menu] = useState(finePointer);
+  return menu ? <SelectMenu {...props} /> : <NativeSelect {...props} />;
+}
+
+const FIELD = 'flex h-11 w-full cursor-pointer items-center rounded-lg border border-input bg-field pl-3.5 text-base sm:text-sm text-foreground transition-all duration-200 hover:border-border-hover focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50';
+const textOf = (node) => (node == null || typeof node === 'boolean' ? '' : Array.isArray(node) ? node.map(textOf).join('') : typeof node === 'object' ? textOf(node.props?.children) : String(node));
+
+// Listbox in a popover. Focus stays on the button (aria-activedescendant), so the label's
+// htmlFor, Tab order and the dialog focus trap behave as with a native select.
+function SelectMenu({ id, value, onChange, disabled, className, children, 'aria-label': ariaLabel }) {
+  const options = React.Children.toArray(children)
+    .filter((c) => c?.type === 'option')
+    .map((c) => ({ value: String(c.props.value ?? ''), label: c.props.children, disabled: !!c.props.disabled }));
+  const uid = useId();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const listRef = useRef(null);
+  const typed = useRef({ text: '', at: 0 });
+  const selected = options.findIndex((o) => o.value === String(value ?? ''));
+
+  useEffect(() => { if (open) setActive(Math.max(0, selected)); }, [open]);
+  useEffect(() => {
+    if (open) listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [active, open]);
+
+  const choose = (i) => {
+    const o = options[i];
+    if (!o || o.disabled) return;
+    onChange?.({ target: { value: o.value } });
+    setOpen(false);
+  };
+  // next enabled option from i in direction dir (stays put at either end)
+  const step = (i, dir) => {
+    for (let j = i + dir; j >= 0 && j < options.length; j += dir) if (!options[j].disabled) return j;
+    return i;
+  };
+
+  const onKeyDown = (e) => {
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); setOpen(true); }
+      return;
+    }
+    const moves = {
+      ArrowDown: () => step(active, 1), ArrowUp: () => step(active, -1),
+      Home: () => step(-1, 1), End: () => step(options.length, -1),
+      PageDown: () => Math.min(options.length - 1, active + 8), PageUp: () => Math.max(0, active - 8),
+    };
+    if (moves[e.key]) { e.preventDefault(); setActive(moves[e.key]()); }
+    else if (e.key === 'Enter' || (e.key === ' ' && Date.now() - typed.current.at > 700)) { e.preventDefault(); choose(active); }
+    else if (e.key === 'Tab') setOpen(false);
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+      // type to jump: letters typed in quick succession build up a prefix
+      const now = Date.now();
+      const text = (now - typed.current.at < 700 ? typed.current.text : '') + e.key.toLowerCase();
+      typed.current = { text, at: now };
+      const from = text.length === 1 ? active + 1 : active;
+      const order = [...options.keys()].map((k) => (k + from + options.length) % options.length);
+      const hit = order.find((k) => !options[k].disabled && textOf(options[k].label).trim().toLowerCase().startsWith(text));
+      if (hit !== undefined) setActive(hit);
+    }
+  };
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild disabled={disabled}>
+        <button
+          id={id} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open}
+          aria-controls={open ? `${uid}-list` : undefined}
+          aria-activedescendant={open && active >= 0 ? `${uid}-${active}` : undefined}
+          onKeyDown={onKeyDown}
+          className={cn(FIELD, 'justify-between gap-2 pr-3 text-left data-[state=open]:border-ring data-[state=open]:ring-1 data-[state=open]:ring-ring', className)}
+        >
+          <span className={cn('truncate', !options[selected]?.value && 'text-muted-foreground')}>{options[selected]?.label ?? ''}</span>
+          <ChevronDown className={cn('w-4 h-4 shrink-0 text-muted-foreground transition-transform duration-200', open && 'rotate-180')} aria-hidden="true" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start" sideOffset={6} collisionPadding={12}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          style={{ minWidth: 'var(--radix-popover-trigger-width)' }}
+          className="z-[60] max-w-[min(28rem,calc(100vw-24px))] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-pop outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+        >
+          <ul id={`${uid}-list`} role="listbox" ref={listRef} aria-label={ariaLabel} className="max-h-72 overflow-y-auto">
+            {options.map((o, i) => (
+              <li
+                key={`${o.value}-${i}`} id={`${uid}-${i}`} data-index={i} role="option"
+                aria-selected={i === selected} aria-disabled={o.disabled || undefined}
+                onPointerMove={() => { if (!o.disabled && active !== i) setActive(i); }}
+                onClick={() => choose(i)}
+                className={cn(
+                  'flex min-h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-sm transition-colors duration-200',
+                  i === active && 'bg-secondary',
+                  i === selected ? 'font-semibold text-link' : 'text-foreground',
+                  o.disabled && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                <span className="min-w-0">{o.label}</span>
+                {i === selected && <Check className="w-4 h-4 shrink-0" aria-hidden="true" />}
+              </li>
+            ))}
+          </ul>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+// Native <select> styled like the menu's button
+function NativeSelect({ className, children, ...props }) {
   return (
     <select
       style={{ backgroundImage: SELECT_CHEVRON, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.85rem center', backgroundSize: '1rem' }}
@@ -77,6 +192,36 @@ export function GlassSelect({ className, children, ...props }) {
     >
       {children}
     </select>
+  );
+}
+
+// Number field with minus and plus buttons. While typing, value may be a string (or empty); it is
+// rounded to the step and kept between min and max when the field loses focus. Arrow keys step.
+export function Stepper({ id, value, onChange, min = 0, max = 9999, step = 1, suffix, className, 'aria-label': ariaLabel }) {
+  const n = value === '' ? NaN : Number(value);
+  const clamp = (v) => Math.min(max, Math.max(min, Math.round((Number.isFinite(v) ? v : min) / step) * step));
+  const bump = (dir) => onChange(clamp((Number.isFinite(n) ? n : min) + dir * step));
+  const btn = 'w-10 shrink-0 flex items-center justify-center text-link transition-all duration-200 hover:bg-primary-soft disabled:text-hint disabled:hover:bg-transparent';
+  return (
+    <div className={cn('inline-flex h-11 items-stretch overflow-hidden rounded-lg border border-input bg-field transition-all duration-200 hover:border-border-hover focus-within:border-ring focus-within:ring-1 focus-within:ring-ring', className)}>
+      <button type="button" tabIndex={-1} aria-label="Decrease" onClick={() => bump(-1)} disabled={n <= min} className={btn}><Minus className="w-4 h-4" /></button>
+      <span className="flex flex-1 items-center justify-center gap-1 px-1">
+        <input
+          id={id} type="text" inputMode="numeric" role="spinbutton" aria-label={ariaLabel}
+          aria-valuemin={min} aria-valuemax={max} aria-valuenow={Number.isFinite(n) ? n : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+          onBlur={() => onChange(clamp(n))}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); bump(e.key === 'ArrowUp' ? 1 : -1); }
+          }}
+          className="min-w-0 bg-transparent text-center text-base sm:text-sm font-semibold tabular text-foreground outline-none"
+          style={{ width: `${Math.max(2, String(value).length) + 1}ch` }}
+        />
+        {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
+      </span>
+      <button type="button" tabIndex={-1} aria-label="Increase" onClick={() => bump(1)} disabled={n >= max} className={btn}><Plus className="w-4 h-4" /></button>
+    </div>
   );
 }
 

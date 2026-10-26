@@ -7,6 +7,7 @@ import EventCard from '@/components/eventcard.jsx';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
+import { isExpiredCancellation } from '@/lib/bookings';
 
 const BOOKINGS_LIMIT = 200;
 
@@ -46,7 +47,7 @@ export default function Dashboard({ profile }) {
     () => bookings.filter((b) => b.status === 'confirmed' && dayKey(b.start_time) === todayKey),
     [bookings, todayKey]
   );
-  const recent = useMemo(() => bookings.slice(0, 5), [bookings]);
+  const recent = useMemo(() => bookings.filter((b) => !isExpiredCancellation(b)).slice(0, 5), [bookings]);
 
   const eventColor = (id) => eventTypes.find((e) => e.id === id)?.color;
 

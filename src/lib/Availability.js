@@ -78,15 +78,34 @@ export const formatDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 
-// An event type's own dates, on the host's calendar. 'weekly' repeats on its weekdays (every day
-// when none are picked), optionally only between start_date and end_date; 'dates' runs only on
-// the listed days. The hours on each day still come from the host's availability.
+// whole days from a to b (local calendar dates; DST-safe)
+const dayIndex = (d) => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+const keyToDate = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+
+// An event type's own dates, on the host's calendar. 'dates' runs only on the listed days.
+// Otherwise it repeats from start_date to end_date (both optional) every `every` days, weeks
+// (on its weekdays; every day when none are picked) or months (on start_date's day of the month,
+// the last day in shorter months). The hours on each day still come from the host's availability.
+// Mirrored by public.event_runs_on() in the database.
 export const eventRunsOn = (eventType, date) => {
   const key = formatDate(date);
   if (eventType.schedule === 'dates') return (eventType.dates || []).includes(key);
   if (eventType.start_date && key < eventType.start_date) return false;
   if (eventType.end_date && key > eventType.end_date) return false;
-  return !eventType.days?.length || eventType.days.includes(date.getDay());
+  const every = Math.max(1, eventType.every || 1);
+  const start = eventType.start_date ? keyToDate(eventType.start_date) : null;
+  if (eventType.freq === 'day') return !start || (dayIndex(date) - dayIndex(start)) % every === 0;
+  if (eventType.freq === 'month') {
+    if (!start) return false;
+    const months = (date.getFullYear() - start.getFullYear()) * 12 + date.getMonth() - start.getMonth();
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    return months % every === 0 && date.getDate() === Math.min(start.getDate(), lastDay);
+  }
+  if (eventType.days?.length && !eventType.days.includes(date.getDay())) return false;
+  if (every === 1 || !start) return true;
+  // weeks counted Sunday to Sunday from the week start_date falls in
+  const weeks = ((dayIndex(date) - date.getDay()) - (dayIndex(start) - start.getDay())) / 7;
+  return weeks % every === 0;
 };
 
 // Days ahead guests may book. An event with its own end (specific dates, or an end date) is

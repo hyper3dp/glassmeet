@@ -48,6 +48,7 @@ const entities = new Proxy({}, {
       WhatsAppSetting: 'whatsapp_settings',
       Notification: 'notifications',
       Address: 'addresses',
+      EventTemplate: 'event_templates',
     };
     const table = tableMap[entityName] || entityName;
 

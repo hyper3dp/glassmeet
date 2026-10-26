@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2 } from 'lucide-react';
+import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2, Copy } from 'lucide-react';
 import { buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { appPath } from '@/lib/authReturnTo';
 import { cn } from '@/lib/utils';
@@ -11,20 +11,32 @@ const EmbedDialog = lazy(() => import('@/components/EmbedDialog.jsx'));
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const shortDate = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
 
-// "Every week", "Mon, Wed until 12 Dec", "3 dates"
-const scheduleSummary = (event) => {
+const ordinal = (n) => `${n}${[, 'st', 'nd', 'rd'][(n % 100 >> 3 ^ 1) && n % 10] || 'th'}`;
+const unit = (every, one) => (every === 1 ? one : `${every} ${one}s`);
+
+// "Every week", "Every 2 weeks on Mon, Wed until 12 Dec", "Monthly on the 5th", "3 dates"
+export const scheduleSummary = (event) => {
   if (event.schedule === 'dates') {
     const n = event.dates?.length || 0;
     return n === 1 ? `On ${shortDate(event.dates[0])}` : `${n} dates`;
   }
-  const days = event.days?.length ? [...event.days].sort().map((d) => WEEKDAYS[d]).join(', ') : 'Every week';
-  return event.end_date ? `${days} until ${shortDate(event.end_date)}` : days;
+  const every = Math.max(1, Number(event.every) || 1);
+  let text;
+  if (event.freq === 'day') text = every === 1 ? 'Every day' : `Every ${unit(every, 'day')}`;
+  else if (event.freq === 'month') {
+    const day = event.start_date ? ordinal(Number(event.start_date.slice(8))) : null;
+    text = `${every === 1 ? 'Monthly' : `Every ${unit(every, 'month')}`}${day ? ` on the ${day}` : ''}`;
+  } else {
+    const days = event.days?.length && event.days.length < 7 ? [...event.days].sort().map((d) => WEEKDAYS[d]).join(', ') : null;
+    text = `Every ${unit(every, 'week')}${days ? ` on ${days}` : ''}`;
+  }
+  return event.end_date ? `${text} until ${shortDate(event.end_date)}` : text;
 };
 
 export const bookingUrlFor = (id) => `${window.location.origin}${appPath(`/book/${id}`)}`;
 
 // Calendly event-type card: colour strip on top, name + duration, Copy link and Share in the footer.
-export default function EventCard({ event, onEdit, onDelete, onToggle }) {
+export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTemplate }) {
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [embedding, setEmbedding] = useState(false);
@@ -65,6 +77,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle }) {
                   <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
                   <div className="absolute right-0 top-9 z-40 w-48 rounded-lg border border-border bg-popover py-1.5 shadow-pop animate-scale-in">
                     {onEdit && <MenuItem icon={Pencil} onClick={() => { setMenu(false); onEdit(); }}>Edit</MenuItem>}
+                    {onSaveTemplate && <MenuItem icon={Copy} onClick={() => { setMenu(false); onSaveTemplate(); }}>Save as template</MenuItem>}
                     {embedOn && <MenuItem icon={Code2} onClick={() => { setMenu(false); setEmbedding(true); }}>Add to website</MenuItem>}
                     {onToggle && <MenuItem icon={Power} onClick={() => { setMenu(false); onToggle(!active); }}>{active ? 'Turn off' : 'Turn on'}</MenuItem>}
                     {onDelete && <MenuItem icon={Trash2} danger onClick={() => { setMenu(false); onDelete(); }}>Delete</MenuItem>}
