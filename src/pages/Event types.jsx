@@ -8,7 +8,7 @@ import EventCard, { scheduleSummary } from '@/components/eventcard.jsx';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import DatePicker, { MultiDatePicker } from '@/components/DatePicker.jsx';
-import { formatDate } from '@/lib/Availability.js';
+import { formatDate, eventRunsOn } from '@/lib/Availability.js';
 import { cn } from '@/lib/utils';
 import { BUILT_IN_TEMPLATES, templateData, templateSummary } from '@/lib/templates';
 
@@ -303,6 +303,18 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
   const dateHasHours = (key) => !hours || hours.dates.has(key) || hours.days.has(new Date(`${key}T00:00`).getDay());
   const closedDays = hours && form.freq === 'week' ? form.days.filter((d) => !hours.days.has(d)) : [];
 
+  // No day in the coming year both runs and has hours: guests would find nothing to book
+  const nothingToBook = (() => {
+    if (!hours || (form.schedule === 'dates' && !form.dates.length)) return false;
+    const preview = { ...form, every, end_date: form.ends === 'date' ? form.end_date : null };
+    const now = new Date();
+    for (let i = 0; i < 366; i++) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      if (eventRunsOn(preview, day) && dateHasHours(formatDate(day))) return false;
+    }
+    return true;
+  })();
+
   // Saved addresses (Settings → Addresses). 'new' means typing one here.
   const [addresses, setAddresses] = useState([]);
   const [savedAddressesAvailable, setSavedAddressesAvailable] = useState(false);
@@ -508,6 +520,11 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
                   )}
                 </div>
               </div>
+            )}
+            {nothingToBook && (
+              <p role="alert" className="mt-3 rounded-lg border border-warning px-3.5 py-2.5 text-sm text-warning">
+                No upcoming day fits these settings and your hours, so guests can’t book this event. Check the days and dates, or your hours in Availability.
+              </p>
             )}
             <p className="mt-3 text-xs text-muted-foreground">Times on each day come from your hours in Availability.</p>
           </fieldset>

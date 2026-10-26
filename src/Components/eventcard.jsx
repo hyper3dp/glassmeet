@@ -5,6 +5,7 @@ import { buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { appPath } from '@/lib/authReturnTo';
 import { cn } from '@/lib/utils';
 import { useBetaFeature } from '@/lib/beta';
+import { firstEventDay } from '@/lib/Availability.js';
 
 const EmbedDialog = lazy(() => import('@/components/EmbedDialog.jsx'));
 
@@ -59,7 +60,9 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
           <div className="min-w-0">
             <h3 className="text-[17px] font-bold leading-snug truncate">{event.name}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{event.duration || 30} mins, {kind}</p>
-            <p className="mt-0.5 text-sm text-muted-foreground truncate">{scheduleSummary(event)}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground truncate">
+              {scheduleSummary(event)}{!firstEventDay(event) && <span className="font-semibold text-warning"> · Ended</span>}
+            </p>
           </div>
           {(onEdit || onDelete || onToggle) && (
             <div className="relative">

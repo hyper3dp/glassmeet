@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import {
-  generateSlots, isPastDate, isWithinMaxFuture, detectTimezone, bookingWindowDays, firstEventDay,
+  generateSlots, isPastDate, isWithinMaxFuture, detectTimezone, bookingWindowDays,
 } from '@/lib/Availability.js';
 import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
@@ -141,9 +141,6 @@ export default function BookingPage() {
       // a switched-off event can't be booked; say so up front rather than at the last click
       if (ev.active === false) { setError('This event isn’t taking bookings right now.'); setLoading(false); return; }
       setEvent(ev);
-      // open on the month of the event's first date (specific dates or a later start)
-      const first = firstEventDay(ev);
-      if (first) { const [y, m] = first.split('-').map(Number); setCursor(new Date(y, m - 1, 1)); }
       const hostId = ev.created_by_id;
       const [r, e, b] = await Promise.all([
         api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
@@ -196,6 +193,28 @@ export default function BookingPage() {
     return open;
   }, [monthDays, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
   const dayHasSlots = (date) => openDays.has(date.getTime());
+
+  // The first day from today with a free time, looking to the end of the booking window (or a
+  // year for events with their own end). null: nothing left to book.
+  const nextOpen = useMemo(() => {
+    if (!event || loading) return null;
+    const busy = [...bookedSlots, ...googleBusy];
+    const days = bookingWindowDays(event) ?? 366;
+    const now = new Date();
+    for (let i = 0; i <= days; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      if (generateSlots(date, event, rules, exceptions, busy, hostTz, guestTz).length) return date;
+    }
+    return null;
+  }, [event, loading, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
+
+  // open on the month of the first free day (an event with later dates, or a full month)
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (!nextOpen || jumped.current) return;
+    jumped.current = true;
+    setCursor(new Date(nextOpen.getFullYear(), nextOpen.getMonth(), 1));
+  }, [nextOpen]);
 
   const confirm = async () => {
     if (!form.guest_name.trim() || !form.guest_phone.trim() || (emailRequired && !form.guest_email.trim())) {
@@ -409,7 +428,20 @@ export default function BookingPage() {
                     })}
                   </div>
 
-                  {!firstEventDay(event) && <p className="mt-6 text-center text-sm text-muted-foreground">This event has no upcoming dates.</p>}
+                  {!nextOpen ? (
+                    <p role="status" className="mt-6 rounded-lg bg-secondary px-4 py-3 text-center text-sm text-muted-foreground">
+                      There are no times left to book for this event. Contact {event.host_name || 'the host'} to find another time.
+                    </p>
+                  ) : openDays.size === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setCursor(new Date(nextOpen.getFullYear(), nextOpen.getMonth(), 1)); setSelectedDate(nextOpen); setPendingSlot(null); }}
+                      className="mx-auto mt-6 flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-semibold transition-all duration-200 hover:brightness-95"
+                      style={{ background: 'color-mix(in srgb, var(--ev) 12%, transparent)', color: evText }}
+                    >
+                      Next available: {nextOpen.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
 
                   <div className="mt-8">
                     <div className="text-[15px] font-bold mb-2">Time zone</div>
