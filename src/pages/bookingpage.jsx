@@ -14,6 +14,7 @@ import { getDevice } from '@/lib/devicedetect.js';
 import QRCodeModal from '@/components/QrcodeModal.jsx';
 import { appPath } from '@/lib/authReturnTo';
 import { isEmbed, useEmbedResize } from '@/lib/embed.js';
+import { useAuth } from '@/lib/Authcontext.jsx';
 
 export default function BookingPage() {
   const { eventTypeId } = useParams();
@@ -78,6 +79,28 @@ export default function BookingPage() {
     if (location.state?.bookingForm) navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...location.state, bookingForm: false } });
   }, []);
   const [form, setForm] = useState({ guest_name: '', guest_email: '', guest_phone: '', guest_notes: '' });
+
+  // A signed-in GlassMeet user booking someone else's event gets their details filled in from
+  // their account (not the host previewing their own page). Fields they already typed are kept.
+  const { user } = useAuth();
+  const [autofilled, setAutofilled] = useState(false);
+  const filledFor = useRef(null);
+  useEffect(() => {
+    if (!user || !event || user.id === event.created_by_id || filledFor.current === user.id) return;
+    filledFor.current = user.id;
+    setForm((f) => ({
+      ...f,
+      guest_name: f.guest_name || user.full_name || '',
+      guest_email: f.guest_email || user.email || '',
+      guest_phone: f.guest_phone || user.whatsapp_number || '',
+    }));
+    setAutofilled(true);
+  }, [user, event]);
+  const clearAutofill = () => {
+    setForm((f) => ({ ...f, guest_name: '', guest_email: '', guest_phone: '' }));
+    setAutofilled(false);
+    document.getElementById('g-name')?.focus();
+  };
   const [customAnswers, setCustomAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -438,6 +461,12 @@ export default function BookingPage() {
             <section ref={formRef} className="scroll-mt-4 p-6 sm:p-8 animate-slide-in-right">
               <h2 className="text-xl font-bold mb-6">Enter Details</h2>
               <div className="max-w-[440px] space-y-5">
+                {autofilled && (
+                  <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary px-3.5 py-2.5 text-sm" role="status">
+                    <span className="min-w-0 text-muted-foreground">Filled in from your GlassMeet account{user?.email ? <> (<span className="text-foreground">{user.email}</span>)</> : ''}.</span>
+                    <button type="button" onClick={clearAutofill} className="shrink-0 font-semibold text-link hover:underline">Not you?</button>
+                  </div>
+                )}
                 <div>
                   <GlassLabel htmlFor="g-name">Name *</GlassLabel>
                   <GlassInput id="g-name" autoComplete="name" maxLength={100} value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
