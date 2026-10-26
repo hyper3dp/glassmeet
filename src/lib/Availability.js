@@ -78,6 +78,30 @@ export const formatDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 
+// An event type's own dates, on the host's calendar. 'weekly' repeats on its weekdays (every day
+// when none are picked), optionally only between start_date and end_date; 'dates' runs only on
+// the listed days. The hours on each day still come from the host's availability.
+export const eventRunsOn = (eventType, date) => {
+  const key = formatDate(date);
+  if (eventType.schedule === 'dates') return (eventType.dates || []).includes(key);
+  if (eventType.start_date && key < eventType.start_date) return false;
+  if (eventType.end_date && key > eventType.end_date) return false;
+  return !eventType.days?.length || eventType.days.includes(date.getDay());
+};
+
+// Days ahead guests may book. An event with its own end (specific dates, or an end date) is
+// bookable up to that end instead.
+export const bookingWindowDays = (eventType) =>
+  (eventType.schedule === 'dates' || eventType.end_date ? null : eventType.max_future_days);
+
+// First day on or after today the event runs, as "YYYY-MM-DD" (null when it never runs again)
+export const firstEventDay = (eventType) => {
+  const today = formatDate(new Date());
+  if (eventType.schedule === 'dates') return (eventType.dates || []).filter((d) => d >= today).sort()[0] || null;
+  if (eventType.end_date && eventType.end_date < today) return null;
+  return eventType.start_date && eventType.start_date > today ? eventType.start_date : today;
+};
+
 // ── time zones ────────────────────────────────────────────────────────────
 // Working hours are wall-clock times in the host's time zone ("09:00" in Asia/Dubai); a guest
 // elsewhere must see the matching moment in their own zone. These helpers convert between
@@ -165,6 +189,7 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
   const slots = [];
   for (let k = -1; k <= 1; k++) {
     const hostDay = new Date(hostFirst.getFullYear(), hostFirst.getMonth(), hostFirst.getDate() + k);
+    if (!eventRunsOn(eventType, hostDay)) continue;
     for (const iv of intervalsForDate(hostDay, rules, exceptions)) {
       for (let t = iv.start; t + duration <= iv.end; t += slotStep) {
         const start = zonedTimeToUtc(hostDay.getFullYear(), hostDay.getMonth(), hostDay.getDate(), t, tz);

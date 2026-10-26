@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import {
-  generateSlots, isPastDate, isWithinMaxFuture, detectTimezone,
+  generateSlots, isPastDate, isWithinMaxFuture, detectTimezone, bookingWindowDays, firstEventDay,
 } from '@/lib/Availability.js';
 import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
@@ -118,6 +118,9 @@ export default function BookingPage() {
       // a switched-off event can't be booked; say so up front rather than at the last click
       if (ev.active === false) { setError('This event isn’t taking bookings right now.'); setLoading(false); return; }
       setEvent(ev);
+      // open on the month of the event's first date (specific dates or a later start)
+      const first = firstEventDay(ev);
+      if (first) { const [y, m] = first.split('-').map(Number); setCursor(new Date(y, m - 1, 1)); }
       const hostId = ev.created_by_id;
       const [r, e, b] = await Promise.all([
         api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
@@ -157,11 +160,19 @@ export default function BookingPage() {
     return cells;
   }, [cursor, event]);
 
-  const dayHasSlots = (date) => {
-    if (!event || isPastDate(date) || !isWithinMaxFuture(date, event.max_future_days)) return false;
-    const s = generateSlots(date, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz, guestTz);
-    return s.length > 0;
-  };
+  // Days of the shown month with a free time, worked out once per change of data rather than
+  // on every render (typing in the form re-renders the page)
+  const openDays = useMemo(() => {
+    const open = new Set();
+    if (!event) return open;
+    const busy = [...bookedSlots, ...googleBusy];
+    for (const date of monthDays) {
+      if (!date || isPastDate(date) || !isWithinMaxFuture(date, bookingWindowDays(event))) continue;
+      if (generateSlots(date, event, rules, exceptions, busy, hostTz, guestTz).length) open.add(date.getTime());
+    }
+    return open;
+  }, [monthDays, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
+  const dayHasSlots = (date) => openDays.has(date.getTime());
 
   const confirm = async () => {
     if (!form.guest_name.trim() || !form.guest_phone.trim() || (emailRequired && !form.guest_email.trim())) {
@@ -193,7 +204,7 @@ export default function BookingPage() {
       // Re-check against fresh bookings with the same rules that built the list: taken, full,
       // now in the past or inside the notice period, or past the booking window.
       const fresh = await api.entities.BookedSlot.filter({ host_id: event.created_by_id, status: 'confirmed' });
-      const stillFree = isWithinMaxFuture(selectedDate, event.max_future_days)
+      const stillFree = isWithinMaxFuture(selectedDate, bookingWindowDays(event))
         && generateSlots(selectedDate, event, rules, exceptions, [...fresh, ...googleBusy], hostTz, guestTz)
           .some((x) => x.date.getTime() === selectedSlot.date.getTime());
       if (!stillFree) {
@@ -374,6 +385,8 @@ export default function BookingPage() {
                       );
                     })}
                   </div>
+
+                  {!firstEventDay(event) && <p className="mt-6 text-center text-sm text-muted-foreground">This event has no upcoming dates.</p>}
 
                   <div className="mt-8">
                     <div className="text-[15px] font-bold mb-2">Time zone</div>

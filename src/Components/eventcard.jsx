@@ -4,8 +4,22 @@ import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2 } from 'lucide-re
 import { buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { appPath } from '@/lib/authReturnTo';
 import { cn } from '@/lib/utils';
+import { useBetaFeature } from '@/lib/beta';
 
 const EmbedDialog = lazy(() => import('@/components/EmbedDialog.jsx'));
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const shortDate = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+
+// "Every week", "Mon, Wed until 12 Dec", "3 dates"
+const scheduleSummary = (event) => {
+  if (event.schedule === 'dates') {
+    const n = event.dates?.length || 0;
+    return n === 1 ? `On ${shortDate(event.dates[0])}` : `${n} dates`;
+  }
+  const days = event.days?.length ? [...event.days].sort().map((d) => WEEKDAYS[d]).join(', ') : 'Every week';
+  return event.end_date ? `${days} until ${shortDate(event.end_date)}` : days;
+};
 
 export const bookingUrlFor = (id) => `${window.location.origin}${appPath(`/book/${id}`)}`;
 
@@ -14,6 +28,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle }) {
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [embedding, setEmbedding] = useState(false);
+  const embedOn = useBetaFeature('embed');
   const url = bookingUrlFor(event.id);
   const active = event.active ?? true;
   const kind = event.booking_type === 'group' ? `Group, up to ${event.max_attendees || 2}` : 'One-on-One';
@@ -32,6 +47,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle }) {
           <div className="min-w-0">
             <h3 className="text-[17px] font-bold leading-snug truncate">{event.name}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{event.duration || 30} mins, {kind}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground truncate">{scheduleSummary(event)}</p>
           </div>
           {(onEdit || onDelete || onToggle) && (
             <div className="relative">
@@ -49,7 +65,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle }) {
                   <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
                   <div className="absolute right-0 top-9 z-40 w-48 rounded-lg border border-border bg-popover py-1.5 shadow-pop animate-scale-in">
                     {onEdit && <MenuItem icon={Pencil} onClick={() => { setMenu(false); onEdit(); }}>Edit</MenuItem>}
-                    <MenuItem icon={Code2} onClick={() => { setMenu(false); setEmbedding(true); }}>Add to website</MenuItem>
+                    {embedOn && <MenuItem icon={Code2} onClick={() => { setMenu(false); setEmbedding(true); }}>Add to website</MenuItem>}
                     {onToggle && <MenuItem icon={Power} onClick={() => { setMenu(false); onToggle(!active); }}>{active ? 'Turn off' : 'Turn on'}</MenuItem>}
                     {onDelete && <MenuItem icon={Trash2} danger onClick={() => { setMenu(false); onDelete(); }}>Delete</MenuItem>}
                   </div>

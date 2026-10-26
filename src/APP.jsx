@@ -9,28 +9,31 @@ import ScrollToTop from './Components/scrolltotop.jsx';
 import ProtectedRoute from '@/components/protectedroute.jsx';
 import { useApp } from '@/lib/useprofile.js';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
+import { PAGES, preloadPage } from '@/lib/pages.js';
 
-// Pages load on demand, so guests opening a booking link don't download the host app
-const AppShell = lazy(() => import('@/components/AppShell.jsx'));
-const PageNotFound = lazy(() => import('./lib/Pagenotfound.jsx'));
-const Login = lazy(() => import('./pages/login.jsx'));
-const Register = lazy(() => import('./pages/register.jsx'));
-const ForgotPassword = lazy(() => import('./pages/forgotpassword.jsx'));
-const ResetPassword = lazy(() => import('./pages/resetpassword.jsx'));
-const Landing = lazy(() => import('@/pages/Landing'));
-const Dashboard = lazy(() => import('./pages/dashboard.jsx'));
-const CalendarPage = lazy(() => import('./pages/calenderpage.jsx'));
-const EventTypes = lazy(() => import('./pages/Event types.jsx'));
-const Bookings = lazy(() => import('./pages/bookings.jsx'));
-const Availability = lazy(() => import('./pages/Availability.jsx'));
-const WhatsAppSettings = lazy(() => import('./pages/whatsappsettings.jsx'));
-const Settings = lazy(() => import('./pages/settings.jsx'));
-const BookingPage = lazy(() => import('./pages/bookingpage.jsx'));
-const BookingConfirmation = lazy(() => import('./pages/bookingconfirmation.jsx'));
-const CalendarConnections = lazy(() => import('./pages/calenderconnections.jsx'));
-const Analytics = lazy(() => import('./pages/Analytics.jsx'));
-const Terms = lazy(() => import('@/pages/terms.jsx'));
-const Privacy = lazy(() => import('@/pages/privacy.jsx'));
+// Pages load on demand (see lib/pages.js); the one being opened starts downloading right away
+const AppShell = lazy(PAGES.appShell);
+const PageNotFound = lazy(PAGES.notFound);
+const Login = lazy(PAGES.login);
+const Register = lazy(PAGES.register);
+const ForgotPassword = lazy(PAGES.forgotPassword);
+const ResetPassword = lazy(PAGES.resetPassword);
+const Landing = lazy(PAGES.landing);
+const Dashboard = lazy(PAGES.dashboard);
+const CalendarPage = lazy(PAGES.calendar);
+const EventTypes = lazy(PAGES.eventTypes);
+const Bookings = lazy(PAGES.bookings);
+const Availability = lazy(PAGES.availability);
+const WhatsAppSettings = lazy(PAGES.whatsapp);
+const Settings = lazy(PAGES.settings);
+const BookingPage = lazy(PAGES.booking);
+const BookingConfirmation = lazy(PAGES.confirmation);
+const CalendarConnections = lazy(PAGES.calendarConnections);
+const Analytics = lazy(PAGES.analytics);
+const Terms = lazy(PAGES.terms);
+const Privacy = lazy(PAGES.privacy);
+
+preloadPage(window.location.pathname.slice(import.meta.env.BASE_URL.length - 1));
 
 const FullScreenLoader = () => (
   <div 
@@ -60,12 +63,15 @@ const SettingsPage = () => { const { profile, updateProfile } = useApp(); return
 const CalendarConnectionsPage = () => { return <CalendarConnections />; };
 const AnalyticsPage = () => { const { profile } = useApp(); return <Analytics profile={profile} />; };
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
+// The landing page sends signed-in visitors to the dashboard: wait for that check rather than
+// flash the landing page first. Other public pages don't depend on it and render at once.
+const LandingPage = () => {
+  const { authChecked } = useAuth();
+  return authChecked ? <Landing /> : <FullScreenLoader />;
+};
 
-  if (isLoadingPublicSettings || isLoadingAuth) {
-    return <FullScreenLoader />;
-  }
+const AuthenticatedApp = () => {
+  const { authError } = useAuth();
 
   // Only short-circuit for unregistered users; unauthenticated visitors may still
   // view public pages (landing, booking). Protected routes gate via ProtectedRoute.
@@ -78,7 +84,7 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<FullScreenLoader />}>
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/book/:eventTypeId" element={<BookingPage />} />
       <Route path="/confirm/:bookingId" element={<BookingConfirmation />} />
 

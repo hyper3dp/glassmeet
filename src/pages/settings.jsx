@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone, Sparkles } from 'lucide-react';
+import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone, Sparkles, FlaskConical } from 'lucide-react';
+import { toast } from 'sonner';
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, Avatar, SaveStatus } from '@/components/glass';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { api } from '@/lib/localApi';
@@ -7,6 +8,8 @@ import { useAutosave } from '@/lib/useAutosave';
 import OutlookIcon from '@/components/outlookicon.jsx';
 import GoogleIcon from '@/components/googleicon.jsx';
 import AddressManager from '@/components/AddressManager.jsx';
+import { Switch } from '@/components/ui/switch';
+import { BETA_FEATURES, useBeta, unlockBeta, hideBeta, setBetaFeature } from '@/lib/beta';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -14,6 +17,8 @@ const SECTIONS = [
   { id: 'addresses', label: 'Addresses', icon: MapPin },
   { id: 'coming-soon', label: 'Coming soon', icon: Plug },
 ];
+const BETA_SECTION = { id: 'beta', label: 'Beta features', icon: FlaskConical };
+const UNLOCK_TAPS = 5;
 
 const MAX_PHOTO_MB = 5;
 
@@ -23,6 +28,20 @@ export default function Settings({ profile, updateProfile }) {
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const fileRef = useRef(null);
+  const beta = useBeta();
+  const sections = beta?.unlocked ? [...SECTIONS, BETA_SECTION] : SECTIONS;
+
+  // Five quick taps on "Coming soon" open the hidden Beta features menu
+  const taps = useRef({ count: 0, at: 0 });
+  const tapComingSoon = () => {
+    if (beta?.unlocked) return;
+    const now = Date.now();
+    taps.current = { count: now - taps.current.at < 1500 ? taps.current.count + 1 : 1, at: now };
+    if (taps.current.count < UNLOCK_TAPS) return;
+    unlockBeta();
+    toast.success('Beta features unlocked');
+    setTimeout(() => document.getElementById(BETA_SECTION.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
 
   useEffect(() => {
     if (profile && !form) {
@@ -56,9 +75,9 @@ export default function Settings({ profile, updateProfile }) {
       const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
       if (visible) setActiveSection(visible.target.id);
     }, { rootMargin: '-80px 0px -55% 0px' });
-    SECTIONS.forEach((s) => { const el = document.getElementById(s.id); if (el) observer.observe(el); });
+    sections.forEach((s) => { const el = document.getElementById(s.id); if (el) observer.observe(el); });
     return () => observer.disconnect();
-  }, [!!form]);
+  }, [!!form, sections.length]);
 
   if (!form) return <div className="flex justify-center py-24"><Spinner /></div>;
 
@@ -87,9 +106,9 @@ export default function Settings({ profile, updateProfile }) {
       <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
         <nav className="hidden lg:block" aria-label="Settings sections">
           <ul className="sticky top-24 space-y-0.5">
-            {SECTIONS.map((s) => (
+            {sections.map((s) => (
               <li key={s.id}>
-                <a href={`#${s.id}`} aria-current={activeSection === s.id ? 'true' : undefined} className={`glass-nav-item flex items-center gap-3 rounded-lg px-3 h-10 text-sm font-semibold text-foreground ${activeSection === s.id ? 'active' : ''}`}>
+                <a href={`#${s.id}`} onClick={s.id === 'coming-soon' ? tapComingSoon : undefined} aria-current={activeSection === s.id ? 'true' : undefined} className={`glass-nav-item flex items-center gap-3 rounded-lg px-3 h-10 text-sm font-semibold text-foreground ${activeSection === s.id ? 'active' : ''}`}>
                   <s.icon className="w-4 h-4 opacity-70" /> {s.label}
                 </a>
               </li>
@@ -155,7 +174,7 @@ export default function Settings({ profile, updateProfile }) {
           </Section>
 
           {/* Coming soon */}
-          <Section id="coming-soon" title="Coming soon" description="Features and integrations we're building next.">
+          <Section id="coming-soon" title="Coming soon" onTitleClick={tapComingSoon} description="Features and integrations we're building next.">
             <ul className="divide-y divide-border rounded-lg border border-border">
               <ComingSoonRow
                 icon={<span className="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><Smartphone className="w-5 h-5" /></span>}
@@ -185,16 +204,39 @@ export default function Settings({ profile, updateProfile }) {
             </ul>
             <p className="mt-3 text-sm text-muted-foreground">Until then, subscribe to your GlassMeet calendar from the Calendars page to see bookings in any calendar app.</p>
           </Section>
+
+          {/* Beta features: hidden until unlocked from Coming soon */}
+          {beta?.unlocked && (
+            <Section id={BETA_SECTION.id} title="Beta features" description="Early features we're still testing. They may change or break. Turning one off only hides it for you on this browser.">
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {BETA_FEATURES.map((f) => (
+                  <li key={f.id}>
+                    <label htmlFor={`beta-${f.id}`} className="flex items-start justify-between gap-4 p-4 cursor-pointer">
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold">{f.name}</span>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-soft text-link">Beta</span>
+                        </span>
+                        <span className="mt-0.5 block text-sm text-muted-foreground">{f.body}</span>
+                      </span>
+                      <Switch id={`beta-${f.id}`} checked={!!beta[f.id]} onCheckedChange={(on) => setBetaFeature(f.id, on)} className="mt-0.5" />
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <GlassButton type="button" variant="ghost" size="sm" className="mt-3" onClick={hideBeta}>Hide beta features</GlassButton>
+            </Section>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function Section({ id, title, description, children }) {
+function Section({ id, title, description, onTitleClick, children }) {
   return (
     <section id={id} className="scroll-mt-24 rounded-xl border border-border bg-card shadow-card p-6 sm:p-7">
-      <h2 className="text-lg font-bold">{title}</h2>
+      <h2 className="text-lg font-bold select-none" onClick={onTitleClick}>{title}</h2>
       {description && <p className="mt-1 mb-5 text-sm text-muted-foreground">{description}</p>}
       {children}
     </section>

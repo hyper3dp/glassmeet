@@ -6,6 +6,7 @@ import CommandPalette from '@/components/commandpalatte.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { api } from '@/lib/localApi';
 import { appPath } from '@/lib/authReturnTo';
+import { prefetchAppPages } from '@/lib/pages.js';
 
 const Spinner = () => <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin" />;
 
@@ -15,6 +16,8 @@ export default function AppShell() {
   const { profile, whatsapp, setWhatsapp, loading, error, updateProfile, reload } = useProfile();
   const [cmdOpen, setCmdOpen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => { prefetchAppPages(); }, []);
 
   // Command palette keyboard shortcut: Ctrl+K / Cmd+K
   useEffect(() => {

@@ -128,3 +128,84 @@ function MonthPicker({ id, value, onChange, min, className }) {
     </Popover.Root>
   );
 }
+
+// Inline month grid where each click adds or removes a day. value: sorted "YYYY-MM-DD" keys.
+export function MultiDatePicker({ value, onChange, min, labelledBy }) {
+  const [focused, setFocused] = useState(() => (value[0] ? fromKey(value[0]) : new Date()));
+  const gridRef = useRef(null);
+  const keyed = useRef(false); // focus follows the arrow keys only, not clicks or month buttons
+  useEffect(() => {
+    if (keyed.current) gridRef.current?.querySelector(`[data-day="${toKey(focused)}"]`)?.focus();
+    keyed.current = false;
+  }, [focused]);
+
+  const days = useMemo(() => {
+    const first = new Date(focused.getFullYear(), focused.getMonth(), 1);
+    const start = addDays(first, -first.getDay());
+    return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+  }, [focused.getFullYear(), focused.getMonth()]);
+
+  const isDisabled = (d) => !!min && toKey(d) < min;
+  const toggle = (d) => {
+    if (isDisabled(d)) return;
+    const key = toKey(d);
+    onChange(value.includes(key) ? value.filter((k) => k !== key) : [...value, key].sort());
+    setFocused(d);
+  };
+  const shiftMonth = (n) => setFocused((f) => new Date(f.getFullYear(), f.getMonth() + n, 1));
+  const prevDisabled = !!min && toKey(new Date(focused.getFullYear(), focused.getMonth(), 0)) < min;
+
+  const onKeyDown = (e) => {
+    const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+    if (!moves[e.key]) return;
+    e.preventDefault();
+    keyed.current = true;
+    setFocused((f) => addDays(f, moves[e.key]));
+  };
+
+  return (
+    <div className="w-full max-w-[320px]">
+      <div className="mb-2 flex items-center justify-between">
+        <button type="button" onClick={() => shiftMonth(-1)} disabled={prevDisabled} aria-label="Previous month"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-link transition-all duration-200 hover:bg-primary-soft disabled:text-hint disabled:hover:bg-transparent">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="text-sm font-bold" aria-live="polite">
+          {focused.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        </div>
+        <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-link transition-all duration-200 hover:bg-primary-soft">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      <div role="grid" aria-labelledby={labelledBy} aria-multiselectable="true" ref={gridRef} onKeyDown={onKeyDown} className="grid grid-cols-7 gap-y-1 text-center">
+        {WEEKDAYS.map((w) => <div key={w} role="columnheader" className="pb-1 text-[11px] font-semibold text-muted-foreground">{w}</div>)}
+        {days.map((d) => {
+          const key = toKey(d);
+          const outside = d.getMonth() !== focused.getMonth();
+          const isSelected = value.includes(key);
+          const disabled = isDisabled(d);
+          return (
+            <div key={key} role="gridcell" className="flex justify-center">
+              <button
+                type="button" data-day={key} disabled={disabled} aria-selected={isSelected}
+                aria-label={d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                tabIndex={key === toKey(focused) ? 0 : -1}
+                onClick={() => toggle(d)}
+                className={cn(
+                  'w-9 h-9 rounded-full text-sm tabular transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  isSelected ? 'bg-primary text-primary-foreground font-bold'
+                    : disabled ? 'text-hint/60 cursor-not-allowed'
+                    : outside ? 'text-hint hover:bg-secondary'
+                    : 'font-semibold text-foreground hover:bg-primary-soft hover:text-link',
+                )}
+              >
+                {d.getDate()}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

@@ -6,6 +6,9 @@ import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSel
 import EventCard from '@/components/eventcard.jsx';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import DatePicker, { MultiDatePicker } from '@/components/DatePicker.jsx';
+import { formatDate } from '@/lib/Availability.js';
+import { cn } from '@/lib/utils';
 
 export default function EventTypes({ profile }) {
   const [eventTypes, setEventTypes] = useState([]);
@@ -103,6 +106,7 @@ export default function EventTypes({ profile }) {
         <EventModal
           key={editing?.id || `new-${modalCount}`}
           event={editing}
+          hostId={profile.id}
           onClose={() => setShowModal(false)}
           onSave={async (values) => {
             const payload = {
@@ -126,6 +130,8 @@ export default function EventTypes({ profile }) {
 }
 
 const DESCRIPTION_MAX = 500;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DURATIONS = [15, 30, 45, 60, 90];
 // value stored in event_types.location; kind decides which extra field shows
 export const LOCATIONS = [
@@ -150,7 +156,10 @@ function ToggleRow({ id, label, description, checked, onChange }) {
   );
 }
 
-function EventModal({ event, onClose, onSave }) {
+const pillClass = (on) => `h-9 px-4 rounded-full border text-sm font-semibold transition-all duration-200 ${on ? 'border-primary bg-primary-soft text-link' : 'border-input text-foreground hover:border-border-hover'}`;
+const shortDate = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); };
+
+function EventModal({ event, hostId, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const known = LOCATIONS.find((l) => l.value === event?.location);
@@ -167,10 +176,32 @@ function EventModal({ event, onClose, onSave }) {
     active: event?.active ?? true,
     requires_approval: event?.requires_approval ?? false,
     email_required: event?.email_required ?? true,
+    schedule: event?.schedule === 'dates' ? 'dates' : 'weekly',
+    days: event?.days?.length ? [...event.days].sort() : ALL_DAYS,
+    date_range: !!(event?.start_date || event?.end_date),
+    start_date: event?.start_date || '',
+    end_date: event?.end_date || '',
+    dates: event?.dates ? [...event.dates].sort() : [],
   }));
   const [customDuration, setCustomDuration] = useState(() => !DURATIONS.includes(event?.duration || 30));
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const kind = LOCATIONS.find((l) => l.value === form.location)?.kind;
+  const today = formatDate(new Date());
+  const toggleDay = (dow) => setField('days', form.days.includes(dow) ? form.days.filter((d) => d !== dow) : [...form.days, dow].sort());
+
+  // The host's hours, to flag days the event would run on but nobody can book
+  const [hours, setHours] = useState(null);
+  useEffect(() => {
+    Promise.all([
+      api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
+      api.entities.AvailabilityException.filter({ created_by_id: hostId }),
+    ]).then(([rules, exceptions]) => setHours({
+      days: new Set(rules.map((r) => r.day_of_week)),
+      dates: new Set(exceptions.filter((e) => e.type === 'available').map((e) => e.date)),
+    })).catch(() => {});
+  }, []);
+  const dateHasHours = (key) => !hours || hours.dates.has(key) || hours.days.has(new Date(`${key}T00:00`).getDay());
+  const closedDays = hours ? form.days.filter((d) => !hours.days.has(d)) : [];
 
   // Saved addresses (Settings → Addresses). 'new' means typing one here.
   const [addresses, setAddresses] = useState([]);
@@ -198,6 +229,11 @@ function EventModal({ event, onClose, onSave }) {
     setError('');
     if (kind === 'in_person' && !form.address.trim()) { setError('Add the address where you will meet.'); return; }
     if (kind === 'other' && !form.custom_location.trim()) { setError('Describe where the meeting happens.'); return; }
+    const weekly = form.schedule === 'weekly';
+    if (weekly && !form.days.length) { setError('Pick at least one day the event repeats on.'); return; }
+    if (weekly && form.date_range && (!form.start_date || !form.end_date)) { setError('Pick the first and last date, or turn off the date range.'); return; }
+    if (weekly && form.date_range && form.end_date < form.start_date) { setError('The last date is before the first date.'); return; }
+    if (!weekly && !form.dates.length) { setError('Pick at least one date.'); return; }
     setSaving(true);
     try {
       if (kind === 'in_person' && addressChoice === 'new' && saveNewAddress && savedAddressesAvailable) {
@@ -205,9 +241,14 @@ function EventModal({ event, onClose, onSave }) {
         setAddresses((list) => [...list, saved]);
         setAddressChoice(saved.id);
       }
-      const { custom_location, ...rest } = form;
+      const { custom_location, date_range, ...rest } = form;
+      const range = weekly && date_range;
       await onSave({
         ...rest,
+        days: weekly && form.days.length < 7 ? form.days : null,
+        start_date: range ? form.start_date : null,
+        end_date: range ? form.end_date : null,
+        dates: weekly ? null : form.dates,
         location: kind === 'other' ? custom_location.trim() : form.location,
         meeting_url: kind === 'video' || kind === 'other' ? form.meeting_url.trim() : '',
         address: kind === 'in_person' ? form.address.trim() : null,
@@ -248,13 +289,13 @@ function EventModal({ event, onClose, onSave }) {
                 const on = !customDuration && Number(form.duration) === d;
                 return (
                   <button key={d} type="button" aria-pressed={on} onClick={() => { setCustomDuration(false); setField('duration', d); }}
-                    className={`h-9 px-4 rounded-full border text-sm font-semibold transition-all duration-200 ${on ? 'border-primary bg-primary-soft text-link' : 'border-input text-foreground hover:border-border-hover'}`}>
+                    className={pillClass(on)}>
                     {d < 60 ? `${d} min` : d === 60 ? '1 hr' : '1.5 hr'}
                   </button>
                 );
               })}
               <button type="button" aria-pressed={customDuration} onClick={() => setCustomDuration(true)}
-                className={`h-9 px-4 rounded-full border text-sm font-semibold transition-all duration-200 ${customDuration ? 'border-primary bg-primary-soft text-link' : 'border-input text-foreground hover:border-border-hover'}`}>
+                className={pillClass(customDuration)}>
                 Custom
               </button>
             </div>
@@ -264,6 +305,71 @@ function EventModal({ event, onClose, onSave }) {
                 <span className="text-sm text-muted-foreground">minutes</span>
               </div>
             )}
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-foreground">Dates</legend>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" aria-pressed={form.schedule === 'weekly'} onClick={() => setField('schedule', 'weekly')} className={pillClass(form.schedule === 'weekly')}>Repeats weekly</button>
+              <button type="button" aria-pressed={form.schedule === 'dates'} onClick={() => setField('schedule', 'dates')} className={pillClass(form.schedule === 'dates')}>Specific dates</button>
+            </div>
+
+            {form.schedule === 'weekly' ? (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <p id="event-days-label" className="mb-2 text-sm text-muted-foreground">Repeats every week on</p>
+                  <div className="grid grid-cols-7 gap-1.5 sm:flex sm:flex-wrap" role="group" aria-labelledby="event-days-label">
+                    {WEEKDAYS.map((label, dow) => (
+                      <button key={label} type="button" aria-pressed={form.days.includes(dow)} onClick={() => toggleDay(dow)}
+                        className={cn(pillClass(form.days.includes(dow)), 'px-0 sm:w-14')}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                  <Switch checked={form.date_range} onCheckedChange={(v) => setField('date_range', v)} /> Only between two dates
+                </label>
+                {form.date_range && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <GlassLabel htmlFor="event-start">First date</GlassLabel>
+                      <DatePicker id="event-start" value={form.start_date} onChange={(v) => setField('start_date', v)} />
+                    </div>
+                    <div>
+                      <GlassLabel htmlFor="event-end">Last date</GlassLabel>
+                      <DatePicker id="event-end" value={form.end_date} min={form.start_date || today} onChange={(v) => setField('end_date', v)} />
+                    </div>
+                  </div>
+                )}
+                {closedDays.length > 0 && (
+                  <p className="text-sm text-warning">No weekly hours on {closedDays.map((d) => WEEKDAYS[d]).join(', ')}, so guests can’t book those days. Add hours in Availability.</p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-[auto_1fr]">
+                <MultiDatePicker value={form.dates} onChange={(v) => setField('dates', v)} min={today} labelledBy="event-dates-label" />
+                <div className="min-w-0">
+                  <p id="event-dates-label" className="mb-2 text-sm text-muted-foreground">{form.dates.length ? `${form.dates.length} ${form.dates.length === 1 ? 'date' : 'dates'} picked` : 'Pick the days guests can book.'}</p>
+                  <ul className="flex flex-wrap gap-1.5 sm:max-h-64 sm:overflow-y-auto">
+                    {form.dates.map((key) => (
+                      <li key={key} className={`inline-flex h-8 items-center gap-1 rounded-full border pl-3 pr-1 text-sm font-semibold ${dateHasHours(key) ? 'border-border' : 'border-warning text-warning'}`}
+                        title={dateHasHours(key) ? undefined : 'No hours on this day'}>
+                        {shortDate(key)}
+                        <button type="button" aria-label={`Remove ${shortDate(key)}`} onClick={() => setField('dates', form.dates.filter((k) => k !== key))}
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {form.dates.some((key) => !dateHasHours(key)) && (
+                    <p className="mt-2 text-sm text-warning">Dates in orange have no hours. Add hours for them in Availability.</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">Times on each day come from your hours in Availability.</p>
           </fieldset>
 
           <div>
