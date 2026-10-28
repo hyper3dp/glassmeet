@@ -9,6 +9,7 @@ import ProtectedRoute from '@/components/protectedroute.jsx';
 import { useApp } from '@/lib/useprofile.js';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { PAGES, preloadPage } from '@/lib/pages.js';
+import BugReport from '@/components/BugReport.jsx';
 
 // Pages load on demand (see lib/pages.js); the one being opened starts downloading right away
 const AppShell = lazy(PAGES.appShell);
@@ -126,6 +127,7 @@ function App() {
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <ScrollToTop />
             <AuthenticatedApp />
+            <BugReport />
           </Router>
           <Suspense fallback={null}><Toaster /></Suspense>
       </AuthProvider>

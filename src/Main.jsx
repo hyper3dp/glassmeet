@@ -3,9 +3,13 @@ import ReactDOM from 'react-dom/client'
 import App from '@/APP.jsx'
 import '@/Index.css'
 import { isEmbed } from '@/lib/embed.js'
+import { installBugCollector } from '@/lib/bugReport.js'
 
 // GitHub Pages deep links (?__gh_pages_route=) are restored by an inline script in index.html,
 // which runs before these imports create the Supabase client.
+
+// before anything else runs, so a bug report can include the errors that led up to it
+installBugCollector();
 
 if (isEmbed()) document.documentElement.classList.add('embed');
 

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import markUrl from '@/assets/brand/mark.png';
-import wordUrl from '@/assets/brand/wordmark-text.png';
+// lossless WebP copies of the brand kit's PNGs (same pixels, about half the bytes)
+import markUrl from '@/assets/brand/mark.webp';
+import wordUrl from '@/assets/brand/wordmark-text.webp';
 
 // The brand kit's art is used as alpha masks so it can be tinted per theme:
 // the mark stays brand teal, the lettering follows the text colour (slate on light, near-white on dark).
