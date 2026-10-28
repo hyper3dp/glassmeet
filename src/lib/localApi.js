@@ -223,6 +223,15 @@ export const api = {
       });
       if (error) throw new Error(error.message);
     },
+    // LinkedIn's "Sign In with LinkedIn using OpenID Connect" provider in Supabase
+    loginWithLinkedIn: async (returnTo = '/') => {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'linkedin_oidc',
+        options: { redirectTo: `${window.location.origin}${appPath(returnTo)}` }
+      });
+      if (error) throw new Error(error.message);
+      if (data?.url) window.location.assign(data.url);
+    },
     loginWithGoogle: async (returnTo = '/') => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

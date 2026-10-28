@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Lock, Loader2, User, Eye, EyeOff } from "lucide-react";
 import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
+import LinkedInIcon from "@/components/linkedinicon.jsx";
 import { appPath, safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Register() {
@@ -47,6 +48,11 @@ export default function Register() {
     api.auth.loginWithGoogle(safeReturnTo()).catch((err) => setError(err.message || "Could not start Google sign-in"));
   };
 
+  const handleLinkedIn = () => {
+    setError("");
+    api.auth.loginWithLinkedIn(safeReturnTo()).catch((err) => setError(err.message || "Could not start LinkedIn sign-in"));
+  };
+
   return (
     <AuthLayout
       icon={UserPlus}
@@ -64,9 +70,14 @@ export default function Register() {
         </>
       }
     >
-      <Button type="button" variant="outline" className="mb-6 h-12 w-full text-[15px] font-bold" onClick={handleGoogle}>
-        <GoogleIcon className="mr-2 h-5 w-5" /> Continue with Google
-      </Button>
+      <div className="mb-6 space-y-3">
+        <Button type="button" variant="outline" className="h-12 w-full text-[15px] font-bold" onClick={handleGoogle}>
+          <GoogleIcon className="mr-2 h-5 w-5" /> Continue with Google
+        </Button>
+        <Button type="button" variant="outline" className="h-12 w-full text-[15px] font-bold" onClick={handleLinkedIn}>
+          <LinkedInIcon className="mr-2 h-5 w-5" /> Continue with LinkedIn
+        </Button>
+      </div>
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
         <div className="relative flex justify-center text-sm"><span className="bg-card px-3 text-muted-foreground">OR</span></div>
