@@ -36,6 +36,18 @@
           try { sessionStorage.setItem('gm-auth-error', message.replace(/\+/g, ' ')); } catch (e) {}
           history.replaceState(null, '', location.pathname.replace(/[^/]*$/, '') + 'login');
         }
+        // Clickjacking guard (GitHub Pages can't send X-Frame-Options or frame-ancestors): only
+        // booking and confirmation pages opened by embed.js (?embed=1) may sit in another site's
+        // frame. Anything else hides itself, so there is nothing to click, and tries to take over
+        // the whole window (browsers may block that without a click; the page stays hidden).
+        if (window.top !== window.self) {
+          var embedded = /\/(book|confirm)\//.test(location.pathname) && (/[?&]embed=1(&|$)/.test(location.search)
+            || (function () { try { return sessionStorage.getItem('gm-embed') === '1'; } catch (e) { return false; } })());
+          if (!embedded) {
+            document.documentElement.style.display = 'none';
+            try { window.top.location.href = location.href; } catch (e) {}
+          }
+        }
       })();
     </script>
   </head>

@@ -2,7 +2,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
-import { copyFile } from 'node:fs/promises'
+import { copyFile, readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 
 // GitHub Pages only serves files that exist, so client-side routes like /privacy
@@ -27,9 +28,61 @@ function staticRoutes() {
   };
 }
 
+// GitHub Pages can't send response headers, so the policies a page can set for itself go in
+// <meta> tags: a Content-Security-Policy (each inline script allowed by its hash, not by
+// 'unsafe-inline') and a Referrer-Policy. Build only: the dev server injects its own inline
+// scripts. frame-ancestors, X-Frame-Options, X-Content-Type-Options and Permissions-Policy only
+// work as real headers; public/_headers sets those on a host that supports it, and index.html
+// guards against framing in the meantime.
+const SUPABASE_ORIGIN = 'https://sjxraemrdpzleipfmwun.supabase.co'; // as in src/lib/supabaseClient.js
+
+const inlineScriptHashes = (html) =>
+  [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+    .filter((m) => m[1].trim())
+    // browsers hash the script as parsed, where CRLF line endings have become LF
+    .map((m) => `'sha256-${createHash('sha256').update(m[1].replace(/\r\n?/g, '\n')).digest('base64')}'`);
+
+const securityMeta = (html) => {
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' ${inlineScriptHashes(html).join(' ')}`.trim(),
+    // React style={...} attributes and the inline background <style> need inline styles
+    "style-src 'self' 'unsafe-inline'",
+    // avatars (Supabase storage, Google photos) and QR codes come from other https hosts
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_ORIGIN.replace('https://', 'wss://')}`,
+    "frame-src 'self'",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+  const tags = `<meta http-equiv="Content-Security-Policy" content="${csp}" />\n    <meta name="referrer" content="strict-origin-when-cross-origin" />\n    `;
+  return html.replace(/<meta charset="utf-8" \/>\s*/i, (m) => `${m}${tags}`);
+};
+
+function securityHeaders() {
+  let outDir;
+  return {
+    name: 'glassmeet-security-meta',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    transformIndexHtml: { order: 'post', handler: securityMeta },
+    // public/404.html is copied as it is; give it the same tags
+    async writeBundle() {
+      const file = path.join(outDir, '404.html');
+      await writeFile(file, securityMeta(await readFile(file, 'utf8')));
+    },
+  };
+}
+
 export default defineConfig({
   base: '/glassmeet/',
-  plugins: [react(), tailwindcss(), staticRoutes()],
+  plugins: [react(), tailwindcss(), securityHeaders(), staticRoutes()],
   resolve: {
     alias: [
       { find: '@/components', replacement: fileURLToPath(new URL('./src/Components', import.meta.url)) },

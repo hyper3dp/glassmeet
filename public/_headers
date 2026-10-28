@@ -1,0 +1,26 @@
+# Security headers for hosts that read a _headers file (Cloudflare Pages, Netlify).
+# GitHub Pages ignores this file: there, vite.config.js puts the CSP and referrer policy in
+# <meta> tags and index.html guards against framing. Paths include the /glassmeet/ base.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+
+# booking pages are made to be embedded on hosts' own websites (public/embed.js)
+/glassmeet/book/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  Content-Security-Policy: frame-ancestors *
+
+/glassmeet/confirm/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  Content-Security-Policy: frame-ancestors *
+
+# embed.js is loaded by other sites
+/glassmeet/embed.js
+  Access-Control-Allow-Origin: *
