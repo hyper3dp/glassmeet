@@ -243,6 +243,25 @@ export const api = {
     logout: async () => {
       await supabase.auth.signOut();
     },
+    // Deletes the signed-in account and all its data: profile photos first (Storage doesn't
+    // cascade), then the login, which takes every table with it (see delete_my_account()).
+    deleteAccount: async () => {
+      const user = await sessionUser();
+      if (!user) throw new Error('Sign in first.');
+      const bucket = supabase.storage.from('avatars');
+      const { data: files, error: listError } = await bucket.list(user.id, { limit: 1000 });
+      if (listError && !/not found/i.test(listError.message)) throw new Error(listError.message);
+      if (files?.length) {
+        const { error: removeError } = await bucket.remove(files.map((f) => `${user.id}/${f.name}`));
+        if (removeError) throw new Error(removeError.message);
+      }
+      const { error } = await supabase.rpc('delete_my_account');
+      if (notDeployed(error)) throw new Error('Deleting accounts isn’t available yet. Please try again later.');
+      if (error) throw new Error(error.message);
+      meCache = null;
+      // the session belonged to the deleted login; clear it on this device
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    },
     resetPasswordRequest: async (email) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}${appPath('/reset-password')}`,

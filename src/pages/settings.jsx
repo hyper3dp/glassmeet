@@ -10,6 +10,8 @@ import GoogleIcon from '@/components/googleicon.jsx';
 import AddressManager from '@/components/AddressManager.jsx';
 import { Switch } from '@/components/ui/switch';
 import { BETA_FEATURES, useBeta, unlockBeta, hideBeta, setBetaFeature } from '@/lib/beta';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { appPath } from '@/lib/authReturnTo';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -18,6 +20,7 @@ const SECTIONS = [
   { id: 'coming-soon', label: 'Coming soon', icon: Plug },
 ];
 const BETA_SECTION = { id: 'beta', label: 'Beta features', icon: FlaskConical };
+const DELETE_SECTION = { id: 'delete-account', label: 'Delete account', icon: Trash2 };
 const UNLOCK_TAPS = 5;
 
 const MAX_PHOTO_MB = 5;
@@ -33,7 +36,7 @@ export default function Settings({ profile, updateProfile }) {
   const [photoError, setPhotoError] = useState('');
   const fileRef = useRef(null);
   const beta = useBeta();
-  const sections = beta?.unlocked ? [...SECTIONS, BETA_SECTION] : SECTIONS;
+  const sections = [...SECTIONS, ...(beta?.unlocked ? [BETA_SECTION] : []), DELETE_SECTION];
 
   // Five quick taps on "Coming soon" open the hidden Beta features menu
   const taps = useRef({ count: 0, at: 0 });
@@ -241,9 +244,74 @@ export default function Settings({ profile, updateProfile }) {
               <GlassButton type="button" variant="ghost" size="sm" className="mt-3" onClick={hideBeta}>Hide beta features</GlassButton>
             </Section>
           )}
+
+          <Section id={DELETE_SECTION.id} title="Delete account" description="Permanently delete your GlassMeet account and everything in it. This can’t be undone.">
+            <DeleteAccount email={profile.email} />
+          </Section>
         </div>
       </div>
     </div>
+  );
+}
+
+// Deletes the account after the host types DELETE. Everything goes: event types, hours, meetings,
+// notifications, templates, addresses, WhatsApp settings, calendar-feed links and photos.
+function DeleteAccount({ email }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  const confirmed = typed.trim().toUpperCase() === 'DELETE';
+
+  const close = () => { if (!deleting) { setOpen(false); setTyped(''); setError(''); } };
+  const remove = async (e) => {
+    e.preventDefault();
+    if (!confirmed) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await api.auth.deleteAccount();
+      try { sessionStorage.setItem('gm-account-deleted', '1'); } catch { /* storage unavailable */ }
+      window.location.assign(appPath('/'));
+    } catch (err) {
+      setError(err?.message || 'Your account couldn’t be deleted. Try again.');
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      <GlassButton type="button" variant="danger" onClick={() => setOpen(true)}><Trash2 className="w-4 h-4" /> Delete account</GlassButton>
+      {open && (
+        <Dialog open onOpenChange={(next) => { if (!next) close(); }}>
+          <DialogContent showCloseButton={false} className="sm:max-w-md p-6 block">
+            <DialogTitle>Delete your account?</DialogTitle>
+            <form onSubmit={remove}>
+              <p className="mt-2 text-sm text-muted-foreground">
+                This permanently deletes {email ? <span className="font-semibold text-foreground">{email}</span> : 'your account'} and all its data:
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground space-y-0.5">
+                <li>your event types, and their booking links stop working</li>
+                <li>your hours, days off and holiday settings</li>
+                <li>every meeting booked with you, with your guests’ details</li>
+                <li>notifications, templates, addresses, WhatsApp settings and your photo</li>
+                <li>calendar subscriptions, which stop updating</li>
+              </ul>
+              <p className="mt-3 text-sm text-muted-foreground">Guests aren’t told. Cancel or message anyone with an upcoming meeting first.</p>
+              <GlassLabel htmlFor="delete-confirm" className="mt-5">Type DELETE to confirm</GlassLabel>
+              <GlassInput id="delete-confirm" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} disabled={deleting} />
+              {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+              <div className="mt-6 flex justify-end gap-2">
+                <GlassButton type="button" variant="ghost" onClick={close} disabled={deleting}>Keep my account</GlassButton>
+                <GlassButton type="submit" variant="danger" disabled={!confirmed || deleting}>
+                  {deleting ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</> : 'Delete everything'}
+                </GlassButton>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 

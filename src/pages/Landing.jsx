@@ -4,6 +4,7 @@ import { MessageCircle, Clock, Check, ArrowRight, ChevronLeft, ChevronRight, Vid
 import { cn } from '@/lib/utils';
 import { GlassButton } from '@/components/glass';
 import { useAuth } from '@/lib/Authcontext.jsx';
+import { toast } from 'sonner';
 import Logo, { LogoMark } from '@/components/logo.jsx';
 
 // Every line here describes something the app does today (see PRODUCT.md, "Promise only what ships").
@@ -100,6 +101,16 @@ function BookingPreview() {
 export default function Landing() {
   const { isAuthenticated, authChecked, user } = useAuth();
   const navigate = useNavigate();
+
+  // just deleted their account in Settings
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('gm-account-deleted')) {
+        sessionStorage.removeItem('gm-account-deleted');
+        toast.success('Your account and all its data were deleted.');
+      }
+    } catch { /* storage unavailable */ }
+  }, []);
 
   useEffect(() => {
     // Only redirect to dashboard if user is fully authenticated
