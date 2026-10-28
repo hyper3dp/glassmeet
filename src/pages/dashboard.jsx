@@ -53,7 +53,8 @@ export default function Dashboard({ profile }) {
   const now = new Date();
   // calendar days in the host's zone (not UTC), so late-evening and early-morning meetings
   // land on the right day
-  const dayKey = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: timezone });
+  const dayFormat = useMemo(() => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }), [timezone]);
+  const dayKey = (d) => dayFormat.format(new Date(d));
   const todayKey = dayKey(now);
 
   // requests waiting for approval aren't meetings yet; they get their own card
@@ -65,7 +66,7 @@ export default function Dashboard({ profile }) {
   );
   const todays = useMemo(
     () => known.filter((b) => isOn(b) && dayKey(b.start_time) === todayKey),
-    [known, todayKey]
+    [known, todayKey, dayFormat]
   );
   const recent = useMemo(() => bookings.filter((b) => !isExpiredCancellation(b)).slice(0, 5), [bookings]);
 
@@ -97,7 +98,7 @@ export default function Dashboard({ profile }) {
         actions={
           <>
             {firstEvent && <GlassButton type="button" onClick={shareOnWhatsApp}><MessageCircle className="w-4 h-4" /> Share on WhatsApp</GlassButton>}
-            <Link to="/event-types?new=true"><GlassButton variant="primary" type="button"><Plus className="w-4 h-4" strokeWidth={2.5} /> Create</GlassButton></Link>
+            <GlassButton as={Link} to="/event-types?new=true" variant="primary"><Plus className="w-4 h-4" strokeWidth={2.5} /> Create</GlassButton>
           </>
         }
       />
@@ -187,7 +188,7 @@ export default function Dashboard({ profile }) {
         </div>
         {eventTypes.length === 0 ? (
           <div className="rounded-xl border border-border bg-card shadow-card">
-            <EmptyState icon={Plus} title="No event types" description="Create an event type to start taking bookings." action={<Link to="/event-types?new=true"><GlassButton variant="primary" size="sm" type="button"><Plus className="w-4 h-4" /> New event type</GlassButton></Link>} />
+            <EmptyState icon={Plus} title="No event types" description="Create an event type to start taking bookings." action={<GlassButton as={Link} to="/event-types?new=true" variant="primary" size="sm"><Plus className="w-4 h-4" /> New event type</GlassButton>} />
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">

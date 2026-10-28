@@ -83,6 +83,20 @@ function securityHeaders() {
 export default defineConfig({
   base: '/glassmeet/',
   plugins: [react(), tailwindcss(), securityHeaders(), staticRoutes()],
+  build: {
+    rolldownOptions: {
+      output: {
+        // Libraries every page loads get chunks of their own: they change far less often than the
+        // app's code, so browsers keep them cached across deploys. Everything else splits by page.
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|@remix-run[\\/]router)[\\/]/, priority: 2 },
+            { name: 'supabase', test: /[\\/]node_modules[\\/](@supabase[\\/]|iceberg-js[\\/]|tslib[\\/])/, priority: 1 },
+          ],
+        },
+      },
+    },
+  },
   resolve: {
     alias: [
       { find: '@/components', replacement: fileURLToPath(new URL('./src/Components', import.meta.url)) },

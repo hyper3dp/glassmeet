@@ -4,7 +4,6 @@ import { MessageCircle, Clock, Check, ArrowRight, ChevronLeft, ChevronRight, Vid
 import { cn } from '@/lib/utils';
 import { GlassButton } from '@/components/glass';
 import { useAuth } from '@/lib/Authcontext.jsx';
-import { toast } from 'sonner';
 import Logo, { LogoMark } from '@/components/logo.jsx';
 
 // Every line here describes something the app does today (see PRODUCT.md, "Promise only what ships").
@@ -107,7 +106,8 @@ export default function Landing() {
     try {
       if (sessionStorage.getItem('gm-account-deleted')) {
         sessionStorage.removeItem('gm-account-deleted');
-        toast.success('Your account and all its data were deleted.');
+        // sonner loads only when needed, keeping it off the landing page's first load
+        import('sonner').then(({ toast }) => toast.success('Your account and all its data were deleted.'));
       }
     } catch { /* storage unavailable */ }
   }, []);
@@ -131,7 +131,7 @@ export default function Landing() {
             <a href="#how" className="hidden md:block px-3 text-[15px] font-semibold text-foreground hover:text-link">How it works</a>
             <a href="#features" className="hidden md:block px-3 text-[15px] font-semibold text-foreground hover:text-link">Features</a>
             <Link to="/login" className="whitespace-nowrap px-1.5 sm:px-3 text-[15px] font-semibold text-foreground hover:text-link">Log in</Link>
-            <Link to="/register"><GlassButton variant="primary" type="button" className="px-3.5 sm:px-5">Get started</GlassButton></Link>
+            <GlassButton as={Link} to="/register" variant="primary" className="px-3.5 sm:px-5">Get started</GlassButton>
           </nav>
         </div>
       </header>
@@ -151,8 +151,8 @@ export default function Landing() {
                 Share one booking link. Guests pick a time without signing up, and you confirm the meeting in a WhatsApp chat instead of an email thread.
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <Link to="/register"><GlassButton variant="primary" size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base">Get started, it's free <ArrowRight className="w-4 h-4" /></GlassButton></Link>
-                <a href="#how"><GlassButton size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base">How it works</GlassButton></a>
+                <GlassButton as={Link} to="/register" variant="primary" size="lg" className="w-full sm:w-auto h-12 px-7 text-base">Get started, it's free <ArrowRight className="w-4 h-4" /></GlassButton>
+                <GlassButton as="a" href="#how" size="lg" className="w-full sm:w-auto h-12 px-7 text-base">How it works</GlassButton>
               </div>
               <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-muted-foreground">
                 {['Free to use', 'No account for guests', 'Works with Google Calendar'].map((item) => (

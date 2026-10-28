@@ -31,10 +31,10 @@ const fold = (line: string) => {
   return out.join('\r\n ');
 };
 
-const notFound = () => new Response('Calendar feed not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+const notFound = () => new Response('Calendar feed not found', { status: 404, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' } });
 
 Deno.serve(async (req) => {
-  if (req.method !== 'GET' && req.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
+  if (req.method !== 'GET' && req.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
 
   const url = new URL(req.url);
   const fromPath = url.pathname.split('/').pop()?.replace(/\.ics$/i, '');
@@ -49,10 +49,11 @@ Deno.serve(async (req) => {
   if (!feed) return notFound();
 
   const [{ data: profile }, { data: bookings, error }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', feed.owner).maybeSingle(),
+    supabase.from('profiles').select('full_name, holidays').eq('id', feed.owner).maybeSingle(),
     supabase
       .from('bookings')
-      .select('*')
+      // only what the feed shows; the event's in-person address is the location, as in src/lib/ics.js
+      .select('id, start_time, end_time, status, approval_status, event_name, guest_name, guest_email, guest_phone, guest_notes, meeting_url, created_date, updated_date, event_types(address, meeting_url, location)')
       .eq('host_id', feed.owner)
       .gte('start_time', new Date(Date.now() - 60 * 864e5).toISOString())
       // newest first, so a busy host's upcoming meetings are never the ones cut off
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
   const missingTable = error && (error.code === '42P01' || error.code === 'PGRST205' || /does not exist|schema cache/i.test(error.message));
   if (error && !missingTable) {
     console.error('bookings query failed', error.code, error.message);
-    return new Response('Feed temporarily unavailable', { status: 503 });
+    return new Response('Feed temporarily unavailable', { status: 503, headers: { 'Content-Type': 'text/plain', 'Retry-After': '300' } });
   }
 
   // public holidays the host blocks, as all-day events (none until the holidays migration is applied)
@@ -79,11 +80,16 @@ Deno.serve(async (req) => {
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GlassMeet//Calendar Feed//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     `X-WR-CALNAME:${esc(name)}`, 'X-WR-TIMEZONE:UTC', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H',
   ];
-  const stamp = icsDate(new Date().toISOString());
+  // DTSTAMP comes from the row (not the request time), so an unchanged calendar gives the same
+  // bytes and the ETag below lets calendar apps skip the download
+  const today = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
   for (const b of bookings ?? []) {
     // declined requests keep status 'confirmed'; they aren't meetings
     if (!b.start_time || !b.end_time || b.status === 'cancelled' || b.approval_status === 'declined') continue;
     const pending = b.approval_status === 'pending';
+    const e = Array.isArray(b.event_types) ? b.event_types[0] : b.event_types;
+    const where = e?.address || b.meeting_url || e?.meeting_url || e?.location || '';
+    const stamp = icsDate(b.updated_date || b.created_date || b.start_time);
     const title = `${pending ? '[Pending] ' : ''}${b.event_name || 'Meeting'}${b.guest_name ? ` with ${b.guest_name}` : ''}`;
     const details = [
       b.guest_name && `Guest: ${b.guest_name}`,
@@ -97,13 +103,14 @@ Deno.serve(async (req) => {
       'BEGIN:VEVENT',
       `UID:glassmeet-${b.id}@glassmeet.app`,
       `DTSTAMP:${stamp}`,
+      `LAST-MODIFIED:${stamp}`,
       `DTSTART:${icsDate(b.start_time)}`,
       `DTEND:${icsDate(b.end_time)}`,
       `SUMMARY:${esc(title)}`,
       `DESCRIPTION:${esc(details)}`,
       `STATUS:${pending ? 'TENTATIVE' : 'CONFIRMED'}`,
     );
-    if (b.meeting_url) lines.push(`LOCATION:${esc(b.meeting_url)}`);
+    if (where) lines.push(`LOCATION:${esc(where)}`);
     lines.push('END:VEVENT');
   }
   for (const h of holidays ?? []) {
@@ -113,7 +120,7 @@ Deno.serve(async (req) => {
     lines.push(
       'BEGIN:VEVENT',
       `UID:glassmeet-holiday-${profile.holidays}-${day}@glassmeet.app`,
-      `DTSTAMP:${stamp}`,
+      `DTSTAMP:${icsDate(today)}`,
       `DTSTART;VALUE=DATE:${day}`,
       `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, '')}`,
       `SUMMARY:${esc(`${h.name} (holiday)`)}`,
@@ -124,13 +131,23 @@ Deno.serve(async (req) => {
   }
   lines.push('END:VCALENDAR');
 
-  return new Response(lines.map(fold).join('\r\n') + '\r\n', {
-    headers: {
-      'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': 'inline; filename="glassmeet.ics"',
-      // guest details inside: calendar apps may cache it, shared proxies may not; no CORS, since
-      // calendar apps don't need it and it would let any website read a leaked feed
-      'Cache-Control': 'private, max-age=300',
-    },
-  });
+  const body = lines.map(fold).join('\r\n') + '\r\n';
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)));
+  const etag = `"${Array.from(digest.slice(0, 16), (x) => x.toString(16).padStart(2, '0')).join('')}"`;
+  const headers = {
+    'Content-Type': 'text/calendar; charset=utf-8',
+    'Content-Disposition': 'inline; filename="glassmeet.ics"',
+    // guest details inside: calendar apps may cache it, shared proxies may not; no CORS, since
+    // calendar apps don't need it and it would let any website read a leaked feed
+    'Cache-Control': 'private, max-age=300',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    ETag: etag,
+  };
+  // calendar apps that send the last ETag get a 304 instead of the whole feed
+  const ifNoneMatch = req.headers.get('If-None-Match');
+  if (ifNoneMatch && ifNoneMatch.split(',').some((tag) => tag.trim().replace(/^W\//, '') === etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  return new Response(req.method === 'HEAD' ? null : body, { headers });
 });

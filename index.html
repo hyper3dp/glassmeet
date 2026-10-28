@@ -34,7 +34,8 @@
         var message = hash.get('error_description') || new URLSearchParams(location.search).get('error_description');
         if (message) {
           try { sessionStorage.setItem('gm-auth-error', message.replace(/\+/g, ' ')); } catch (e) {}
-          history.replaceState(null, '', location.pathname.replace(/[^/]*$/, '') + 'login');
+          // to the app's base path (Vite fills it in), whichever page the link landed on
+          history.replaceState(null, '', '%BASE_URL%login');
         }
         // Clickjacking guard (GitHub Pages can't send X-Frame-Options or frame-ancestors): only
         // booking and confirmation pages opened by embed.js (?embed=1) may sit in another site's

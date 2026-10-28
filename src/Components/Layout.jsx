@@ -1,5 +1,5 @@
 import { appPath } from '@/lib/authReturnTo';
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Home, Calendar as CalendarIcon, Link2, CalendarDays, Clock,
@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/glass';
 import Logo, { LogoMark } from '@/components/logo.jsx';
 import NotificationCenter from '@/components/Notificationcenter.jsx';
-import Tour from '@/components/Tour.jsx';
+
+const Tour = lazy(() => import('@/components/Tour.jsx')); // loads when a tour starts
 
 // the places the tour points at (see Tour.jsx)
 const TOUR_TARGETS = { '/event-types': 'scheduling', '/bookings': 'meetings', '/availability': 'availability' };
@@ -201,7 +202,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         </main>
       </div>
 
-      {touring && <Tour onClose={() => setTouring(false)} />}
+      {touring && <Suspense fallback={null}><Tour onClose={() => setTouring(false)} /></Suspense>}
 
       {/* Mobile bottom tab bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border pb-[env(safe-area-inset-bottom)]" aria-label="Mobile">

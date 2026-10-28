@@ -10,7 +10,9 @@ import { holidayMap } from '@/lib/holidays.js';
 
 // y-m-d of a local calendar cell, and of a booking in the host time zone
 const cellKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const bookingKey = (iso, tz) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz });
+// one formatter per zone: building one per booking is slow with a thousand of them
+const keyFormatters = {};
+const bookingKey = (iso, tz) => (keyFormatters[tz] || (keyFormatters[tz] = new Intl.DateTimeFormat('en-CA', { timeZone: tz }))).format(new Date(iso));
 
 // today's date in the host's zone (the browser may be somewhere else)
 const todayIn = (tz) => dateInZone(Date.now(), tz);
@@ -43,7 +45,7 @@ export default function CalendarPage({ profile }) {
   const load = async () => {
     setLoadFailed(false);
     try {
-      const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000);
+      const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000, 'id, guest_name, event_name, start_time, status, approval_status');
       // everything still on (confirmed, completed, and requests awaiting approval)
       setBookings(b.filter((x) => x.status !== 'cancelled'));
     } catch {
@@ -54,7 +56,9 @@ export default function CalendarPage({ profile }) {
 
   const bookingsByDay = useMemo(() => {
     const map = {};
-    for (const b of bookings) {
+    // earliest first, so a month cell's first chips are the day's first meetings (the list
+    // arrives latest first)
+    for (const b of [...bookings].reverse()) {
       const key = bookingKey(b.start_time, timezone);
       (map[key] = map[key] || []).push(b);
     }
@@ -176,7 +180,7 @@ function WeekView({ cursor, today, bookingsByDay, holidays, timezone }) {
     <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
       {days.map((date, i) => {
         const key = cellKey(date);
-        const dayBookings = (bookingsByDay[key]||[]).sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
+        const dayBookings = [...(bookingsByDay[key]||[])].sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
         const isToday = date.getTime() === today.getTime();
         return (
           <div key={i} className={`rounded-lg border p-3 min-h-[120px] ${isToday?'border-primary':'border-border'}`}>

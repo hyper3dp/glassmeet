@@ -25,15 +25,21 @@ export default function CommandPalette({ open, onClose }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const inputRef = useRef(null);
+  const listRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (open) {
-      setQuery('');
-      setSelected(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!open) return undefined;
+    setQuery('');
+    setSelected(0);
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
   }, [open]);
+
+  // arrowing past the bottom of the list keeps the picked command in view
+  useEffect(() => {
+    listRef.current?.children[selected]?.scrollIntoView?.({ block: 'nearest' });
+  }, [selected]);
 
   const matches = COMMANDS.filter((c) =>
     c.label.toLowerCase().includes(query.toLowerCase()) ||
@@ -70,12 +76,13 @@ export default function CommandPalette({ open, onClose }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKey}
+            aria-label="Search commands and meetings"
             placeholder="Type a command or search…"
             className="flex-1 bg-transparent outline-hidden text-sm text-foreground placeholder:text-muted-foreground"
           />
           <button onClick={onClose} aria-label="Close" className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-3.5 h-3.5" /></button>
         </div>
-        <div className="max-h-80 overflow-y-auto p-2">
+        <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">No commands found.</div>
           ) : (

@@ -37,6 +37,9 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
     }
   }, [whatsapp, profile]);
 
+  // a row made elsewhere after this page opened (onboarding, another tab) is the one to update
+  if (!idRef.current && whatsapp?.id) idRef.current = whatsapp.id;
+
   const creating = useRef(null); // the first save's create, so a second save waits for it
   const autosave = useAutosave(form, async (payload) => {
     if (!idRef.current && creating.current) await creating.current;
@@ -49,6 +52,14 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
         const created = await creating.current;
         idRef.current = created.id;
         setWhatsapp(created);
+      } catch (e) {
+        // one row per host: if it already exists (it didn't load), update that one instead
+        if (!/duplicate key|unique/i.test(e?.message || '')) throw e;
+        const [existing] = await api.entities.WhatsAppSetting.filter({ created_by_id: profile.id }, undefined, 1, 'id');
+        if (!existing) throw e;
+        idRef.current = existing.id;
+        const updated = await api.entities.WhatsAppSetting.update(existing.id, payload);
+        if (updated) setWhatsapp(updated);
       } finally {
         creating.current = null;
       }

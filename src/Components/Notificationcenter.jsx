@@ -64,7 +64,7 @@ export default function NotificationCenter() {
   const loadNotifications = async () => {
     if (!loaded.current) setLoading(true);
     try {
-      const list = await api.entities.Notification.filter({}, '-created_date', 20);
+      const list = await api.entities.Notification.filter({}, '-created_date', 20, 'id, title, message, link, read, created_date');
       setNotifications(list);
       loaded.current = true;
       setLoadFailed(false);
@@ -81,7 +81,9 @@ export default function NotificationCenter() {
     setMarkError(false);
     try {
       await api.entities.Notification.bulkUpdate(unreadIds.map((id) => ({ id, read: true })));
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      // only the ones marked: a newer one that arrived meanwhile stays unread
+      const marked = new Set(unreadIds);
+      setNotifications((prev) => prev.map((n) => (marked.has(n.id) ? { ...n, read: true } : n)));
     } catch {
       setMarkError(true);
     }

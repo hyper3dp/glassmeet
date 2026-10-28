@@ -29,17 +29,18 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
       setLoading(true);
       setLoadFailed(false);
       try {
-        const events = await api.entities.EventType.filter({ created_by_id: profile.id, active: true }, '-created_date');
-        setEventTypes(events);
-        if (events.length) setSelectedEvent(events[0]);
-
-        const [r, e, b, h] = await Promise.all([
+        // all at once: none of these needs another's answer
+        const [events, r, e, b, h] = await Promise.all([
+          api.entities.EventType.filter({ created_by_id: profile.id, active: true }, '-created_date'),
           api.entities.AvailabilityRule.filter({ created_by_id: profile.id }),
           api.entities.AvailabilityException.filter({ created_by_id: profile.id }),
           api.entities.BookedSlot.filter({ host_id: profile.id, status: 'confirmed' }),
           // public holidays the host blocks are closed on the booking page too
           api.holidays.forHost(profile.id).catch(() => []),
         ]);
+        setEventTypes(events);
+        // keep the event picked before a reload while it's still there
+        setSelectedEvent((cur) => events.find((x) => x.id === cur?.id) || events[0] || null);
         setRules(r);
         setExceptions([...e, ...holidayExceptions(h)]);
         setBookedSlots(b);

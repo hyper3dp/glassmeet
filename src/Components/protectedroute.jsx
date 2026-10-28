@@ -10,7 +10,7 @@ const DefaultFallback = () => (
 );
 
 export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
-  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth } = useAuth();
+  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, logout } = useAuth();
 
   useEffect(() => {
     if (!authChecked && !isLoadingAuth) {
@@ -31,7 +31,11 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
         <div role="alert" className="min-h-screen flex flex-col items-center justify-center gap-3 px-4 text-center">
           <h1 className="text-xl font-bold">Your account couldn’t be loaded</h1>
           <p className="max-w-sm text-sm text-muted-foreground">You’re still signed in. Check your connection and try again.</p>
-          <button type="button" onClick={() => checkUserAuth()} className="mt-2 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold transition-all duration-200 hover:brightness-110">Try again</button>
+          {/* signing out is the way out when retrying can't help (e.g. the account was deleted) */}
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={() => checkUserAuth()} className="h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold transition-all duration-200 hover:brightness-110">Try again</button>
+            <button type="button" onClick={() => logout()} className="h-10 px-5 rounded-full border border-input text-sm font-semibold transition-all duration-200 hover:bg-secondary">Sign out</button>
+          </div>
         </div>
       );
     }

@@ -75,8 +75,9 @@ export default function Settings({ profile, updateProfile }) {
     const host = { host_timezone: value.timezone || null, host_name: value.full_name.trim() || null, host_photo: value.profile_photo || null };
     const changed = Object.fromEntries(Object.entries(host).filter(([k, v]) => v !== savedHost.current[k] && (v || k !== 'host_timezone')));
     if (Object.keys(changed).length) {
-      const events = await api.entities.EventType.filter({ created_by_id: profile.id });
-      await Promise.all(events.map((e) => api.entities.EventType.update(e.id, changed)));
+      // one request for all of them, not one per event type
+      const events = await api.entities.EventType.filter({ created_by_id: profile.id }, undefined, undefined, 'id');
+      if (events.length) await api.entities.EventType.bulkUpdate(events.map((e) => ({ id: e.id, value: changed })));
       savedHost.current = { ...savedHost.current, ...changed };
     }
   };

@@ -8,6 +8,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.localStorage,
+    // no explicit storage: reading window.localStorage throws when the browser blocks site data
+    // (e.g. "block all cookies"), which would blank every page; supabase-js checks for it and
+    // falls back to memory
   },
 });

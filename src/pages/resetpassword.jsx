@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import AuthLayout from "@/components/Authlayout.jsx";
-import { appPath } from "@/lib/authReturnTo";
+import { appPath, authErrorMessage } from "@/lib/authReturnTo";
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
@@ -34,18 +34,19 @@ export default function ResetPassword() {
       setError("Passwords do not match");
       return;
     }
+    if (loading) return;
     setLoading(true);
     try {
       if (!(await api.auth.hasSession())) {
         setLinkValid(false);
+        setLoading(false);
         return;
       }
       await api.auth.resetPassword({ newPassword });
-      // the reset link already signed the user in
+      // the reset link already signed the user in; stay busy while the dashboard loads
       window.location.href = appPath('/dashboard');
     } catch (err) {
-      setError(err.message || "Failed to reset password");
-    } finally {
+      setError(authErrorMessage(err, "Failed to reset password"));
       setLoading(false);
     }
   };

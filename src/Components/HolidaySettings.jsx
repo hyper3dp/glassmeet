@@ -34,7 +34,10 @@ export default function HolidaySettings({ profile, updateProfile }) {
   const wantsReview = new URLSearchParams(location.search).get('holidays') === 'review';
 
   useEffect(() => {
-    api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 500).then(setBookings).catch(() => setBookings([]));
+    // only meetings still ahead can clash with a holiday
+    api.entities.Booking.filter({ host_id: profile.id, start_time: { gte: new Date().toISOString() } }, 'start_time', 500,
+      'id, event_type_id, guest_name, guest_phone, start_time, timezone, status, approval_status')
+      .then(setBookings).catch(() => setBookings([]));
   }, [profile.id]);
 
   useEffect(() => {
@@ -166,7 +169,8 @@ function ClashRow({ clash, timezone, state, onKeep, onCancelled }) {
     setBusy(true);
     setError('');
     try {
-      await api.entities.Booking.update(booking.id, { status: 'cancelled' });
+      const saved = await api.entities.Booking.update(booking.id, { status: 'cancelled' });
+      if (!saved) throw new Error('This meeting may have been deleted. Reload the page.');
       onCancelled();
     } catch (e) {
       setError(e?.message || 'Could not cancel this meeting.');

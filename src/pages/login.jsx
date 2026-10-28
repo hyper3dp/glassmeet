@@ -8,7 +8,7 @@ import { LogIn, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import LinkedInIcon from "@/components/linkedinicon.jsx";
-import { appPath, safeReturnTo } from "@/lib/authReturnTo";
+import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
 
 // an auth link that failed (expired, already used, Google cancelled) leaves its message here;
 // see the inline script in index.html
@@ -39,26 +39,27 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setUnconfirmed(false);
+    if (loading) return;
     setLoading(true);
     try {
       await api.auth.loginViaEmailPassword(email, password);
+      // stays "Logging in..." while the page loads, so the button can't sign in twice
       window.location.href = appPath(returnTo);
     } catch (err) {
       setUnconfirmed(err.code === "email_not_confirmed");
-      setError(err.message || "Invalid email or password");
-    } finally {
+      setError(err.code === "invalid_credentials" ? "That email and password don’t match. Try again, or reset your password." : authErrorMessage(err, "Invalid email or password"));
       setLoading(false);
     }
   };
 
   const handleGoogle = () => {
     setError("");
-    api.auth.loginWithGoogle(returnTo).catch((err) => setError(err.message || "Could not start Google sign-in"));
+    api.auth.loginWithGoogle(returnTo).catch((err) => setError(authErrorMessage(err, "Could not start Google sign-in")));
   };
 
   const handleLinkedIn = () => {
     setError("");
-    api.auth.loginWithLinkedIn(returnTo).catch((err) => setError(err.message || "Could not start LinkedIn sign-in"));
+    api.auth.loginWithLinkedIn(returnTo).catch((err) => setError(authErrorMessage(err, "Could not start LinkedIn sign-in")));
   };
 
   return (

@@ -16,10 +16,15 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('GlassMeet page error:', error, info?.componentStack);
-    const chunkFailed = /Loading chunk|dynamically imported module|Importing a module script failed/i.test(String(error?.message));
+    // Chrome/Firefox: "...dynamically imported module", Safari: "Importing a module script failed",
+    // Vite's preload helper: "Unable to preload CSS"
+    const chunkFailed = error?.name === 'ChunkLoadError'
+      || /Loading chunk|dynamically imported module|Importing a module script failed|Unable to preload CSS/i.test(String(error?.message));
+    // offline, a reload can't fetch the new files either and would leave the browser's error page
+    if (!chunkFailed || navigator.onLine === false) return;
     try {
       const last = Number(sessionStorage.getItem('gm-chunk-reload') || 0);
-      if (chunkFailed && Date.now() - last > 30000) {
+      if (Date.now() - last > 30000) {
         sessionStorage.setItem('gm-chunk-reload', String(Date.now()));
         window.location.reload();
       }

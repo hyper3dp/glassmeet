@@ -14,15 +14,15 @@ const foldLine = icsFold;
 
 // Build the event description block with guest + meeting details
 const buildEventDescription = (booking, eventType, host) => {
-  const lines = [
-    eventType?.description || '',
-    '',
+  // email is optional on some events: no empty "Email:" line
+  const details = [
     `Guest: ${booking.guest_name || ''}`,
-    `Email: ${booking.guest_email || ''}`,
-    `WhatsApp: ${booking.guest_phone || ''}`,
+    booking.guest_email ? `Email: ${booking.guest_email}` : '',
+    booking.guest_phone ? `WhatsApp: ${booking.guest_phone}` : '',
     booking.guest_notes ? `Notes: ${booking.guest_notes}` : '',
-  ].filter(Boolean);
-  return lines.join('\n');
+  ].filter(Boolean).join('\n');
+  // a blank line between the event's description and the guest's details
+  return eventType?.description ? `${eventType.description}\n\n${details}` : details;
 };
 
 // Generate a full .ics calendar string for a booking

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import AuthLayout from '@/components/Authlayout.jsx';
+import { authErrorMessage } from '@/lib/authReturnTo';
 
 export default function Verify() {
   const [email, setEmail] = useState('');
@@ -23,14 +24,14 @@ export default function Verify() {
 
   const handleVerify = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     setLoading(true);
     try {
-      await api.auth.verifyOtp({ email, token });
+      await api.auth.verifyOtp({ email, token: token.trim() });
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.message || 'Invalid verification code');
-    } finally {
+      setError(authErrorMessage(err, 'Invalid verification code'));
       setLoading(false);
     }
   };

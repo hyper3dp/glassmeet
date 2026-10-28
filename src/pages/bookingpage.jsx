@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, lazy, Suspense } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import {
@@ -12,10 +12,12 @@ import {
 import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
 import { holidayExceptions } from '@/lib/holidays.js';
-import QRCodeModal from '@/components/QrcodeModal.jsx';
 import { appPath } from '@/lib/authReturnTo';
 import { isEmbed, useEmbedResize } from '@/lib/embed.js';
 import { useAuth } from '@/lib/Authcontext.jsx';
+
+// guests rarely open it (desktop only), so its dialog code loads on demand
+const QRCodeModal = lazy(() => import('@/components/QrcodeModal.jsx'));
 
 export default function BookingPage() {
   const { eventTypeId } = useParams();
@@ -106,6 +108,7 @@ export default function BookingPage() {
   };
   const [customAnswers, setCustomAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
   // the picked time was taken while the guest filled in the form
   const [slotGone, setSlotGone] = useState(false);
@@ -137,16 +140,24 @@ export default function BookingPage() {
   const hostTz = event?.host_timezone || 'UTC'; // same fallback as the server's booking check
   const emailRequired = event?.email_required ?? true;
 
+  // asked once per shown month (a new cursor for the same month doesn't ask again)
+  const cursorYear = cursor.getFullYear(), cursorMonth = cursor.getMonth();
   useEffect(() => {
-    if (!event) return;
-    const timeMin = new Date(cursor.getFullYear(), cursor.getMonth(), 1).toISOString();
-    const timeMax = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1).toISOString();
+    if (!event) return undefined;
+    // a day either side: the month's first and last days in the guest's zone can reach into
+    // the neighbouring months in this browser's
+    const timeMin = new Date(cursorYear, cursorMonth, 0).toISOString();
+    const timeMax = new Date(cursorYear, cursorMonth + 1, 2).toISOString();
     // Google Calendar busy times are optional (connections are "coming soon"); without them,
     // slots come from the host's availability and GlassMeet bookings.
+    let current = true; // a slow answer for a month the guest has left doesn't overwrite this one
+    // nothing busy keeps the same empty list, so the times aren't worked out again for nothing
+    const take = (busy) => { if (current) setGoogleBusy((cur) => (busy.length || cur.length ? busy : cur)); };
     api.google.busy(event.created_by_id, timeMin, timeMax)
-      .then((busy) => setGoogleBusy(Array.isArray(busy) ? busy : []))
-      .catch(() => setGoogleBusy([]));
-  }, [event, cursor]);
+      .then((busy) => take(Array.isArray(busy) ? busy : []))
+      .catch(() => take([]));
+    return () => { current = false; };
+  }, [event, cursorYear, cursorMonth]);
 
   useEffect(() => { load(); }, []);
 
@@ -179,15 +190,18 @@ export default function BookingPage() {
     setLoading(false);
   };
 
+  // GlassMeet bookings and Google busy times, merged once for every slot computation below
+  const busyTimes = useMemo(() => [...bookedSlots, ...googleBusy], [bookedSlots, googleBusy]);
+
   // generate slots when a date is selected
   useEffect(() => {
     if (!selectedDate || !event) { setSlots([]); return; }
-    const s = generateSlots(selectedDate, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz, guestTz);
+    const s = generateSlots(selectedDate, event, rules, exceptions, busyTimes, hostTz, guestTz);
     setSlots(s);
     // keep the guest's pick if it's still free (a background refresh shouldn't throw them out)
     setSelectedSlot((cur) => (cur && s.some((x) => x.date.getTime() === cur.date.getTime()) ? cur : null));
     setPendingSlot(null);
-  }, [selectedDate, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
+  }, [selectedDate, event, rules, exceptions, busyTimes, hostTz, guestTz]);
 
   const color = event?.color || '#2B7A75';
 
@@ -208,27 +222,25 @@ export default function BookingPage() {
   const openDays = useMemo(() => {
     const open = new Set();
     if (!event) return open;
-    const busy = [...bookedSlots, ...googleBusy];
     for (const date of monthDays) {
       if (!date || isPastDate(date, today) || !isWithinMaxFuture(date, bookingWindowDays(event), today)) continue;
-      if (generateSlots(date, event, rules, exceptions, busy, hostTz, guestTz).length) open.add(date.getTime());
+      if (generateSlots(date, event, rules, exceptions, busyTimes, hostTz, guestTz).length) open.add(date.getTime());
     }
     return open;
-  }, [monthDays, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz, todayKey]);
+  }, [monthDays, event, rules, exceptions, busyTimes, hostTz, guestTz, todayKey]);
   const dayHasSlots = (date) => openDays.has(date.getTime());
 
   // The first day from today with a free time, looking to the end of the booking window (or a
   // year for events with their own end). null: nothing left to book.
   const nextOpen = useMemo(() => {
     if (!event || loading) return null;
-    const busy = [...bookedSlots, ...googleBusy];
     const days = bookingWindowDays(event) ?? 366;
     for (let i = 0; i <= days; i++) {
       const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-      if (generateSlots(date, event, rules, exceptions, busy, hostTz, guestTz).length) return date;
+      if (generateSlots(date, event, rules, exceptions, busyTimes, hostTz, guestTz).length) return date;
     }
     return null;
-  }, [event, loading, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz, todayKey]);
+  }, [event, loading, rules, exceptions, busyTimes, hostTz, guestTz, todayKey]);
 
   // open on the month of the first free day (an event with later dates, or a full month)
   // a link with ?at=<time> (from the host's "Find a time") opens on that time's day in the
@@ -240,7 +252,7 @@ export default function BookingPage() {
     const at = Date.parse(new URLSearchParams(window.location.search).get('at') || '');
     const linked = Number.isNaN(at) ? null : dateInZone(at, guestTz);
     if (linked && linked >= nextOpen && isWithinMaxFuture(linked, bookingWindowDays(event), today)
-      && generateSlots(linked, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz, guestTz).length) {
+      && generateSlots(linked, event, rules, exceptions, busyTimes, hostTz, guestTz).length) {
       setCursor(new Date(linked.getFullYear(), linked.getMonth(), 1));
       setSelectedDate(linked);
       return;
@@ -271,24 +283,34 @@ export default function BookingPage() {
         }
       }
     }
+    // one booking per click, however fast the button is pressed again
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
+    // the time went (taken, full, or no longer bookable): back to the times, freshly loaded
+    const timeGone = (message) => {
+      setError(message);
+      setSlotGone(true);
+      backToTimes(); // the message shows above the times
+      api.entities.BookedSlot.filter({ host_id: event.created_by_id, status: 'confirmed' })
+        .then(setBookedSlots).catch(() => { /* the times shown stay as they were */ });
+    };
     try {
       const start = selectedSlot.date.toISOString();
       // the booking ends when the meeting does; buffers only keep neighbouring bookings away
-      const end = new Date(selectedSlot.date.getTime() + event.duration * 60000);
-      // Re-check against fresh bookings with the same rules that built the list: taken, full,
-      // now in the past or inside the notice period, or past the booking window.
-      const fresh = await api.entities.BookedSlot.filter({ host_id: event.created_by_id, status: 'confirmed' });
+      const end = new Date(selectedSlot.date.getTime() + (event.duration || 30) * 60000);
+      // Re-check with the same rules that built the list, as of now: in the past or inside the
+      // notice period, past the booking window, or clashing with a time known to be busy. A
+      // booking someone else just made is caught by the database, which also stops two guests
+      // taking the same time at once.
       const stillFree = isWithinMaxFuture(selectedDate, bookingWindowDays(event), today)
-        && generateSlots(selectedDate, event, rules, exceptions, [...fresh, ...googleBusy], hostTz, guestTz)
+        && generateSlots(selectedDate, event, rules, exceptions, busyTimes, hostTz, guestTz)
           .some((x) => x.date.getTime() === selectedSlot.date.getTime());
       if (!stillFree) {
-        setError(isGroup ? 'Sorry, that time just filled up or is no longer available. Please pick another.' : 'Sorry, that time is no longer available. Please pick another.');
-        setBookedSlots(fresh); // refreshes the times shown
-        setSlotGone(true);
+        timeGone(isGroup ? 'Sorry, that time just filled up or is no longer available. Please pick another.' : 'Sorry, that time is no longer available. Please pick another.');
         setSubmitting(false);
-        backToTimes(); // the message shows above the times
+        submittingRef.current = false;
         return;
       }
 
@@ -305,27 +327,33 @@ export default function BookingPage() {
         end_time: end.toISOString(),
         timezone: hostTz,
         meeting_url: event.meeting_url || '',
-        status: requiresApproval ? 'confirmed' : 'confirmed',
+        status: 'confirmed',
         approval_status: requiresApproval ? 'pending' : 'approved',
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
-      // the meeting link is private until booked; ask for it now (null while awaiting approval)
-      const link = await api.bookings.meetingLink(booking.id);
+      // the meeting link is private until booked; ask for it now (null while awaiting approval).
+      // The booking is made by now, so a failure here must not read as a failed booking.
+      const link = await api.bookings.meetingLink(booking.id).catch(() => undefined);
       if (link !== undefined) booking.meeting_url = link || '';
       // bookPath: this page's own link (it may be a private one), for "pick another time"
       const state = { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo }, bookPath: `/book/${eventTypeId}`, guestTz };
       // kept for this tab so the confirmation survives a refresh (guests can't read bookings back)
       try { sessionStorage.setItem(`gm-booking-${booking.id}`, JSON.stringify(state)); } catch { /* storage unavailable */ }
       navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state, replace: true });
+      return; // leaving the page; the button stays disabled until it does
     } catch (e) {
       // the database's own booking checks speak to guests; anything else stays generic
-      const friendly = /^(Sorry, that time|That time can no longer|This event is not taking|Too many bookings)/.test(e.message || '');
-      if (friendly && /^(Sorry, that time|That time can no longer)/.test(e.message)) setSlotGone(true);
-      setError(friendly ? e.message : /fetch|network/i.test(e.message || '')
-        ? 'We couldn’t reach GlassMeet. Check your connection and try again; your details are kept.'
-        : 'Something went wrong. Your details are kept; please try again.');
+      const message = e?.message || '';
+      if (/^(Sorry, that time|That time can no longer)/.test(message)) timeGone(message);
+      else if (/^(This event is not taking|Too many bookings)/.test(message)) setError(message);
+      else {
+        setError(/fetch|network/i.test(message)
+          ? 'We couldn’t reach GlassMeet. Check your connection and try again; your details are kept.'
+          : 'Something went wrong. Your details are kept; please try again.');
+      }
     }
+    submittingRef.current = false;
     setSubmitting(false);
   };
 
@@ -637,7 +665,7 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {showQR && <QRCodeModal url={bookingUrl} open={showQR} onClose={() => setShowQR(false)} />}
+      {showQR && <Suspense fallback={null}><QRCodeModal url={bookingUrl} open={showQR} onClose={() => setShowQR(false)} /></Suspense>}
     </div>
   );
 }

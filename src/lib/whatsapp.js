@@ -18,16 +18,18 @@ export const buildWhatsAppShareLink = (message) => {
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 };
 
-// Format a Date for display in a given timezone
+// Format a Date for display in a given timezone. Building an Intl.DateTimeFormat is slow, and
+// lists of meetings call these once per row, so each formatter is made once per zone.
+const formatters = new Map();
+const formatter = (kind, options, timezone) => {
+  const key = `${kind}|${timezone || ''}`;
+  if (!formatters.has(key)) formatters.set(key, new Intl.DateTimeFormat('en-US', { ...options, timeZone: timezone }));
+  return formatters.get(key);
+};
+
 export const formatMeetingDate = (date, timezone) => {
   try {
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: timezone,
-    }).format(new Date(date));
+    return formatter('date', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, timezone).format(new Date(date));
   } catch {
     return new Date(date).toLocaleDateString();
   }
@@ -35,11 +37,7 @@ export const formatMeetingDate = (date, timezone) => {
 
 export const formatMeetingTime = (date, timezone) => {
   try {
-    return new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: timezone,
-    }).format(new Date(date));
+    return formatter('time', { hour: 'numeric', minute: '2-digit' }, timezone).format(new Date(date));
   } catch {
     return new Date(date).toLocaleTimeString();
   }

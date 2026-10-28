@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/localApi';
 import { BarChart3, TrendingUp, Clock, Users, Calendar } from 'lucide-react';
 import { GlassCard, EmptyState, Spinner, LoadError, PageHeader } from '@/components/glass';
@@ -16,9 +16,37 @@ const inZone = (iso, tz) => {
   for (const { type, value } of f.formatToParts(new Date(iso))) p[type] = value;
   return { day: WEEKDAYS.indexOf(p.weekday), hour: Number(p.hour), month: `${p.year}-${p.month}` };
 };
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-} from 'recharts';
+
+// recharts is most of this page's weight: it loads in its own chunk, side by side with the
+// bookings, so the numbers can show before the chart's code has arrived
+// (one module per part: importing the 'recharts' index here would pull in every chart type)
+const loadChart = () => Promise.all([
+  import('recharts/es6/chart/BarChart'), import('recharts/es6/cartesian/Bar'), import('recharts/es6/cartesian/XAxis'),
+  import('recharts/es6/cartesian/YAxis'), import('recharts/es6/component/Tooltip'),
+  import('recharts/es6/component/ResponsiveContainer'), import('recharts/es6/cartesian/CartesianGrid'),
+]).then((parts) => Object.assign({}, ...parts));
+const BookingsChart = lazy(() => loadChart().then(({ BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid }) => ({
+  default: function BookingsChart({ data }) {
+    return (
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data}>
+          <CartesianGrid vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
+          <YAxis axisLine={false} tickLine={false} width={28} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
+          <Tooltip
+            cursor={{ fill: 'var(--secondary)' }}
+            contentStyle={{ background: 'var(--popover)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', boxShadow: 'var(--shadow-pop)' }}
+          />
+          <Bar dataKey="bookings" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  },
+})));
+
+// the fields the numbers below use
+const BOOKING_COLUMNS = 'id, status, approval_status, event_name, start_time, end_time, attendee_count';
+const BOOKINGS_LIMIT = 1000;
 
 export default function Analytics({ profile }) {
   const [bookings, setBookings] = useState([]);
@@ -33,10 +61,11 @@ export default function Analytics({ profile }) {
   useEffect(() => {
     (async () => {
       setLoadFailed(false);
+      loadChart().catch(() => {});
       try {
         const [b, e] = await Promise.all([
-          api.entities.Booking.filter({ host_id: profile.id }, '-created_date', 200),
-          api.entities.EventType.filter({ created_by_id: profile.id }, '-created_date'),
+          api.entities.Booking.filter({ host_id: profile.id }, '-created_date', BOOKINGS_LIMIT, BOOKING_COLUMNS),
+          api.entities.EventType.filter({ created_by_id: profile.id }, '-created_date', undefined, 'id'),
         ]);
         setBookings(b);
         setEventTypes(e);
@@ -51,7 +80,8 @@ export default function Analytics({ profile }) {
     const total = bookings.length;
     const completed = bookings.filter((b) => b.status === 'completed').length;
     const cancelled = bookings.filter((b) => b.status === 'cancelled').length;
-    const confirmed = bookings.filter((b) => b.status === 'confirmed').length;
+    // requests still waiting for approval aren't confirmed yet
+    const confirmed = bookings.filter((b) => b.status === 'confirmed' && b.approval_status !== 'pending').length;
 
     // Most popular event
     const eventCounts = {};
@@ -118,7 +148,7 @@ export default function Analytics({ profile }) {
       <PageHeader title="Analytics" description="How guests book with you." />
 
       <dl className="grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card">
-        <StatCard label="Total booked" value={stats.total} />
+        <StatCard label="Total booked" value={stats.total >= BOOKINGS_LIMIT ? `${BOOKINGS_LIMIT}+` : stats.total} />
         <StatCard label="Confirmed" value={stats.confirmed} />
         <StatCard label="Canceled" value={stats.cancelled} />
         <StatCard label="Average length" value={`${stats.avgDuration} min`} />
@@ -142,18 +172,9 @@ export default function Analytics({ profile }) {
           {chartData.length === 0 ? (
             <EmptyState icon={BarChart3} title="No bookings yet" description="This chart fills in as guests book." />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData}>
-                <CartesianGrid vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
-                <YAxis axisLine={false} tickLine={false} width={28} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} />
-                <Tooltip
-                  cursor={{ fill: 'var(--secondary)' }}
-                  contentStyle={{ background: 'var(--popover)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', boxShadow: 'var(--shadow-pop)' }}
-                />
-                <Bar dataKey="bookings" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-[200px]" />}>
+              <BookingsChart data={chartData} />
+            </Suspense>
           )}
         </GlassCard>
       </div>

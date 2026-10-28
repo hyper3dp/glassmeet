@@ -13,7 +13,19 @@ export function appPath(path = '/') {
   const basePath = configuredBase.endsWith('/') ? configuredBase : `${configuredBase}/`;
   const value = String(path || '/');
   if (value.startsWith(basePath)) return value;
+  // the base without its trailing slash ("/glassmeet") is the app root, not a page inside it
+  if (`${value}/` === basePath) return basePath;
   return `${basePath}${value.replace(/^\/+/, '')}`;
+}
+
+// What to show for a failed auth request: a dropped connection reads "Failed to fetch" otherwise.
+export function authErrorMessage(err, fallback) {
+  const message = err?.message || '';
+  if (!message) return fallback;
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
+    return 'Couldn’t reach GlassMeet. Check your connection and try again.';
+  }
+  return message;
 }
 
 export function safeReturnTo() {

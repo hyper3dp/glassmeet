@@ -1,4 +1,3 @@
-import { Toaster } from "@/components/ui/toaster";
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
@@ -32,6 +31,8 @@ const CalendarConnections = lazy(PAGES.calendarConnections);
 const Analytics = lazy(PAGES.analytics);
 const Terms = lazy(PAGES.terms);
 const Privacy = lazy(PAGES.privacy);
+// Toasts wait in sonner until the Toaster mounts, so it needn't hold up the first render
+const Toaster = lazy(() => import('@/components/ui/toaster').then((m) => ({ default: m.Toaster })));
 
 preloadPage(window.location.pathname.slice(import.meta.env.BASE_URL.length - 1));
 
@@ -126,7 +127,7 @@ function App() {
             <ScrollToTop />
             <AuthenticatedApp />
           </Router>
-          <Toaster />
+          <Suspense fallback={null}><Toaster /></Suspense>
       </AuthProvider>
     </ThemeProvider>
   );

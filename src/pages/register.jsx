@@ -8,7 +8,7 @@ import { UserPlus, Mail, Lock, Loader2, User, Eye, EyeOff } from "lucide-react";
 import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import LinkedInIcon from "@/components/linkedinicon.jsx";
-import { appPath, safeReturnTo } from "@/lib/authReturnTo";
+import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -28,29 +28,32 @@ export default function Register() {
       setError("Use at least 6 characters for your password.");
       return;
     }
+    if (loading) return;
     setLoading(true);
     try {
       // the name is what guests see on your booking pages
       const result = await api.auth.register({ email, password, full_name: name.trim(), returnTo: safeReturnTo() });
-      // signed in straight away when email confirmation is off
-      if (result.access_token) window.location.assign(appPath(safeReturnTo()));
-      else setNotice("Check your email for a confirmation link before signing in.");
+      // signed in straight away when email confirmation is off; stay busy while the app loads
+      if (result.access_token) {
+        window.location.assign(appPath(safeReturnTo()));
+        return;
+      }
+      setNotice("Check your email for a confirmation link before signing in.");
     } catch (err) {
       setExists(err.code === "user_exists");
-      setError(err.message || "Registration failed");
-    } finally {
-      setLoading(false);
+      setError(authErrorMessage(err, "Registration failed"));
     }
+    setLoading(false);
   };
 
   const handleGoogle = () => {
     setError("");
-    api.auth.loginWithGoogle(safeReturnTo()).catch((err) => setError(err.message || "Could not start Google sign-in"));
+    api.auth.loginWithGoogle(safeReturnTo()).catch((err) => setError(authErrorMessage(err, "Could not start Google sign-in")));
   };
 
   const handleLinkedIn = () => {
     setError("");
-    api.auth.loginWithLinkedIn(safeReturnTo()).catch((err) => setError(err.message || "Could not start LinkedIn sign-in"));
+    api.auth.loginWithLinkedIn(safeReturnTo()).catch((err) => setError(authErrorMessage(err, "Could not start LinkedIn sign-in")));
   };
 
   return (

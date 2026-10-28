@@ -36,7 +36,9 @@ const notDeployed = (error) => error && (error.code === 'PGRST202' || error.code
 let googleBusyMissing = false; // the google-calendar edge function isn't there (see google.busy)
 let meCache = null;
 const sessionUser = async () => (await supabase.auth.getSession()).data.session?.user || null;
-supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'USER_UPDATED') meCache = null; });
+// SIGNED_IN also fires when a tab regains focus; the cache is keyed by user id, so another user
+// signing in misses it anyway, and only signing out (or a changed login) needs to clear it
+supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') meCache = null; });
 
 const entities = new Proxy({}, {
   get: (_target, entityName) => {
@@ -70,8 +72,9 @@ const entities = new Proxy({}, {
     }
 
     return {
-      filter: async (where = {}, sort, limit) => {
-        let query = supabase.from(table).select('*');
+      // columns: a select list ('id, start_time, ...') when a page needs only a few fields
+      filter: async (where = {}, sort, limit, columns = '*') => {
+        let query = supabase.from(table).select(columns);
         
         // Simple filter mapping: a value matches exactly, an array is "one of", and
         // { gte: x } is "x or later"
@@ -118,15 +121,21 @@ const entities = new Proxy({}, {
         return data?.[0] ?? null;
       },
       bulkUpdate: async (values) => {
-        // Supabase doesn't support bulk update with different values per ID in one call
-        // We map them to individual updates
-        const results = [];
+        // Supabase can't give each id its own values in one call, so rows that get the same
+        // change (e.g. "mark all read") share one update, and the groups run side by side
+        const groups = new Map();
         for (const { id, value, ...fields } of values) {
-          const { data, error } = await supabase.from(table).update(value || fields).eq('id', id).select().single();
-          if (error) throw new Error(error.message);
-          results.push(data);
+          const change = value || fields;
+          const key = JSON.stringify(change);
+          if (!groups.has(key)) groups.set(key, { change, ids: [] });
+          groups.get(key).ids.push(id);
         }
-        return results;
+        const results = await Promise.all([...groups.values()].map(async ({ change, ids }) => {
+          const { data, error } = await supabase.from(table).update(change).in('id', ids).select();
+          if (error) throw new Error(error.message);
+          return data;
+        }));
+        return results.flat();
       },
       delete: async (id) => {
         const { error } = await supabase.from(table).delete().eq('id', id);
@@ -163,6 +172,11 @@ export const api = {
           }])
           .select()
           .single();
+        // another tab (or the sign-up trigger) made it first: read that one
+        if (createError?.code === '23505') {
+          const existing = await getProfile(user.id);
+          if (existing) return existing;
+        }
         if (createError) throw new Error(createError.message);
         return newProfile;
       })();
@@ -204,6 +218,12 @@ export const api = {
         password: value.password,
         options: { emailRedirectTo: `${window.location.origin}${appPath(value.returnTo || '/')}`, data: value.full_name ? { full_name: value.full_name } : undefined },
       });
+      // with confirmations off, Supabase reports an existing account as an error instead
+      if (error?.code === 'user_already_exists') {
+        const err = new Error('An account with this email already exists. Log in or reset your password.');
+        err.code = 'user_exists';
+        throw err;
+      }
       if (error) throw new Error(error.message);
       // with confirmations on, an address that already has an account comes back with no
       // identities and no error, and no email is sent
@@ -250,7 +270,10 @@ export const api = {
       return { user: await getProfile(data.user.id), session: data.session };
     },
     logout: async () => {
-      await supabase.auth.signOut();
+      // signOut reports a failure (e.g. offline) instead of throwing; then at least end the
+      // session on this device, so the login page doesn't find it still signed in
+      const { error } = await supabase.auth.signOut();
+      if (error) await supabase.auth.signOut({ scope: 'local' });
     },
     // Deletes the signed-in account and all its data: profile photos first (Storage doesn't
     // cascade), then the login, which takes every table with it (see delete_my_account()).

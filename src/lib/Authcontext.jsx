@@ -1,8 +1,18 @@
-import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '@/lib/localApi';
 import { appPath } from '@/lib/authReturnTo';
 
 const AuthContext = createContext();
+
+// a profile request that never answers (stalled network) must not leave a spinner up forever
+const PROFILE_TIMEOUT_MS = 20000;
+const withTimeout = (promise) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('Loading your account is taking too long.')), PROFILE_TIMEOUT_MS);
+  promise.then(
+    (value) => { clearTimeout(timer); resolve(value); },
+    (error) => { clearTimeout(timer); reject(error); },
+  );
+});
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -13,23 +23,29 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
   const userId = useRef(null);
+  // the user a running check is loading, so the same user's repeat events don't start another
+  const checkingFor = useRef(null);
+  const authed = useRef(false);
   // each check gets a number; a sign-out or a newer check makes older results stale
   const checkSeq = useRef(0);
 
   // quiet: refresh the user without showing the full-screen loader (and unmounting the app)
-  const checkUserAuth = useCallback(async ({ quiet = false } = {}) => {
+  const checkUserAuth = useCallback(async ({ quiet = false, forId = null } = {}) => {
     if (!quiet) setIsLoadingAuth(true);
     const mine = ++checkSeq.current;
+    checkingFor.current = forId;
     try {
-      const currentUser = await api.auth.me();
+      const currentUser = await withTimeout(api.auth.me());
       if (mine !== checkSeq.current) return; // signed out (or checked again) meanwhile
       if (currentUser) {
         userId.current = currentUser.id;
+        authed.current = true;
         setUser(currentUser);
         setIsAuthenticated(true);
         setAuthError(null);
       } else {
         userId.current = null;
+        authed.current = false;
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -41,18 +57,20 @@ export const AuthProvider = ({ children }) => {
       const signedIn = await api.auth.hasSession().catch(() => false);
       if (mine !== checkSeq.current) return;
       userId.current = null;
+      authed.current = false;
       setUser(null);
       setIsAuthenticated(false);
       setAuthError(signedIn ? { type: 'profile_failed', message: error?.message || '' } : null);
     } finally {
       if (mine === checkSeq.current) {
+        checkingFor.current = null;
         setIsLoadingAuth(false);
         setAuthChecked(true);
       }
     }
   }, []);
 
-  const checkAppState = useCallback(async () => {
+  const loadPublicSettings = useCallback(async () => {
     setIsLoadingPublicSettings(true);
     try {
       const settings = await api.app.getPublicSettings();
@@ -62,32 +80,44 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoadingPublicSettings(false);
     }
-    await checkUserAuth();
-  }, [checkUserAuth]);
+  }, []);
+
+  const checkAppState = useCallback(async () => {
+    await Promise.all([loadPublicSettings(), checkUserAuth()]);
+  }, [loadPublicSettings, checkUserAuth]);
 
   useEffect(() => {
-    checkAppState();
-  }, [checkAppState]);
+    loadPublicSettings();
+  }, [loadPublicSettings]);
 
   useEffect(() => {
-    // Supabase also fires SIGNED_IN when a hidden tab comes back and TOKEN_REFRESHED hourly;
-    // those are the same user, so nothing needs to reload.
+    // The first event, INITIAL_SESSION, comes from storage once any sign-in link in the URL has
+    // been read: no session means signed out straight away, with no network request. Supabase
+    // also fires SIGNED_IN when a hidden tab comes back and TOKEN_REFRESHED hourly; those are the
+    // same user, so nothing needs to reload. Keep this callback synchronous: Supabase holds its
+    // auth lock while it runs, and awaiting another auth call inside it would deadlock.
     const subscriptionResult = api.auth.onAuthStateChange?.((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         checkSeq.current += 1; // a profile still loading must not sign them back in
+        checkingFor.current = null;
         setIsLoadingAuth(false);
         setAuthChecked(true);
         setAuthError(null);
         userId.current = null;
+        authed.current = false;
         setUser(null);
         setIsAuthenticated(false);
         return;
       }
-      if (event === 'PASSWORD_RECOVERY' && !window.location.pathname.endsWith('/reset-password')) {
+      if (event === 'PASSWORD_RECOVERY' && !/\/reset-password\/?$/.test(window.location.pathname)) {
         window.location.replace(appPath('/reset-password'));
         return;
       }
-      if (session.user && session.user.id !== userId.current) checkUserAuth({ quiet: authChecked });
+      const id = session.user?.id;
+      if (!id || id === userId.current || id === checkingFor.current) return;
+      // a different account (signed in on another tab) swaps quietly; a first sign-in shows the
+      // loader, so a protected page waits for the profile instead of bouncing to Log in
+      checkUserAuth({ quiet: authed.current, forId: id });
     });
 
     const unsubscribe = subscriptionResult?.data?.subscription?.unsubscribe || subscriptionResult?.unsubscribe;
@@ -97,39 +127,47 @@ export const AuthProvider = ({ children }) => {
         unsubscribe();
       }
     };
-  }, [checkUserAuth, authChecked]);
+  }, [checkUserAuth]);
 
-  const logout = async (shouldRedirect = true) => {
+  const logout = useCallback(async (shouldRedirect = true) => {
     try {
       await api.auth.logout();
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
+      checkSeq.current += 1;
+      checkingFor.current = null;
+      userId.current = null;
+      authed.current = false;
       setUser(null);
       setIsAuthenticated(false);
+      setAuthError(null);
+      setIsLoadingAuth(false);
       setAuthChecked(true);
       if (shouldRedirect) window.location.assign(appPath('/login'));
     }
-  };
+  }, []);
 
-  const navigateToLogin = () => {
-    window.location.assign(`${appPath('/login')}?returnTo=${encodeURIComponent(window.location.pathname)}`);
-  };
+  const navigateToLogin = useCallback(() => {
+    window.location.assign(`${appPath('/login')}?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    isAuthenticated,
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    authError,
+    appPublicSettings,
+    authChecked,
+    logout,
+    navigateToLogin,
+    checkUserAuth,
+    checkAppState
+  }), [user, isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, appPublicSettings, authChecked, logout, navigateToLogin, checkUserAuth, checkAppState]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated,
-      isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      appPublicSettings,
-      authChecked,
-      logout,
-      navigateToLogin,
-      checkUserAuth,
-      checkAppState
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

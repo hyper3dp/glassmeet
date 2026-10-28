@@ -151,8 +151,20 @@ const offsetMinutes = (ms, tz) => {
 };
 
 // the instant (ms) when the wall clock in tz reads y-m-d plus `minutes` (month is 0-based;
-// overflowing days roll over like Date.UTC)
+// overflowing days roll over like Date.UTC). Remembered per zone: the booking page asks for
+// the same times over and over (every day of the month, the next open day, each refresh).
+const zonedCache = new Map();
 export const zonedTimeToUtc = (y, m, d, minutes, tz) => {
+  const key = `${tz}|${Date.UTC(y, m, d, 0, minutes)}`;
+  let ms = zonedCache.get(key);
+  if (ms === undefined) {
+    if (zonedCache.size > 50000) zonedCache.clear();
+    ms = zonedTimeToUtcUncached(y, m, d, minutes, tz);
+    zonedCache.set(key, ms);
+  }
+  return ms;
+};
+const zonedTimeToUtcUncached = (y, m, d, minutes, tz) => {
   const guess = Date.UTC(y, m, d, 0, minutes);
   const first = guess - offsetMinutes(guess, tz) * 60000;
   const second = guess - offsetMinutes(first, tz) * 60000;

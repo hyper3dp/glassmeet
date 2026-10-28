@@ -64,7 +64,12 @@ export default function BookingConfirmation() {
     `— ${booking.guest_name}`,
   ].filter((line) => line !== null).join('\n');
 
-  const copyLink = () => { navigator.clipboard.writeText(meetingUrl); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+  // the clipboard can be missing or refused (an embed's frame, a non-secure page): only say
+  // "copied" when it was
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(meetingUrl); } catch { return; }
+    setCopied(true); setTimeout(()=>setCopied(false),2000);
+  };
 
   const calendarPriority = getCalendarPriority();
 

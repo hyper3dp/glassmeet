@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/localApi';
 
 export const AppContext = createContext(null);
@@ -43,30 +43,53 @@ export function useProfile() {
   const [whatsapp, setWhatsapp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // a newer load (retry, account switch) makes an older one's results stale
+  const loadSeq = useRef(0);
+  const loadedId = useRef(null);
 
   const load = useCallback(async () => {
+    const mine = ++loadSeq.current;
     setError(null);
     try {
       const me = await api.auth.me();
+      if (mine !== loadSeq.current) return;
+      loadedId.current = me.id;
       setUser(me);
       setProfile(me);
       // WhatsApp settings and first-run working hours load side by side
       await Promise.all([
         api.entities.WhatsAppSetting.filter({ created_by_id: me.id })
-          .then((settings) => setWhatsapp(settings[0] || null))
-          .catch(() => setWhatsapp(null)),
+          .then((settings) => { if (mine === loadSeq.current) setWhatsapp(settings[0] || null); })
+          .catch(() => { if (mine === loadSeq.current) setWhatsapp(null); }),
         seedHours(me).catch(() => { /* non-fatal */ }),
       ]);
     } catch (e) {
+      if (mine !== loadSeq.current) return;
+      loadedId.current = null;
       setUser(null);
       setProfile(null);
       setError(e?.message || 'Your profile could not be loaded.');
     } finally {
-      setLoading(false);
+      if (mine === loadSeq.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // another account signed in (e.g. in another tab): load theirs rather than keep showing the
+  // previous profile. Same-user events (token refresh, tab focus) change nothing. Synchronous on
+  // purpose: Supabase runs this inside its auth lock.
+  useEffect(() => {
+    const result = api.auth.onAuthStateChange?.((_event, session) => {
+      const id = session?.user?.id;
+      if (id && loadedId.current && id !== loadedId.current) {
+        loadedId.current = id;
+        setLoading(true);
+        load();
+      }
+    });
+    return () => result?.data?.subscription?.unsubscribe?.();
+  }, [load]);
 
   const updateProfile = useCallback(async (data) => {
     const updated = await api.auth.updateMe(data);

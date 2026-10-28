@@ -82,16 +82,21 @@ export default function CalendarConnections() {
     api.auth.loginWithGoogle('/calendar-connections', 'calendar').catch((error) => setGoogleError(error.message));
   };
 
-  const handleDisconnectGoogle = async () => {
+  // a failed save says so instead of failing silently
+  const attempt = (work, failMessage) => async (...args) => {
+    try { await work(...args); } catch (error) { toast.error(`${failMessage} ${error?.message || ''}`.trim()); }
+  };
+
+  const handleDisconnectGoogle = attempt(async () => {
     await api.google.disconnect();
     setGoogleAccount({ connected: false });
     setGoogleCalendarsList([]);
-  };
+  }, 'Could not disconnect Google Calendar.');
 
-  const toggleAutoSync = async () => {
+  const toggleAutoSync = attempt(async () => {
     const result = await api.google.saveSettings({ calendarId: googleAccount.calendar_id, autoSync: !autoSync });
     setGoogleAccount((current) => ({ ...current, auto_sync: result.autoSync }));
-  };
+  }, 'Could not change auto-sync.');
 
   const syncNow = async () => {
     setSyncing(true);
@@ -108,20 +113,22 @@ export default function CalendarConnections() {
   // Microsoft Outlook handlers
   const handleConnectOutlook = () => setShowOutlookSetup(true);
 
-  const handleDisconnectOutlook = async () => {
+  const handleDisconnectOutlook = attempt(async () => {
     await updateProfile({ outlook_connected: false, outlook_email: '', outlook_calendars: [], outlook_last_synced: null, outlook_account_type: '' });
-  };
+  }, 'Could not disconnect Outlook.');
 
-  const toggleOutlookAutoSync = async () => {
+  const toggleOutlookAutoSync = attempt(async () => {
     await updateProfile({ outlook_auto_sync: !outlookAutoSync });
-  };
+  }, 'Could not change auto-sync.');
 
   const syncOutlookNow = async () => {
     setSyncing(true);
-    setTimeout(async () => {
+    try {
       await updateProfile({ outlook_last_synced: new Date().toISOString() });
-      setSyncing(false);
-    }, 1200);
+    } catch (error) {
+      toast.error(`Could not sync Outlook. ${error?.message || ''}`.trim());
+    }
+    setSyncing(false);
   };
 
   const testGoogle = async () => {
@@ -151,7 +158,9 @@ export default function CalendarConnections() {
   const exportMyMeetings = async () => {
     setTesting('apple');
     try {
-      const all = (await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000)).reverse();
+      // from a day back: a meeting that started earlier and is still running counts too
+      const since = new Date(Date.now() - 86400000).toISOString();
+      const all = await api.entities.Booking.filter({ host_id: profile.id, start_time: { gte: since } }, 'start_time', 1000);
       const now = Date.now();
       const upcoming = all.filter((b) => b.status !== 'cancelled' && b.approval_status !== 'pending' && new Date(b.end_time || b.start_time).getTime() >= now);
       if (!upcoming.length) {
@@ -193,8 +202,8 @@ export default function CalendarConnections() {
     try {
       setFeedToken(await api.calendarFeed.rotate());
     } catch (error) {
-      setFeedError(`Could not reset the link: ${error.message}`);
-      setFeedState('error');
+      // the current link still works, so keep showing it
+      toast.error(`Could not reset the link: ${error.message}`);
     }
     setFeedResetting(false);
   };
@@ -243,15 +252,9 @@ export default function CalendarConnections() {
         </div>
         {feedState === 'ready' && feedUrl && (
           <div className="px-5 pb-5 flex flex-wrap gap-2">
-            <a href={feedUrl.replace(/^https:/, 'webcal:')}>
-              <GlassButton size="sm" variant="primary" type="button"><Apple className="w-4 h-4" /> Apple Calendar</GlassButton>
-            </a>
-            <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl.replace(/^https:/, 'webcal:'))}`} target="_blank" rel="noreferrer">
-              <GlassButton size="sm" type="button"><Calendar className="w-4 h-4" /> Google Calendar</GlassButton>
-            </a>
-            <a href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feedUrl)}&name=${encodeURIComponent('GlassMeet')}`} target="_blank" rel="noreferrer">
-              <GlassButton size="sm" type="button"><OutlookIcon className="w-4 h-4" /> Outlook</GlassButton>
-            </a>
+            <GlassButton as="a" href={feedUrl.replace(/^https:/, 'webcal:')} size="sm" variant="primary"><Apple className="w-4 h-4" /> Apple Calendar</GlassButton>
+            <GlassButton as="a" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl.replace(/^https:/, 'webcal:'))}`} target="_blank" rel="noreferrer" size="sm"><Calendar className="w-4 h-4" /> Google Calendar</GlassButton>
+            <GlassButton as="a" href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feedUrl)}&name=${encodeURIComponent('GlassMeet')}`} target="_blank" rel="noreferrer" size="sm"><OutlookIcon className="w-4 h-4" /> Outlook</GlassButton>
             <GlassButton size="sm" variant="ghost" type="button" onClick={resetFeed} disabled={feedResetting}>
               {feedResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} Reset link
             </GlassButton>
@@ -430,11 +433,11 @@ export default function CalendarConnections() {
           calendars={googleCalendarsList}
           selectedCalendarId={googleAccount.calendar_id || 'primary'}
           onClose={() => setShowGoogleSetup(false)}
-          onSave={async (calendarId) => {
+          onSave={attempt(async (calendarId) => {
             const result = await api.google.saveSettings({ calendarId, autoSync });
             setGoogleAccount((current) => ({ ...current, connected: true, calendar_id: result.calendarId, calendar_name: result.calendarName, auto_sync: result.autoSync }));
             setShowGoogleSetup(false);
-          }}
+          }, 'Could not save your calendar choice.')}
         />
       )}
 
@@ -445,7 +448,7 @@ export default function CalendarConnections() {
           accountEmail={outlookEmail}
           accountType={outlookAccountType}
           onClose={() => setShowOutlookSetup(false)}
-          onSave={async (cals, accountType) => {
+          onSave={attempt(async (cals, accountType) => {
             await updateProfile({
               outlook_calendars: cals,
               outlook_connected: true,
@@ -453,7 +456,7 @@ export default function CalendarConnections() {
               outlook_account_type: accountType || 'outlook_com',
             });
             setShowOutlookSetup(false);
-          }}
+          }, 'Could not save your calendars.')}
         />
       )}
     </div>

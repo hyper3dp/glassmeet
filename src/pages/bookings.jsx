@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '@/lib/localApi';
@@ -83,15 +83,23 @@ export default function Bookings({ profile, whatsapp }) {
   }, [bookings, filter, query]);
 
   // after a change the guest usually needs to hear about it, so the meeting opens with that message
+  // one change per meeting at a time, so a double tap doesn't send it twice
+  const changing = useRef(new Set());
   const change = async (b, fields, failMessage, thenMessage) => {
+    if (changing.current.has(b.id)) return;
+    changing.current.add(b.id);
     try {
-      await api.entities.Booking.update(b.id, fields);
+      const saved = await api.entities.Booking.update(b.id, fields);
+      // nothing updated: the meeting was deleted, or isn't this host's to change
+      if (!saved) throw new Error('It may have been deleted. Reload the page.');
       const updated = { ...b, ...fields };
       setBookings((list) => list.map((x) => (x.id === b.id ? updated : x)));
       if (thenMessage) setSelected({ booking: updated, kind: thenMessage, justChanged: true });
       else setSelected((cur) => (cur?.booking.id === b.id ? { ...cur, booking: updated } : cur));
     } catch (e) {
       toast.error(`${failMessage} ${e.message || ''}`.trim());
+    } finally {
+      changing.current.delete(b.id);
     }
   };
   const approve = (b) => change(b, { approval_status: 'approved' }, 'Could not approve this request.', 'confirmation');
@@ -120,18 +128,23 @@ export default function Bookings({ profile, whatsapp }) {
     return fillTemplate(template, ctx);
   };
 
-  if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
-
-  const counts = {
+  const counts = useMemo(() => ({
     upcoming: bookings.filter(isUpcoming).length,
     pending: bookings.filter((b) => b.approval_status === 'pending' && b.status !== 'cancelled').length,
-  };
-  const groups = [];
-  filtered.forEach((b) => {
-    const day = new Date(b.start_time).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: timezone });
-    const last = groups[groups.length - 1];
-    if (last && last[0] === day) last[1].push(b); else groups.push([day, [b]]);
-  });
+  }), [bookings]);
+  // one formatter for the whole list: a new one per meeting is slow with hundreds of them
+  const groups = useMemo(() => {
+    const dayFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: timezone });
+    const list = [];
+    filtered.forEach((b) => {
+      const day = dayFormat.format(new Date(b.start_time));
+      const last = list[list.length - 1];
+      if (last && last[0] === day) last[1].push(b); else list.push([day, [b]]);
+    });
+    return list;
+  }, [filtered, timezone]);
+
+  if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
 
   return (
     <div className="animate-fade-in">
@@ -182,7 +195,7 @@ export default function Bookings({ profile, whatsapp }) {
           <div key={day}>
             <div className="bg-secondary px-5 py-2.5 text-sm font-bold border-b border-border">{day}</div>
             {items.map((b) => (
-              <BookingCard key={b.id} booking={b} timezone={timezone} message={messageFor(b)} onView={()=>setSelected({ booking: b, kind: defaultKind(b) })} onCancel={()=>askCancel(b)} onApprove={()=>approve(b)} onDecline={()=>askDecline(b)} />
+              <BookingCard key={b.id} booking={b} timezone={timezone} getMessage={() => messageFor(b)} onView={()=>setSelected({ booking: b, kind: defaultKind(b) })} onCancel={()=>askCancel(b)} onApprove={()=>approve(b)} onDecline={()=>askDecline(b)} />
             ))}
           </div>
         ))}
@@ -212,14 +225,15 @@ export default function Bookings({ profile, whatsapp }) {
   );
 }
 
-function BookingCard({ booking, timezone, message, onView, onCancel, onApprove, onDecline }) {
+function BookingCard({ booking, timezone, getMessage, onView, onCancel, onApprove, onDecline }) {
   const time = formatMeetingTime(booking.start_time, timezone);
   const end = booking.end_time ? formatMeetingTime(booking.end_time, timezone) : null;
   const cancelled = booking.status === 'cancelled';
   const pending = booking.approval_status === 'pending' && !cancelled;
   const declined = booking.approval_status === 'declined';
 
-  const sendWhatsApp = () => window.open(buildWhatsAppLink(booking.guest_phone, message), '_blank');
+  // the message is only filled in when it's sent, not for every meeting on every render
+  const sendWhatsApp = () => window.open(buildWhatsAppLink(booking.guest_phone, getMessage()), '_blank');
 
   return (
     <div className="flex flex-col gap-3 border-b border-border last:border-b-0 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">

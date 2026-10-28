@@ -83,8 +83,9 @@ export default function EventTypes({ profile }) {
       alert(`Could not delete this event type. ${e.message || ''}`.trim());
     }
   };
-  // opens the create form filled in from an existing event
-  const duplicate = (e) => startFrom({ data: { ...templateData(e), name: `${e.name} (copy)` } });
+  // opens the create form filled in from an existing event, its dates included (a template
+  // leaves them out, but a copy of a "specific dates" event needs them)
+  const duplicate = (e) => startFrom({ data: { ...templateData(e), name: `${e.name} (copy)`, start_date: e.start_date, end_date: e.end_date, dates: e.dates?.filter((d) => d >= formatDate(new Date())) } });
 
   const handleToggle = async (ev, active) => {
     try {
@@ -181,7 +182,8 @@ export default function EventTypes({ profile }) {
             let saved;
             if (editing) {
               saved = await api.entities.EventType.update(editing.id, payload);
-              setEventTypes((list) => list.map((x) => (x.id === editing.id ? (saved || { ...x, ...payload }) : x)));
+              if (!saved) throw new Error('This event type may have been deleted. Reload the page.');
+              setEventTypes((list) => list.map((x) => (x.id === editing.id ? saved : x)));
             } else {
               saved = await api.entities.EventType.create(payload);
               setEventTypes((list) => [saved, ...list]);
@@ -313,10 +315,10 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
     freq: ['day', 'week', 'month'].includes(src.freq) ? src.freq : 'week',
     every: src.every || 1,
     days: src.days?.length ? [...src.days].sort() : ALL_DAYS,
-    start_date: event?.start_date || today,
-    ends: event?.end_date ? 'date' : 'never',
-    end_date: event?.end_date || '',
-    dates: event?.dates ? [...event.dates].sort() : [],
+    start_date: src.start_date || today,
+    ends: src.end_date ? 'date' : 'never',
+    end_date: src.end_date || '',
+    dates: src.dates ? [...src.dates].sort() : [],
     // 'hours': any free time inside the host's hours; 'fixed': only these start times
     times: src.fixed_times?.length ? 'fixed' : 'hours',
     fixed_times: src.fixed_times?.length ? [...src.fixed_times].sort() : ['09:00'],
@@ -335,8 +337,8 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
   const [hours, setHours] = useState(null);
   useEffect(() => {
     Promise.all([
-      api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
-      api.entities.AvailabilityException.filter({ created_by_id: hostId }),
+      api.entities.AvailabilityRule.filter({ created_by_id: hostId }, undefined, undefined, 'day_of_week'),
+      api.entities.AvailabilityException.filter({ created_by_id: hostId }, undefined, undefined, 'date, type'),
     ]).then(([rules, exceptions]) => setHours({
       days: new Set(rules.map((r) => r.day_of_week)),
       dates: new Set(exceptions.filter((e) => e.type === 'available').map((e) => e.date)),
