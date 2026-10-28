@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarClock, Calendar, BookOpen, Clock, MessageCircle, CalendarCheck,
-  Settings, Plus, Search, BarChart3, Bell, X, CornerDownLeft,
+  Settings, Plus, Search, BarChart3, Bell, X, CornerDownLeft, Compass,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
@@ -18,6 +18,7 @@ const COMMANDS = [
   { label: 'Availability', icon: Clock, path: '/availability', desc: 'Edit working hours' },
   { label: 'Analytics', icon: BarChart3, path: '/analytics', desc: 'View booking insights' },
   { label: 'Settings', icon: Settings, path: '/settings', desc: 'Account preferences' },
+  { label: 'Take the tour', icon: Compass, path: '/dashboard?tour=1', desc: 'A quick look around GlassMeet' },
 ];
 
 export default function CommandPalette({ open, onClose }) {

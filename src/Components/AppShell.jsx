@@ -7,6 +7,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { api } from '@/lib/localApi';
 import { appPath } from '@/lib/authReturnTo';
 import { prefetchAppPages } from '@/lib/pages.js';
+import Onboarding from '@/components/Onboarding.jsx';
 
 const Spinner = () => <div className="w-8 h-8 border-2 border-primary-soft border-t-primary rounded-full animate-spin" />;
 
@@ -55,6 +56,12 @@ export default function AppShell() {
         <p className="text-sm text-muted-foreground">Setting up your profile...</p>
       </div>
     );
+  }
+
+  // a new host sets up first, whichever app page they opened (profiles.onboarded is false only
+  // for accounts made after the onboarding migration; undefined before it, so nobody is stopped)
+  if (profile.onboarded === false) {
+    return <Onboarding profile={profile} updateProfile={updateProfile} whatsapp={whatsapp} setWhatsapp={setWhatsapp} />;
   }
 
   return (

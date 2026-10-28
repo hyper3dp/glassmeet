@@ -1,16 +1,20 @@
 import { appPath } from '@/lib/authReturnTo';
 import React, { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Home, Calendar as CalendarIcon, Link2, CalendarDays, Clock,
   MessageCircle, Settings as SettingsIcon, Plus, LogOut, CalendarCheck,
-  BarChart3, Menu, X, Search, ChevronDown,
+  BarChart3, Menu, X, Search, ChevronDown, Compass,
 } from 'lucide-react';
 import { api } from '@/lib/localApi';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/glass';
 import Logo, { LogoMark } from '@/components/logo.jsx';
 import NotificationCenter from '@/components/Notificationcenter.jsx';
+import Tour from '@/components/Tour.jsx';
+
+// the places the tour points at (see Tour.jsx)
+const TOUR_TARGETS = { '/event-types': 'scheduling', '/bookings': 'meetings', '/availability': 'availability' };
 
 const NAV = [
   { to: '/dashboard', label: 'Home', icon: Home },
@@ -55,6 +59,7 @@ const Sidebar = ({ onClose, onCreate, onLogout }) => (
     <div className="px-4 pb-4">
       <button
         type="button"
+        data-tour="create"
         onClick={onCreate}
         className="w-full h-10 rounded-full border border-primary text-link font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 hover:bg-primary-soft"
       >
@@ -64,7 +69,7 @@ const Sidebar = ({ onClose, onCreate, onLogout }) => (
 
     <nav className="flex-1 overflow-y-auto no-scrollbar px-3 space-y-0.5" aria-label="Main">
       {NAV.map((item) => (
-        <NavLink key={item.to} to={item.to} className={navItem}>
+        <NavLink key={item.to} to={item.to} className={navItem} data-tour={TOUR_TARGETS[item.to]}>
           <item.icon className="w-[18px] h-[18px]" />
           {item.label}
         </NavLink>
@@ -94,6 +99,14 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // ?tour=1 (after onboarding, or "Take the tour") starts the tour, then leaves the address
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if (searchParams.get('tour') !== '1') return;
+    setTouring(true);
+    setSearchParams((p) => { const next = new URLSearchParams(p); next.delete('tour'); return next; }, { replace: true });
+  }, [searchParams]);
 
   // Close drawer and menus on route change
   useEffect(() => { setDrawerOpen(false); setMenuOpen(false); }, [location.pathname]);
@@ -127,7 +140,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-background border-b border-border lg:border-transparent">
           <div className="h-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center gap-3">
-            <button onClick={() => setDrawerOpen(true)} aria-label="Open menu" className="lg:hidden shrink-0 w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-secondary">
+            <button onClick={() => setDrawerOpen(true)} aria-label="Open menu" data-tour="menu" className="lg:hidden shrink-0 w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-secondary">
               <Menu className="w-5 h-5" />
             </button>
             {/* the narrowest phones (under 360px) get the mark alone so the top bar fits */}
@@ -155,6 +168,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
                   onClick={() => setMenuOpen((v) => !v)}
                   aria-expanded={menuOpen}
                   aria-label="Account menu"
+                  data-tour="account"
                   className="flex items-center gap-1 rounded-full p-1 pr-2 transition-all duration-200 hover:bg-secondary"
                 >
                   <Avatar src={profile?.profile_photo || profile?.avatar_url} name={profile?.full_name} size={32} />
@@ -170,6 +184,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
                       </div>
                       <NavLink to="/settings" className="flex items-center gap-3 px-4 h-10 text-sm hover:bg-secondary"><SettingsIcon className="w-4 h-4 text-muted-foreground" /> Account settings</NavLink>
                       <NavLink to="/availability" className="flex items-center gap-3 px-4 h-10 text-sm hover:bg-secondary"><Clock className="w-4 h-4 text-muted-foreground" /> Availability</NavLink>
+                      <button type="button" onClick={() => { setMenuOpen(false); setTouring(true); }} className="w-full flex items-center gap-3 px-4 h-10 text-sm hover:bg-secondary"><Compass className="w-4 h-4 text-muted-foreground" /> Take the tour</button>
                       <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 h-10 text-sm hover:bg-secondary"><LogOut className="w-4 h-4 text-muted-foreground" /> Sign out</button>
                     </div>
                   </>
@@ -186,11 +201,13 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
         </main>
       </div>
 
+      {touring && <Tour onClose={() => setTouring(false)} />}
+
       {/* Mobile bottom tab bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border pb-[env(safe-area-inset-bottom)]" aria-label="Mobile">
         <div className="flex items-stretch justify-around h-16">
           {MOBILE_NAV.slice(0, 2).map((item) => <MobileTab key={item.to} item={item} />)}
-          <NavLink to="/event-types?new=true" aria-label="Create event" className="flex items-center justify-center px-2">
+          <NavLink to="/event-types?new=true" aria-label="Create event" data-tour="create" className="flex items-center justify-center px-2">
             <span className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-card">
               <Plus className="w-5 h-5" strokeWidth={2.5} />
             </span>
@@ -206,6 +223,7 @@ function MobileTab({ item }) {
   return (
     <NavLink
       to={item.to}
+      data-tour={TOUR_TARGETS[item.to]}
       className={({ isActive }) =>
         cn('flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-all duration-200',
           isActive ? 'text-link' : 'text-muted-foreground')
