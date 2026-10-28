@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import { Calendar, Plus, MessageCircle, CheckCircle2, Link2, Hourglass, ChevronRight } from 'lucide-react';
-import { GlassButton, EmptyState, Spinner, PageHeader, Avatar } from '@/components/glass';
+import { GlassButton, EmptyState, Spinner, LoadError, PageHeader, Avatar } from '@/components/glass';
 import EventCard from '@/components/eventcard.jsx';
 import { formatMeetingDate, formatMeetingTime, buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { detectTimezone } from '@/lib/Availability.js';
@@ -19,8 +19,11 @@ export default function Dashboard({ profile }) {
   const [copied, setCopied] = useState(false);
   const timezone = profile?.timezone || detectTimezone();
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloads, setReloads] = useState(0);
   useEffect(() => {
     (async () => {
+      setLoadFailed(false);
       try {
         // from a day back, so today's earlier meetings count in any time zone
         const since = new Date(Date.now() - 86400000).toISOString();
@@ -34,10 +37,12 @@ export default function Dashboard({ profile }) {
         setBookings(b);
         setAhead(u);
         setEventTypes(e);
-      } catch (e) {}
+      } catch {
+        setLoadFailed(true);
+      }
       setLoading(false);
     })();
-  }, [profile.id]);
+  }, [profile.id, reloads]);
 
   // recent and upcoming lists together, each booking once
   const known = useMemo(() => {
@@ -79,6 +84,7 @@ export default function Dashboard({ profile }) {
   };
 
   if (loading) return <div className="flex justify-center py-24"><Spinner className="w-8 h-8" /></div>;
+  if (loadFailed) return <LoadError what="Your dashboard" onRetry={() => { setLoading(true); setReloads((n) => n + 1); }} />;
 
   const firstName = profile?.full_name?.split(' ')[0];
   const groups = groupByDay(upcoming.slice(0, 8), timezone);
@@ -100,7 +106,7 @@ export default function Dashboard({ profile }) {
       {firstEvent && (
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-card sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold">Your booking link</div>
+            <div className="text-sm font-bold">Your booking link <span className="font-semibold text-muted-foreground">· {firstEvent.name}</span></div>
             <a href={bookingLink} target="_blank" rel="noreferrer" className="block truncate text-sm text-link hover:underline">{bookingLink}</a>
           </div>
           <GlassButton variant="brand" size="sm" type="button" onClick={copyLink}>

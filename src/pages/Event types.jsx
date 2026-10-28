@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import { Plus, Clock, ExternalLink, Search, X, FileText, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Stepper, EmptyState, Spinner, PageHeader, Tabs, Avatar } from '@/components/glass';
+import { GlassCard, GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Stepper, EmptyState, Spinner, LoadError, PageHeader, Tabs, Avatar, TimeSelect } from '@/components/glass';
 import EventCard, { scheduleSummary } from '@/components/eventcard.jsx';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
@@ -34,7 +34,9 @@ export default function EventTypes({ profile }) {
     }
   }, [searchParams]);
 
+  const [loadFailed, setLoadFailed] = useState(false);
   const load = async () => {
+    setLoadFailed(false);
     try {
       const [e, t] = await Promise.all([
         api.entities.EventType.filter({ created_by_id: profile.id }, '-created_date'),
@@ -43,7 +45,9 @@ export default function EventTypes({ profile }) {
       ]);
       setEventTypes(e);
       setTemplates(t);
-    } catch (err) {}
+    } catch {
+      setLoadFailed(true);
+    }
     setLoading(false);
   };
 
@@ -69,8 +73,9 @@ export default function EventTypes({ profile }) {
     }
   };
 
+  const [deleting, setDeleting] = useState(null); // the event type waiting on "Delete?"
   const handleDelete = async (id) => {
-    if (!confirm('Delete this event type? Existing bookings remain.')) return;
+    setDeleting(null);
     try {
       await api.entities.EventType.delete(id);
       setEventTypes((list) => list.filter((e) => e.id !== id));
@@ -78,6 +83,8 @@ export default function EventTypes({ profile }) {
       alert(`Could not delete this event type. ${e.message || ''}`.trim());
     }
   };
+  // opens the create form filled in from an existing event
+  const duplicate = (e) => startFrom({ data: { ...templateData(e), name: `${e.name} (copy)` } });
 
   const handleToggle = async (ev, active) => {
     try {
@@ -90,6 +97,8 @@ export default function EventTypes({ profile }) {
   };
 
   const q = query.trim().toLowerCase();
+  // a turned-off event's page says it's unavailable, so preview the first one that's on
+  const previewEvent = eventTypes.find((e) => e.active ?? true);
   const shown = q ? eventTypes.filter((e) => (e.name || '').toLowerCase().includes(q)) : eventTypes;
 
   return (
@@ -110,14 +119,16 @@ export default function EventTypes({ profile }) {
           <Avatar src={profile?.profile_photo} name={profile?.full_name} size={36} />
           <div className="text-[15px] font-bold truncate">{profile?.full_name || 'You'}</div>
         </div>
-        {eventTypes[0] && (
-          <a href={appPath(`/book/${eventTypes[0].id}`)} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
+        {previewEvent && (
+          <a href={appPath(`/book/${previewEvent.id}`)} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-link flex items-center gap-1.5 hover:underline">
             <ExternalLink className="w-4 h-4" /> Preview booking page
           </a>
         )}
       </div>
 
-      {loading ? <div className="flex justify-center py-20"><Spinner /></div> : eventTypes.length === 0 ? (
+      {loading ? <div className="flex justify-center py-20"><Spinner /></div> : loadFailed ? (
+        <LoadError what="Your event types" onRetry={() => { setLoading(true); load(); }} />
+      ) : eventTypes.length === 0 ? (
         <GlassCard hover={false}>
           <EmptyState icon={Clock} title="Create your first event type" description="An event type is a meeting guests can book, like a 30 minute call. Share its link and guests pick a time." action={<GlassButton variant="primary" type="button" onClick={openNew}><Plus className="w-4 h-4" /> New event type</GlassButton>} />
         </GlassCard>
@@ -127,11 +138,27 @@ export default function EventTypes({ profile }) {
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {shown.map((e) => (
             <EventCard
-              key={e.id} event={e} onEdit={() => openEdit(e)} onDelete={() => handleDelete(e.id)} onToggle={(active) => handleToggle(e, active)}
+              key={e.id} event={e} onEdit={() => openEdit(e)} onDuplicate={() => duplicate(e)} onDelete={() => setDeleting(e)} onToggle={(active) => handleToggle(e, active)}
               onSaveTemplate={() => saveTemplate(templateData(e)).catch((err) => alert(`Could not save the template. ${err.message || ''}`.trim()))}
             />
           ))}
         </div>
+      )}
+
+      {deleting && (
+        <Dialog open onOpenChange={(next) => { if (!next) setDeleting(null); }}>
+          <DialogContent showCloseButton={false} className="sm:max-w-sm p-6 block">
+            <DialogTitle>Delete “{deleting.name}”?</DialogTitle>
+            <p className="mt-2 text-sm text-muted-foreground">Its booking link stops working. Meetings already booked stay on your calendar.</p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <GlassButton type="button" variant="ghost" onClick={() => setDeleting(null)}>Keep it</GlassButton>
+              {(deleting.active ?? true) && (
+                <GlassButton type="button" onClick={() => { handleToggle(deleting, false); setDeleting(null); }}>Turn off instead</GlassButton>
+              )}
+              <GlassButton type="button" variant="danger" onClick={() => handleDelete(deleting.id)}>Delete</GlassButton>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {picking && <TemplatePicker templates={templates} onPick={startFrom} onDelete={deleteTemplate} onClose={() => setPicking(false)} />}
@@ -290,6 +317,9 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
     ends: event?.end_date ? 'date' : 'never',
     end_date: event?.end_date || '',
     dates: event?.dates ? [...event.dates].sort() : [],
+    // 'hours': any free time inside the host's hours; 'fixed': only these start times
+    times: src.fixed_times?.length ? 'fixed' : 'hours',
+    fixed_times: src.fixed_times?.length ? [...src.fixed_times].sort() : ['09:00'],
   }));
   const initialForm = useRef(null);
   if (initialForm.current === null) initialForm.current = JSON.stringify(form);
@@ -319,8 +349,8 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
     setForm((f) => ({ ...f, days }));
     initialForm.current = JSON.stringify({ ...JSON.parse(initialForm.current), days });
   }, [hours]);
-  const dateHasHours = (key) => !hours || hours.dates.has(key) || hours.days.has(new Date(`${key}T00:00`).getDay());
-  const closedDays = hours && form.freq === 'week' ? form.days.filter((d) => !hours.days.has(d)) : [];
+  const dateHasHours = (key) => form.times === 'fixed' || !hours || hours.dates.has(key) || hours.days.has(new Date(`${key}T00:00`).getDay());
+  const closedDays = hours && form.times !== 'fixed' && form.freq === 'week' ? form.days.filter((d) => !hours.days.has(d)) : [];
 
   // No day in the coming year both runs and has hours: guests would find nothing to book
   const nothingToBook = (() => {
@@ -346,7 +376,12 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
       setSavedAddressesAvailable(true);
       const match = list.find((a) => a.address === form.address);
       if (match) setAddressChoice(match.id);
-      else if (!form.address && list[0]) { setAddressChoice(list[0].id); setField('address', list[0].address); }
+      else if (!form.address && list[0]) {
+        setAddressChoice(list[0].id);
+        setField('address', list[0].address);
+        // a prefill, not an edit: closing without changes shouldn't ask to discard
+        initialForm.current = JSON.stringify({ ...JSON.parse(initialForm.current), address: list[0].address });
+      }
     }).catch(() => setSavedAddressesAvailable(false));
   }, []);
   const pickAddress = (choice) => {
@@ -366,6 +401,7 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
     if (repeats && form.ends === 'date' && !form.end_date) { setError('Pick the last date, or choose Never.'); return; }
     if (repeats && form.ends === 'date' && form.end_date < form.start_date) { setError('The last date is before the start date.'); return; }
     if (!repeats && !form.dates.length) { setError('Pick at least one date.'); return; }
+    if (form.times === 'fixed' && !form.fixed_times.some(Boolean)) { setError('Add at least one start time.'); return; }
     setSaving(true);
     try {
       if (kind === 'in_person' && addressChoice === 'new' && saveNewAddress && savedAddressesAvailable) {
@@ -383,7 +419,7 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
 
   // the event type's fields as saved
   const values = () => {
-    const { custom_location, ends, ...rest } = form;
+    const { custom_location, ends, times, ...rest } = form;
     const repeats = form.schedule === 'weekly';
     return {
       ...rest,
@@ -393,6 +429,7 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
       start_date: repeats ? form.start_date : null,
       end_date: repeats && ends === 'date' ? form.end_date : null,
       dates: repeats ? null : form.dates,
+      fixed_times: times === 'fixed' ? [...new Set(form.fixed_times.filter(Boolean))].sort() : null,
       location: kind === 'other' ? custom_location.trim() : form.location,
       meeting_url: kind === 'video' || kind === 'other' ? form.meeting_url.trim() : '',
       address: kind === 'in_person' ? form.address.trim() : null,
@@ -546,7 +583,39 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
                 No upcoming day fits these settings and your hours, so guests can’t book this event. Check the days and dates, or your hours in Availability.
               </p>
             )}
-            <p className="mt-3 text-xs text-muted-foreground">Times on each day come from your hours in Availability.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-foreground">Times</legend>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" aria-pressed={form.times === 'hours'} onClick={() => setField('times', 'hours')} className={pillClass(form.times === 'hours')}>From my hours</button>
+              <button type="button" aria-pressed={form.times === 'fixed'} onClick={() => setField('times', 'fixed')} className={pillClass(form.times === 'fixed')}>Fixed times</button>
+            </div>
+            {form.times === 'fixed' ? (
+              <div className="mt-3 space-y-2">
+                {form.fixed_times.map((t, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <TimeSelect
+                      aria-label={`Start time ${i + 1}`}
+                      placeholder="Pick a time"
+                      value={t}
+                      onChange={(v) => setField('fixed_times', form.fixed_times.map((x, j) => (j === i ? v : x)))}
+                      className="w-40"
+                    />
+                    {form.fixed_times.length > 1 && (
+                      <button type="button" aria-label={`Remove start time ${i + 1}`} onClick={() => setField('fixed_times', form.fixed_times.filter((_, j) => j !== i))}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setField('fixed_times', [...form.fixed_times, ''])} className="text-sm font-semibold text-link hover:underline">+ Add a start time</button>
+                <p className="text-xs text-muted-foreground">Guests can only book these start times, in your time zone, on the days above. Your weekly hours don’t apply; days or hours you block off in Availability still do.</p>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">Guests pick any free time inside your hours in Availability.</p>
+            )}
           </fieldset>
 
           <div>

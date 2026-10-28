@@ -35,6 +35,60 @@ const MOBILE_NAV = [
   { to: '/calendar', label: 'Calendar', icon: CalendarIcon },
 ];
 
+const navItem = ({ isActive }) =>
+  cn('glass-nav-item flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-semibold text-foreground',
+    isActive && 'active');
+
+// At module scope: defined inside Layout it was a new component each render, so it remounted
+// on every route change and keyboard focus fell back to the page.
+const Sidebar = ({ onClose, onCreate, onLogout }) => (
+  <div className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">
+    <div className="flex items-center justify-between px-5 h-16">
+      <Logo to="/dashboard" />
+      {onClose && (
+        <button onClick={onClose} aria-label="Close menu" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary">
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+
+    <div className="px-4 pb-4">
+      <button
+        type="button"
+        onClick={onCreate}
+        className="w-full h-10 rounded-full border border-primary text-link font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 hover:bg-primary-soft"
+      >
+        <Plus className="w-4 h-4" strokeWidth={2.5} /> Create
+      </button>
+    </div>
+
+    <nav className="flex-1 overflow-y-auto no-scrollbar px-3 space-y-0.5" aria-label="Main">
+      {NAV.map((item) => (
+        <NavLink key={item.to} to={item.to} className={navItem}>
+          <item.icon className="w-[18px] h-[18px]" />
+          {item.label}
+        </NavLink>
+      ))}
+      <div className="px-3 pt-5 pb-1.5 text-xs font-semibold text-muted-foreground">Integrations</div>
+      {INTEGRATIONS.map((item) => (
+        <NavLink key={item.to} to={item.to} className={navItem}>
+          <item.icon className="w-[18px] h-[18px]" />
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+
+    <div className="px-3 py-3 border-t border-sidebar-border space-y-0.5">
+      <NavLink to="/settings" className={navItem}>
+        <SettingsIcon className="w-[18px] h-[18px]" /> Settings
+      </NavLink>
+      <button onClick={onLogout} className="glass-nav-item w-full flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-semibold text-muted-foreground">
+        <LogOut className="w-[18px] h-[18px]" /> Sign out
+      </button>
+    </div>
+  </div>
+);
+
 export default function Layout({ children, profile, onOpenCommandPalette }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -43,74 +97,29 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
 
   // Close drawer and menus on route change
   useEffect(() => { setDrawerOpen(false); setMenuOpen(false); }, [location.pathname]);
+  // Escape closes the drawer and the account menu
+  useEffect(() => {
+    if (!drawerOpen && !menuOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') { setDrawerOpen(false); setMenuOpen(false); } };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawerOpen, menuOpen]);
 
   const handleLogout = async () => {
     await api.auth.logout();
     window.location.href = appPath('/login');
   };
 
-  const navItem = ({ isActive }) =>
-    cn('glass-nav-item flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-semibold text-foreground',
-      isActive && 'active');
-
-  const Sidebar = ({ onClose }) => (
-    <div className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">
-      <div className="flex items-center justify-between px-5 h-16">
-        <Logo to="/dashboard" />
-        {onClose && (
-          <button onClick={onClose} aria-label="Close menu" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary">
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="px-4 pb-4">
-        <button
-          type="button"
-          onClick={() => navigate('/event-types?new=true')}
-          className="w-full h-10 rounded-full border border-primary text-link font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 hover:bg-primary-soft"
-        >
-          <Plus className="w-4 h-4" strokeWidth={2.5} /> Create
-        </button>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto no-scrollbar px-3 space-y-0.5" aria-label="Main">
-        {NAV.map((item) => (
-          <NavLink key={item.to} to={item.to} className={navItem}>
-            <item.icon className="w-[18px] h-[18px]" />
-            {item.label}
-          </NavLink>
-        ))}
-        <div className="px-3 pt-5 pb-1.5 text-xs font-semibold text-muted-foreground">Integrations</div>
-        {INTEGRATIONS.map((item) => (
-          <NavLink key={item.to} to={item.to} className={navItem}>
-            <item.icon className="w-[18px] h-[18px]" />
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="px-3 py-3 border-t border-sidebar-border space-y-0.5">
-        <NavLink to="/settings" className={navItem}>
-          <SettingsIcon className="w-[18px] h-[18px]" /> Settings
-        </NavLink>
-        <button onClick={handleLogout} className="glass-nav-item w-full flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-semibold text-muted-foreground">
-          <LogOut className="w-[18px] h-[18px]" /> Sign out
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen">
       {/* Desktop sidebar, flush to the edge */}
       <aside className="hidden lg:block fixed inset-y-0 left-0 z-40">
-        <Sidebar />
+        <Sidebar onCreate={() => navigate('/event-types?new=true')} onLogout={handleLogout} />
       </aside>
 
       {/* Tablet / mobile drawer */}
       <aside className={cn('lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200', drawerOpen ? 'translate-x-0 shadow-pop' : '-translate-x-full invisible')}>
-        <Sidebar onClose={() => setDrawerOpen(false)} />
+        <Sidebar onClose={() => setDrawerOpen(false)} onCreate={() => navigate('/event-types?new=true')} onLogout={handleLogout} />
       </aside>
       {drawerOpen && <div className="lg:hidden fixed inset-0 z-40 bg-scrim" onClick={() => setDrawerOpen(false)} />}
 

@@ -1,3 +1,5 @@
+import { meetingLocation } from '@/lib/ics.js';
+
 // Outlook Calendar integration utilities for GlassMeet
 // Supports both Microsoft 365 and Outlook.com personal accounts.
 
@@ -25,7 +27,7 @@ export const outlookCalendarUrl = (booking, eventType, host) => {
   const hostName = host?.full_name || eventType?.host_name || 'Host';
   const title = `${eventType?.name || 'Meeting'} with ${hostName}`;
   const description = buildOutlookDescription(booking, eventType, host);
-  const location = booking.meeting_url || eventType?.meeting_url || eventType?.location || '';
+  const location = meetingLocation(booking, eventType);
 
   const params = new URLSearchParams({
     rru: 'addevent',
@@ -57,6 +59,6 @@ export const buildOutlookEventContent = (booking, eventType, host) => {
     guestName: booking.guest_name || '',
     guestEmail: booking.guest_email || '',
     guestPhone: booking.guest_phone || '',
-    location: eventType?.location || '',
+    location: meetingLocation(booking, eventType),
   };
 };

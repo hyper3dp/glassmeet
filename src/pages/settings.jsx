@@ -24,6 +24,10 @@ const MAX_PHOTO_MB = 5;
 
 export default function Settings({ profile, updateProfile }) {
   const [form, setForm] = useState(null);
+  const formRef = useRef(form);
+  formRef.current = form;
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -60,7 +64,11 @@ export default function Settings({ profile, updateProfile }) {
   // profiles), so changes to them are copied onto the host's event types too.
   const savedHost = useRef({ host_timezone: profile?.timezone || null, host_name: profile?.full_name || null, host_photo: profile?.profile_photo || null });
   const save = async (value) => {
-    await updateProfile({ ...value, username: value.username.trim() || null });
+    try {
+      await updateProfile({ ...value, username: value.username.trim() || null });
+    } catch (e) {
+      throw /duplicate key|unique/i.test(e?.message || '') && /username/i.test(e.message) ? new Error('that username is taken') : e;
+    }
     const host = { host_timezone: value.timezone || null, host_name: value.full_name.trim() || null, host_photo: value.profile_photo || null };
     const changed = Object.fromEntries(Object.entries(host).filter(([k, v]) => v !== savedHost.current[k] && (v || k !== 'host_timezone')));
     if (Object.keys(changed).length) {
@@ -69,7 +77,7 @@ export default function Settings({ profile, updateProfile }) {
       savedHost.current = { ...savedHost.current, ...changed };
     }
   };
-  const saveState = useAutosave(form, save, { enabled: !!form, delay: 900 });
+  const autosave = useAutosave(form, save, { enabled: !!form, delay: 900 });
 
   useEffect(() => {
     if (!form) return undefined;
@@ -94,7 +102,10 @@ export default function Settings({ profile, updateProfile }) {
     if (file.size > MAX_PHOTO_MB * 1024 * 1024) { setPhotoError(`Choose an image under ${MAX_PHOTO_MB} MB.`); return; }
     setUploading(true);
     try {
-      set('profile_photo', await api.storage.uploadAvatar(file));
+      const url = await api.storage.uploadAvatar(file);
+      // left the page while it uploaded: save the photo directly, as autosave has stopped
+      if (!mounted.current) { save({ ...formRef.current, profile_photo: url }).catch(() => {}); return; }
+      set('profile_photo', url);
     } catch (err) {
       setPhotoError(`Upload failed: ${err.message}`);
     }
@@ -103,7 +114,7 @@ export default function Settings({ profile, updateProfile }) {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Account settings" description="Changes save automatically." actions={<SaveStatus state={saveState} />} />
+      <PageHeader title="Account settings" description="Changes save automatically." actions={<SaveStatus state={autosave.state} error={autosave.error} onRetry={autosave.retry} />} />
 
       <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
         <nav className="hidden lg:block" aria-label="Settings sections">
@@ -144,7 +155,8 @@ export default function Settings({ profile, updateProfile }) {
               </div>
               <div>
                 <GlassLabel htmlFor="s-user">Public username</GlassLabel>
-                <GlassInput id="s-user" maxLength={40} value={form.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} />
+                <GlassInput id="s-user" maxLength={40} aria-describedby="s-user-hint" value={form.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} />
+                <p id="s-user-hint" className="mt-1.5 text-xs text-muted-foreground">Reserved for your profile link, coming soon. Guests book through each event type’s link for now.</p>
               </div>
               <div>
                 <GlassLabel htmlFor="s-email">Email</GlassLabel>

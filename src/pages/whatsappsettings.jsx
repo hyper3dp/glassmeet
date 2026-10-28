@@ -38,7 +38,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
   }, [whatsapp, profile]);
 
   const creating = useRef(null); // the first save's create, so a second save waits for it
-  const saveState = useAutosave(form, async (payload) => {
+  const autosave = useAutosave(form, async (payload) => {
     if (!idRef.current && creating.current) await creating.current;
     if (idRef.current) {
       const updated = await api.entities.WhatsAppSetting.update(idRef.current, payload);
@@ -61,7 +61,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
-      <PageHeader title="WhatsApp" description="How GlassMeet prepares confirmations for your guests. Changes save automatically." actions={<SaveStatus state={saveState} />} />
+      <PageHeader title="WhatsApp" description="How GlassMeet prepares confirmations for your guests. Changes save automatically." actions={<SaveStatus state={autosave.state} error={autosave.error} onRetry={autosave.retry} />} />
 
       <GlassCard hover={false}>
         <div className="flex items-center gap-3 mb-5">

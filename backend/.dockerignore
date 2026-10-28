@@ -1,2 +1,8 @@
 node_modules
 npm-debug.log
+
+# secrets never go into the image; mount them at runtime
+service-account.json
+*.pem
+.env
+.env.*

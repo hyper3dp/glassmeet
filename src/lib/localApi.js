@@ -189,19 +189,39 @@ export const api = {
     },
     loginViaEmailPassword: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error(error.message);
+      if (error) {
+        const err = new Error(error.code === 'email_not_confirmed' ? 'Confirm your email before logging in. Check your inbox (and spam) for the link.' : error.message);
+        err.code = error.code;
+        throw err;
+      }
       return { user: await getProfile(data.user.id), access_token: data.session.access_token };
     },
     register: async (value) => {
-      // The confirmation link returns to the app root (a page GitHub Pages always serves), which
-      // signs the user in from the link and forwards to the dashboard.
+      // The confirmation link returns to the page the user was heading for (the app root by
+      // default, a page GitHub Pages always serves), which signs them in from the link.
       const { data, error } = await supabase.auth.signUp({
         email: value.email,
         password: value.password,
-        options: { emailRedirectTo: `${window.location.origin}${appPath('/')}`, data: value.full_name ? { full_name: value.full_name } : undefined },
+        options: { emailRedirectTo: `${window.location.origin}${appPath(value.returnTo || '/')}`, data: value.full_name ? { full_name: value.full_name } : undefined },
       });
       if (error) throw new Error(error.message);
-      return { user: await getProfile(data.user.id), access_token: data.session?.access_token };
+      // with confirmations on, an address that already has an account comes back with no
+      // identities and no error, and no email is sent
+      if (data.user && data.user.identities?.length === 0) {
+        const err = new Error('An account with this email already exists. Log in or reset your password.');
+        err.code = 'user_exists';
+        throw err;
+      }
+      if (!data.session) return { user: null, access_token: undefined };
+      return { user: await getProfile(data.user.id), access_token: data.session.access_token };
+    },
+    resendSignup: async (email, returnTo = '/') => {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: `${window.location.origin}${appPath(returnTo)}` },
+      });
+      if (error) throw new Error(error.message);
     },
     loginWithGoogle: async (returnTo = '/') => {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -331,6 +351,22 @@ export const api = {
       const { data, error } = await supabase.rpc('booking_meeting_link', { p_booking: id });
       if (error) return undefined; // older database: the page already has the link
       return data || null;
+    },
+  },
+  // A host's hours for their booking pages (no private labels). Until the migration is applied,
+  // read the tables as before.
+  availability: {
+    forHost: async (hostId) => {
+      const { data, error } = await supabase.rpc('host_availability', { p_host: hostId });
+      if (notDeployed(error)) {
+        const [rules, exceptions] = await Promise.all([
+          api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
+          api.entities.AvailabilityException.filter({ created_by_id: hostId }),
+        ]);
+        return { rules, exceptions };
+      }
+      if (error) throw new Error(error.message);
+      return { rules: data?.rules || [], exceptions: data?.exceptions || [] };
     },
   },
   // Public holidays a host blocks (profiles.holidays). Until the migration is applied, none.

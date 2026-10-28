@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { QrCode, Download, Copy, Check, X } from 'lucide-react';
 import { GlassButton } from '@/components/glass';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -25,8 +26,8 @@ export default function QRCodeModal({ url, open, onClose }) {
     document.body.removeChild(a);
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(url);
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(url); } catch { toast.error('Couldn’t copy the link.'); return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

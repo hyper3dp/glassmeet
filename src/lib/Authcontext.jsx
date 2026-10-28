@@ -13,12 +13,16 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
   const userId = useRef(null);
+  // each check gets a number; a sign-out or a newer check makes older results stale
+  const checkSeq = useRef(0);
 
   // quiet: refresh the user without showing the full-screen loader (and unmounting the app)
   const checkUserAuth = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setIsLoadingAuth(true);
+    const mine = ++checkSeq.current;
     try {
       const currentUser = await api.auth.me();
+      if (mine !== checkSeq.current) return; // signed out (or checked again) meanwhile
       if (currentUser) {
         userId.current = currentUser.id;
         setUser(currentUser);
@@ -30,14 +34,21 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
       }
     } catch (error) {
+      if (mine !== checkSeq.current) return;
       console.warn('Auth check failed or session expired:', error);
+      // still signed in but the profile didn't load (network, database): say so and offer a
+      // retry, rather than sending them to log in again, which would fail the same way
+      const signedIn = await api.auth.hasSession().catch(() => false);
+      if (mine !== checkSeq.current) return;
       userId.current = null;
       setUser(null);
       setIsAuthenticated(false);
-      setAuthError(null);
+      setAuthError(signedIn ? { type: 'profile_failed', message: error?.message || '' } : null);
     } finally {
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
+      if (mine === checkSeq.current) {
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+      }
     }
   }, []);
 
@@ -63,6 +74,10 @@ export const AuthProvider = ({ children }) => {
     // those are the same user, so nothing needs to reload.
     const subscriptionResult = api.auth.onAuthStateChange?.((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
+        checkSeq.current += 1; // a profile still loading must not sign them back in
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+        setAuthError(null);
         userId.current = null;
         setUser(null);
         setIsAuthenticated(false);

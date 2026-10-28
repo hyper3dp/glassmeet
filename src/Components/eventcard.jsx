@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
-import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2, Copy } from 'lucide-react';
+import { Link2, Check, Settings2, Pencil, Trash2, Power, Code2, Copy, CopyPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import { buildWhatsAppShareLink } from '@/lib/whatsapp';
 import { appPath } from '@/lib/authReturnTo';
 import { cn } from '@/lib/utils';
@@ -15,10 +16,21 @@ const ordinal = (n) => `${n}${[, 'st', 'nd', 'rd'][(n % 100 >> 3 ^ 1) && n % 10]
 const unit = (every, one) => (every === 1 ? one : `${every} ${one}s`);
 
 // "Every week", "Every 2 weeks on Mon, Wed until 12 Dec", "Monthly on the 5th", "3 dates"
+// "at 3:00pm" / "at 9:00am and 3:00pm" for an event with fixed start times
+const fixedTimesText = (times) => {
+  if (!times?.length) return '';
+  const labels = [...times].sort().map((t) => {
+    const [h, m] = t.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
+  });
+  return ` at ${labels.length > 1 ? `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}` : labels[0]}`;
+};
+
 export const scheduleSummary = (event) => {
+  const at = fixedTimesText(event.fixed_times);
   if (event.schedule === 'dates') {
     const n = event.dates?.length || 0;
-    return n === 1 ? `On ${shortDate(event.dates[0])}` : `${n} dates`;
+    return (n === 1 ? `On ${shortDate(event.dates[0])}` : `${n} dates`) + at;
   }
   const every = Math.max(1, Number(event.every) || 1);
   let text;
@@ -30,13 +42,13 @@ export const scheduleSummary = (event) => {
     const days = event.days?.length && event.days.length < 7 ? [...event.days].sort().map((d) => WEEKDAYS[d]).join(', ') : null;
     text = `Every ${unit(every, 'week')}${days ? ` on ${days}` : ''}`;
   }
-  return event.end_date ? `${text} until ${shortDate(event.end_date)}` : text;
+  return (event.end_date ? `${text} until ${shortDate(event.end_date)}` : text) + at;
 };
 
 export const bookingUrlFor = (id) => `${window.location.origin}${appPath(`/book/${id}`)}`;
 
 // Calendly event-type card: colour strip on top, name + duration, Copy link and Share in the footer.
-export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTemplate }) {
+export default function EventCard({ event, onEdit, onDuplicate, onDelete, onToggle, onSaveTemplate }) {
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [embedding, setEmbedding] = useState(false);
@@ -46,7 +58,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
   const kind = event.booking_type === 'group' ? `Group, up to ${event.max_attendees || 2}` : 'One-on-One';
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(url); } catch { return; }
+    try { await navigator.clipboard.writeText(url); } catch { toast.error('Couldn’t copy the link. Open the booking page and copy it from the address bar.'); return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -79,6 +91,7 @@ export default function EventCard({ event, onEdit, onDelete, onToggle, onSaveTem
                   <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
                   <div className="absolute right-0 top-9 z-40 w-48 rounded-lg border border-border bg-popover py-1.5 shadow-pop animate-scale-in">
                     {onEdit && <MenuItem icon={Pencil} onClick={() => { setMenu(false); onEdit(); }}>Edit</MenuItem>}
+                    {onDuplicate && <MenuItem icon={CopyPlus} onClick={() => { setMenu(false); onDuplicate(); }}>Duplicate</MenuItem>}
                     {onSaveTemplate && <MenuItem icon={Copy} onClick={() => { setMenu(false); onSaveTemplate(); }}>Save as template</MenuItem>}
                     {embedOn && <MenuItem icon={Code2} onClick={() => { setMenu(false); setEmbedding(true); }}>Add to website</MenuItem>}
                     {onToggle && <MenuItem icon={Power} onClick={() => { setMenu(false); onToggle(!active); }}>{active ? 'Turn off' : 'Turn on'}</MenuItem>}

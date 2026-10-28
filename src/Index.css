@@ -61,6 +61,8 @@
   /* brand kit: teal #66aca9, slate #344248 (logo, bands, decoration; not text on white) */
   --brand-teal: #66aca9;
   --brand-slate: #344248;
+  /* darker slate for body text on the brand teal band (slate alone is about 4:1 there) */
+  --brand-ink: #1f2b2f;
   color-scheme: light;
 }
 
@@ -123,6 +125,7 @@
   --color-primary-soft: var(--primary-soft);
   --color-brand-teal: var(--brand-teal);
   --color-brand-slate: var(--brand-slate);
+  --color-brand-ink: var(--brand-ink);
   --color-link: var(--link);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);

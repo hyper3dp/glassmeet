@@ -53,11 +53,17 @@ export default function PageNotFound() {
                     </div>
                   </form>
                 )}
+                {/* signed-out visitors are mostly guests with a mistyped or old booking link */}
+                {!isAuthenticated && (
+                  <p className="text-sm text-muted-foreground">Got this link from someone to book a meeting? Ask them to send it again.</p>
+                )}
                 <div className="flex flex-wrap gap-2">
-                  <Link to={isAuthenticated ? '/event-types?new=true' : '/register'}>
-                    <GlassButton variant="primary" type="button"><Plus className="w-4 h-4" strokeWidth={2.5} /> Schedule a new event</GlassButton>
-                  </Link>
-                  <GlassButton type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(isAuthenticated ? '/dashboard' : '/'))}>
+                  {isAuthenticated && (
+                    <Link to="/event-types?new=true">
+                      <GlassButton variant="primary" type="button"><Plus className="w-4 h-4" strokeWidth={2.5} /> Schedule a new event</GlassButton>
+                    </Link>
+                  )}
+                  <GlassButton variant={isAuthenticated ? undefined : 'primary'} type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(isAuthenticated ? '/dashboard' : '/'))}>
                     <ArrowLeft className="w-4 h-4" /> Go back
                   </GlassButton>
                 </div>

@@ -55,7 +55,8 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('host_id', feed.owner)
       .gte('start_time', new Date(Date.now() - 60 * 864e5).toISOString())
-      .order('start_time', { ascending: true })
+      // newest first, so a busy host's upcoming meetings are never the ones cut off
+      .order('start_time', { ascending: false })
       .limit(1000),
   ]);
   // A missing bookings table (or no bookings yet) is an empty calendar, not an error,
@@ -67,10 +68,11 @@ Deno.serve(async (req) => {
   }
 
   // public holidays the host blocks, as all-day events (none until the holidays migration is applied)
-  const { data: holidays } = profile?.holidays
+  const { data: holidays, error: holidayError } = profile?.holidays
     ? await supabase.from('holidays').select('date, name').eq('region', profile.holidays)
       .gte('date', new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)).order('date')
-    : { data: [] };
+    : { data: [], error: null };
+  if (holidayError) console.error('holidays query failed', holidayError.code, holidayError.message);
 
   const name = profile?.full_name ? `GlassMeet: ${profile.full_name}` : 'GlassMeet';
   const lines = [
@@ -79,7 +81,8 @@ Deno.serve(async (req) => {
   ];
   const stamp = icsDate(new Date().toISOString());
   for (const b of bookings ?? []) {
-    if (!b.start_time || !b.end_time || b.status === 'cancelled') continue;
+    // declined requests keep status 'confirmed'; they aren't meetings
+    if (!b.start_time || !b.end_time || b.status === 'cancelled' || b.approval_status === 'declined') continue;
     const pending = b.approval_status === 'pending';
     const title = `${pending ? '[Pending] ' : ''}${b.event_name || 'Meeting'}${b.guest_name ? ` with ${b.guest_name}` : ''}`;
     const details = [

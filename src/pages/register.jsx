@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Lock, Loader2, User, Eye, EyeOff } from "lucide-react";
-import AuthLayout from "@/components/Authlayout.jsx";
+import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import { appPath, safeReturnTo } from "@/lib/authReturnTo";
 
@@ -15,12 +15,14 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [exists, setExists] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setExists(false);
     if (password.length < 6) {
       setError("Use at least 6 characters for your password.");
       return;
@@ -28,11 +30,12 @@ export default function Register() {
     setLoading(true);
     try {
       // the name is what guests see on your booking pages
-      const result = await api.auth.register({ email, password, full_name: name.trim() });
+      const result = await api.auth.register({ email, password, full_name: name.trim(), returnTo: safeReturnTo() });
       // signed in straight away when email confirmation is off
       if (result.access_token) window.location.assign(appPath(safeReturnTo()));
       else setNotice("Check your email for a confirmation link before signing in.");
     } catch (err) {
+      setExists(err.code === "user_exists");
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
@@ -71,6 +74,12 @@ export default function Register() {
       {error && (
         <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}
+          {exists && (
+            <span className="mt-2 flex gap-4">
+              <Link to={"/login" + (safeReturnTo() !== "/" ? "?returnTo=" + encodeURIComponent(safeReturnTo()) : "")} className="font-semibold underline">Log in</Link>
+              <Link to={"/forgot-password?email=" + encodeURIComponent(email)} className="font-semibold underline">Reset password</Link>
+            </span>
+          )}
         </div>
       )}
 
@@ -78,7 +87,10 @@ export default function Register() {
         <div role="status" className="rounded-lg border border-border bg-secondary p-4 text-sm">
           <p className="font-semibold text-foreground">Check your email</p>
           <p className="mt-1 text-muted-foreground">We sent a confirmation link to <span className="font-semibold text-foreground">{email}</span>. Open it to finish creating your account. It can take a minute, and may land in spam.</p>
-          <button type="button" onClick={() => setNotice("")} className="mt-3 font-semibold text-link hover:underline">Use a different email</button>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            <ResendEmailButton onResend={() => api.auth.resendSignup(email, safeReturnTo())} />
+            <button type="button" onClick={() => setNotice("")} className="font-semibold text-link hover:underline">Use a different email</button>
+          </div>
         </div>
       ) : (
       <form onSubmit={handleSubmit} className="space-y-4">

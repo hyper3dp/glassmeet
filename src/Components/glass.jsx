@@ -252,11 +252,14 @@ export function TimeSelect({ value, onChange, placeholder, midnight = false, cla
 }
 
 // "Saving… / Saved" line shown next to autosaving forms
-export function SaveStatus({ state }) {
+export function SaveStatus({ state, error, onRetry }) {
   if (state === 'idle') return null;
   return (
-    <span role="status" className={cn('inline-flex items-center gap-1.5 text-sm', state === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
-      {state === 'saving' ? 'Saving…' : state === 'error' ? 'Could not save' : 'All changes saved'}
+    <span role="status" className={cn('inline-flex flex-wrap items-center gap-x-1.5 text-sm', state === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
+      {state === 'saving' ? 'Saving…' : state === 'error' ? `Could not save${error ? `: ${error}` : ''}` : 'All changes saved'}
+      {state === 'error' && onRetry && (
+        <button type="button" onClick={onRetry} className="font-semibold text-link hover:underline">Retry</button>
+      )}
     </span>
   );
 }
@@ -272,6 +275,17 @@ export function EmptyState({ icon: Icon, title, description, action }) {
       <h3 className="text-lg font-bold tracking-tight text-foreground mb-1.5">{title}</h3>
       {description && <p className="text-sm text-muted-foreground max-w-sm mb-5">{description}</p>}
       {action}
+    </div>
+  );
+}
+
+// A load that failed, so it isn't mistaken for an empty account
+export function LoadError({ what = 'This page', onRetry }) {
+  return (
+    <div role="alert" className="flex flex-col items-center justify-center text-center py-16 px-6 animate-fade-in">
+      <h3 className="text-lg font-bold tracking-tight text-foreground mb-1.5">{what} couldn’t be loaded</h3>
+      <p className="text-sm text-muted-foreground max-w-sm mb-5">Check your connection and try again. Nothing was changed.</p>
+      {onRetry && <GlassButton type="button" onClick={onRetry}>Try again</GlassButton>}
     </div>
   );
 }

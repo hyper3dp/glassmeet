@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   Calendar, CalendarCheck, RefreshCw, Unplug, CheckCircle2,
   Apple, AlertCircle, Loader2, Settings2,
@@ -180,8 +181,8 @@ export default function CalendarConnections() {
       });
   }, []);
 
-  const copyFeedUrl = () => {
-    navigator.clipboard.writeText(feedUrl);
+  const copyFeedUrl = async () => {
+    try { await navigator.clipboard.writeText(feedUrl); } catch { toast.error('Couldn’t copy the link. Select it and copy it instead.'); return; }
     setCopiedFeed(true);
     setTimeout(() => setCopiedFeed(false), 2000);
   };

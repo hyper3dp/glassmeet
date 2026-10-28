@@ -30,3 +30,8 @@ export const icsFold = (line) => {
   out.push(cur);
   return out.join('\r\n ');
 };
+
+// Where a meeting happens, the same in every calendar link: an in-person address, else the
+// meeting link, else the location's name (phone, WhatsApp, ...)
+export const meetingLocation = (booking, eventType) =>
+  eventType?.address || booking?.meeting_url || eventType?.meeting_url || eventType?.location || '';

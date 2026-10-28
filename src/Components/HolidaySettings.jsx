@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { HOLIDAY_REGIONS, holidayClashes, rescheduleMessage } from '@/lib/holidays.js';
 import { buildWhatsAppLink, formatMeetingDate, formatMeetingTime } from '@/lib/whatsapp';
-import { detectTimezone } from '@/lib/Availability.js';
+import { detectTimezone, formatDate } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
 
 const REGION = 'ae';
@@ -69,7 +69,7 @@ export default function HolidaySettings({ profile, updateProfile }) {
   const keep = (id) => setKept((cur) => { const next = new Set(cur).add(id); saveKept(next); return next; });
   const markCancelled = (id) => setBookings((bs) => bs.map((b) => (b.id === id ? { ...b, status: 'cancelled' } : b)));
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatDate(new Date()); // the local date, not UTC's
   const upcoming = holidays.filter((h) => h.date >= today).reduce((list, h) => {
     // one line per holiday: Eid al-Fitr spans three days
     const last = list[list.length - 1];
@@ -159,6 +159,7 @@ function ClashRow({ clash, timezone, state, onKeep, onCancelled }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false); // cancelling a guest's meeting takes a second tap
   const cancelled = state === 'cancelled' || booking.status === 'cancelled';
 
   const cancel = async () => {
@@ -187,12 +188,18 @@ function ClashRow({ clash, timezone, state, onKeep, onCancelled }) {
           </div>
           <div className="text-sm font-semibold text-link">{holiday}</div>
         </div>
-        {!state && !cancelled && (
-          <div className="flex gap-2 shrink-0">
-            <GlassButton type="button" size="sm" onClick={onKeep} disabled={busy}>Keep</GlassButton>
-            <GlassButton type="button" size="sm" variant="danger" onClick={cancel} disabled={busy}>{busy ? 'Cancelling…' : 'Cancel'}</GlassButton>
+        {!state && !cancelled && (confirming ? (
+          <div className="flex flex-wrap items-center gap-2 shrink-0" role="group" aria-label="Confirm cancellation">
+            <span className="text-sm font-semibold">Cancel this meeting?</span>
+            <GlassButton type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>No</GlassButton>
+            <GlassButton type="button" size="sm" variant="danger" onClick={cancel} disabled={busy}>{busy ? 'Cancelling…' : 'Yes, cancel'}</GlassButton>
           </div>
-        )}
+        ) : (
+          <div className="flex gap-2 shrink-0">
+            <GlassButton type="button" size="sm" onClick={onKeep}>Keep</GlassButton>
+            <GlassButton type="button" size="sm" variant="danger" onClick={() => setConfirming(true)}>Cancel</GlassButton>
+          </div>
+        ))}
         {state === 'kept' && <span className="text-sm font-semibold text-success">Kept</span>}
         {cancelled && <span className="text-sm font-semibold text-destructive">Cancelled</span>}
       </div>

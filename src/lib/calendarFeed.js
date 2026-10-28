@@ -61,7 +61,8 @@ export function generateICSFeed(bookings, calendarName = 'GlassMeet') {
   }
 
   lines.push('END:VCALENDAR');
-  return lines.map(icsFold).join('\r\n');
+  // RFC 5545: every line ends with CRLF, the last one too
+  return lines.map(icsFold).join('\r\n') + '\r\n';
 }
 
 /**
@@ -77,7 +78,8 @@ export function downloadICSFeed(bookings, filename = 'glassmeet-calendar.ics', c
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // revoking straight away can cancel the download in Safari and some Firefox versions
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**

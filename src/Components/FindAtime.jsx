@@ -2,8 +2,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { X, Clock, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { api } from '@/lib/localApi';
 import { GlassButton } from '@/components/glass';
-import { generateSlots, detectTimezone, formatDate, dateInZone } from '@/lib/Availability.js';
+import { generateSlots, detectTimezone, dateInZone } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { holidayExceptions } from '@/lib/holidays.js';
+import { bookingUrlFor } from '@/components/eventcard.jsx';
 
 const DAY_LABELS = ['Today', 'Tomorrow'];
 
@@ -14,29 +17,51 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
   const [exceptions, setExceptions] = useState([]);
   const [bookedSlots, setBookedSlots] = useState([]);
   const [loading, setLoading] = useState(false);
-  const tz = profile?.timezone || detectTimezone();
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloads, setReloads] = useState(0);
+  const profileTz = profile?.timezone || detectTimezone();
+  // the event's own zone, as the booking page and the server use
+  const tz = selectedEvent?.host_timezone || profileTz;
 
   useEffect(() => {
     if (!open) return;
     (async () => {
       setLoading(true);
+      setLoadFailed(false);
       try {
         const events = await api.entities.EventType.filter({ created_by_id: profile.id, active: true }, '-created_date');
         setEventTypes(events);
         if (events.length) setSelectedEvent(events[0]);
 
-        const [r, e, b] = await Promise.all([
+        const [r, e, b, h] = await Promise.all([
           api.entities.AvailabilityRule.filter({ created_by_id: profile.id }),
           api.entities.AvailabilityException.filter({ created_by_id: profile.id }),
           api.entities.BookedSlot.filter({ host_id: profile.id, status: 'confirmed' }),
+          // public holidays the host blocks are closed on the booking page too
+          api.holidays.forHost(profile.id).catch(() => []),
         ]);
         setRules(r);
-        setExceptions(e);
+        setExceptions([...e, ...holidayExceptions(h)]);
         setBookedSlots(b);
-      } catch {}
+      } catch {
+        setLoadFailed(true);
+      }
       setLoading(false);
     })();
-  }, [open, profile.id]);
+  }, [open, profile.id, reloads]);
+
+  // a time is shared as the event's booking link opened on that day
+  const shareSlot = async (day, slot) => {
+    if (onSelectSlot) { onSelectSlot(slot, selectedEvent); onClose(); return; }
+    // the exact time, so the page opens on the right day in the guest's own zone
+    const url = `${bookingUrlFor(selectedEvent.id)}?at=${encodeURIComponent(slot.date.toISOString())}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Link copied: ${selectedEvent.name}, opening on ${day.label} (${slot.label} is free)`);
+    } catch {
+      toast.error('Couldn’t copy the link. Copy it from Event types instead.');
+    }
+  };
 
   // Generate slots for the next 7 days
   const daySlots = useMemo(() => {
@@ -62,13 +87,18 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-link" />
-            <DialogTitle>Find a Time</DialogTitle>
+            <DialogTitle>Find a time</DialogTitle>
           </div>
           <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : loadFailed ? (
+          <div role="alert" className="text-center py-8 text-sm text-muted-foreground">
+            Your times couldn’t be loaded.
+            <div className="mt-3"><GlassButton type="button" size="sm" onClick={() => setReloads((n) => n + 1)}>Try again</GlassButton></div>
+          </div>
         ) : eventTypes.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">Create an event type first to find available times.</div>
         ) : (
@@ -88,7 +118,7 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground mb-4">Times that work — in {tz}</p>
+            <p className="text-xs text-muted-foreground mb-4">Times that work, in {tz}. Pick one to copy a booking link that opens on that day.</p>
 
             {daySlots.length === 0 ? (
               <div className="text-center py-8">
@@ -105,7 +135,7 @@ export default function FindATime({ open, onClose, profile, onSelectSlot }) {
                       {day.slots.map((s, si) => (
                         <button
                           key={si}
-                          onClick={() => { onSelectSlot?.(s, selectedEvent); onClose(); }}
+                          onClick={() => shareSlot(day, s)}
                           className="rounded-lg border border-primary/50 py-2.5 text-sm font-bold text-link tabular transition-all duration-200 hover:border-primary hover:bg-primary-soft"
                         >
                           {s.label}

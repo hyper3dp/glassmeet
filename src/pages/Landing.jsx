@@ -197,13 +197,13 @@ export default function Landing() {
           <div className="max-w-6xl mx-auto flex flex-col gap-8 rounded-2xl bg-brand-teal p-8 sm:p-12 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-brand-slate">You're one link away</h2>
-              <p className="mt-3 max-w-lg text-lg leading-relaxed text-[#1f2b2f]">
+              <p className="mt-3 max-w-lg text-lg leading-relaxed text-brand-ink">
                 Create your booking page in minutes and share it in your next WhatsApp chat.
               </p>
             </div>
             <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-              <Link to="/register"><GlassButton size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base border-transparent bg-brand-slate text-white hover:bg-brand-slate/90 hover:border-transparent">Get started, it's free</GlassButton></Link>
-              <Link to="/login"><GlassButton size="lg" type="button" className="w-full sm:w-auto h-12 px-7 text-base border-[#1f2b2f] bg-transparent text-[#1f2b2f] hover:bg-[#1f2b2f]/10 hover:border-[#1f2b2f]">Log in</GlassButton></Link>
+              <Link to="/register" className="inline-flex w-full sm:w-auto h-12 items-center justify-center rounded-full px-7 text-base font-semibold bg-brand-slate text-white transition-all duration-200 hover:bg-brand-slate/90">Get started, it's free</Link>
+              <Link to="/login" className="inline-flex w-full sm:w-auto h-12 items-center justify-center rounded-full border border-brand-ink px-7 text-base font-semibold text-brand-ink transition-all duration-200 hover:bg-brand-ink/10">Log in</Link>
             </div>
           </div>
         </section>

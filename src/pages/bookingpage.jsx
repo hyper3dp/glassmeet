@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import {
-  generateSlots, isPastDate, isWithinMaxFuture, detectTimezone, bookingWindowDays,
+  generateSlots, isPastDate, isWithinMaxFuture, detectTimezone, bookingWindowDays, COMMON_TIMEZONES, dateInZone,
 } from '@/lib/Availability.js';
 import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
 import { getDevice } from '@/lib/devicedetect.js';
@@ -63,6 +63,8 @@ export default function BookingPage() {
 
   // The form is its own history step, so the browser's Back button returns to the times.
   const chooseSlot = (slot) => {
+    setError('');
+    setSlotGone(false);
     setSelectedSlot(slot);
     setPendingSlot(null);
     // one form step in history at most (after Forward, the current entry already is one)
@@ -105,6 +107,8 @@ export default function BookingPage() {
   const [customAnswers, setCustomAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // the picked time was taken while the guest filled in the form
+  const [slotGone, setSlotGone] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -120,9 +124,15 @@ export default function BookingPage() {
   const sameStart = (b, ms) => b.event_type_id === event?.id && new Date(b.start_time).getTime() === ms;
   const spotsLeftAt = (date) => Math.max(0, maxAttendees - bookedSlots.filter((b) => sameStart(b, date.getTime())).length);
 
-  const guestTz = detectTimezone();
-  const dialCode = DIAL_CODES[guestTz];
-  const phoneExample = PHONE_EXAMPLES[dialCode] || '+971 50 123 4567';
+  // times show in the guest's zone; they can switch it (travelling, or booking for another city)
+  const [detectedTz] = useState(detectTimezone);
+  const [guestTz, setGuestTz] = useState(detectedTz);
+  const tzOptions = useMemo(() => [...new Set([detectedTz, ...COMMON_TIMEZONES])], [detectedTz]);
+  const dialCode = DIAL_CODES[detectedTz];
+  // "today" in the zone the guest is viewing, which may not be this browser's
+  const todayKey = dateInZone(Date.now(), guestTz).getTime();
+  const today = new Date(todayKey);
+  const phoneExample = PHONE_EXAMPLES[dialCode] || (dialCode ? `+${dialCode} …` : '+1 415 555 0123');
   // weekly hours are in the host's zone; everything the guest sees is in the guest's zone
   const hostTz = event?.host_timezone || 'UTC'; // same fallback as the server's booking check
   const emailRequired = event?.email_required ?? true;
@@ -148,9 +158,8 @@ export default function BookingPage() {
       if (ev.active === false) { setError('This event isn’t taking bookings right now.'); setLoading(false); return; }
       found = true;
       const hostId = ev.created_by_id;
-      const [r, e, b, h] = await Promise.all([
-        api.entities.AvailabilityRule.filter({ created_by_id: hostId }),
-        api.entities.AvailabilityException.filter({ created_by_id: hostId }),
+      const [{ rules: r, exceptions: e }, b, h] = await Promise.all([
+        api.availability.forHost(hostId),
         api.entities.BookedSlot.filter({ host_id: hostId, status: 'confirmed' }),
         api.holidays.forHost(hostId).catch(() => []),
       ]);
@@ -178,7 +187,7 @@ export default function BookingPage() {
     // keep the guest's pick if it's still free (a background refresh shouldn't throw them out)
     setSelectedSlot((cur) => (cur && s.some((x) => x.date.getTime() === cur.date.getTime()) ? cur : null));
     setPendingSlot(null);
-  }, [selectedDate, event, rules, exceptions, bookedSlots, googleBusy]);
+  }, [selectedDate, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
 
   const color = event?.color || '#2B7A75';
 
@@ -201,11 +210,11 @@ export default function BookingPage() {
     if (!event) return open;
     const busy = [...bookedSlots, ...googleBusy];
     for (const date of monthDays) {
-      if (!date || isPastDate(date) || !isWithinMaxFuture(date, bookingWindowDays(event))) continue;
+      if (!date || isPastDate(date, today) || !isWithinMaxFuture(date, bookingWindowDays(event), today)) continue;
       if (generateSlots(date, event, rules, exceptions, busy, hostTz, guestTz).length) open.add(date.getTime());
     }
     return open;
-  }, [monthDays, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
+  }, [monthDays, event, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz, todayKey]);
   const dayHasSlots = (date) => openDays.has(date.getTime());
 
   // The first day from today with a free time, looking to the end of the booking window (or a
@@ -214,43 +223,51 @@ export default function BookingPage() {
     if (!event || loading) return null;
     const busy = [...bookedSlots, ...googleBusy];
     const days = bookingWindowDays(event) ?? 366;
-    const now = new Date();
     for (let i = 0; i <= days; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
       if (generateSlots(date, event, rules, exceptions, busy, hostTz, guestTz).length) return date;
     }
     return null;
-  }, [event, loading, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz]);
+  }, [event, loading, rules, exceptions, bookedSlots, googleBusy, hostTz, guestTz, todayKey]);
 
   // open on the month of the first free day (an event with later dates, or a full month)
+  // a link with ?at=<time> (from the host's "Find a time") opens on that time's day in the
+  // guest's zone instead
   const jumped = useRef(false);
   useEffect(() => {
     if (!nextOpen || jumped.current) return;
     jumped.current = true;
+    const at = Date.parse(new URLSearchParams(window.location.search).get('at') || '');
+    const linked = Number.isNaN(at) ? null : dateInZone(at, guestTz);
+    if (linked && linked >= nextOpen && isWithinMaxFuture(linked, bookingWindowDays(event), today)
+      && generateSlots(linked, event, rules, exceptions, [...bookedSlots, ...googleBusy], hostTz, guestTz).length) {
+      setCursor(new Date(linked.getFullYear(), linked.getMonth(), 1));
+      setSelectedDate(linked);
+      return;
+    }
     setCursor(new Date(nextOpen.getFullYear(), nextOpen.getMonth(), 1));
   }, [nextOpen]);
 
   const confirm = async (e) => {
     e?.preventDefault();
-    if (!form.guest_name.trim() || !form.guest_phone.trim() || (emailRequired && !form.guest_email.trim())) {
-      setError(emailRequired ? 'Please fill in your name, email and WhatsApp number.' : 'Please fill in your name and WhatsApp number.');
-      return;
-    }
-    // the host reaches the guest on WhatsApp, so the number has to be dialable
+    // name the first field that needs attention and move to it
+    const fail = (message, id) => { setError(message); if (id) document.getElementById(id)?.focus(); };
+    if (!form.guest_name.trim()) return fail('Enter your name.', 'g-name');
+    if (emailRequired && !form.guest_email.trim()) return fail('Enter your email.', 'g-email');
+    if (form.guest_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) return fail('That email address doesn’t look right.', 'g-email');
+    if (!form.guest_phone.trim()) return fail('Enter your WhatsApp number.', 'g-phone');
+    // the host reaches the guest on WhatsApp, so the number has to be dialable; outside the
+    // zones we know a dial code for, it must start with the country code
     const phone = withDialCode(form.guest_phone, dialCode);
-    if (!/^\+?\d{7,15}$/.test(normalizePhone(phone))) {
-      setError(`Enter your WhatsApp number with the country code, e.g. ${phoneExample}.`);
-      document.getElementById('g-phone')?.focus();
-      return;
+    if (!/^\+?\d{7,15}$/.test(normalizePhone(phone)) || (!dialCode && !phone.startsWith('+'))) {
+      return fail(`Enter your WhatsApp number with the country code, e.g. ${phoneExample}.`, 'g-phone');
     }
-    if (form.guest_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) { setError('That email address doesn’t look right.'); return; }
     if (!selectedSlot) return;
     // Validate required custom questions
     if (event?.custom_questions) {
       for (let qi = 0; qi < event.custom_questions.length; qi++) {
         if (event.custom_questions[qi].required && !String(customAnswers[qi] || '').trim()) {
-          setError('Please answer all required questions.');
-          return;
+          return fail(`Please answer “${event.custom_questions[qi].text}”.`, `q-${qi}`);
         }
       }
     }
@@ -263,13 +280,15 @@ export default function BookingPage() {
       // Re-check against fresh bookings with the same rules that built the list: taken, full,
       // now in the past or inside the notice period, or past the booking window.
       const fresh = await api.entities.BookedSlot.filter({ host_id: event.created_by_id, status: 'confirmed' });
-      const stillFree = isWithinMaxFuture(selectedDate, bookingWindowDays(event))
+      const stillFree = isWithinMaxFuture(selectedDate, bookingWindowDays(event), today)
         && generateSlots(selectedDate, event, rules, exceptions, [...fresh, ...googleBusy], hostTz, guestTz)
           .some((x) => x.date.getTime() === selectedSlot.date.getTime());
       if (!stillFree) {
         setError(isGroup ? 'Sorry, that time just filled up or is no longer available. Please pick another.' : 'Sorry, that time is no longer available. Please pick another.');
-        setBookedSlots(fresh); // refreshes the times shown when they go back
+        setBookedSlots(fresh); // refreshes the times shown
+        setSlotGone(true);
         setSubmitting(false);
+        backToTimes(); // the message shows above the times
         return;
       }
 
@@ -294,12 +313,18 @@ export default function BookingPage() {
       // the meeting link is private until booked; ask for it now (null while awaiting approval)
       const link = await api.bookings.meetingLink(booking.id);
       if (link !== undefined) booking.meeting_url = link || '';
-      const state = { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo } };
+      // bookPath: this page's own link (it may be a private one), for "pick another time"
+      const state = { booking, event, host: { full_name: event.host_name, profile_photo: event.host_photo }, bookPath: `/book/${eventTypeId}`, guestTz };
       // kept for this tab so the confirmation survives a refresh (guests can't read bookings back)
       try { sessionStorage.setItem(`gm-booking-${booking.id}`, JSON.stringify(state)); } catch { /* storage unavailable */ }
       navigate(`/confirm/${booking.id}${embed ? window.location.search : ''}`, { state, replace: true });
     } catch (e) {
-      setError('Could not complete booking. ' + (e.message || 'Please try again.'));
+      // the database's own booking checks speak to guests; anything else stays generic
+      const friendly = /^(Sorry, that time|That time can no longer|This event is not taking|Too many bookings)/.test(e.message || '');
+      if (friendly && /^(Sorry, that time|That time can no longer)/.test(e.message)) setSlotGone(true);
+      setError(friendly ? e.message : /fetch|network/i.test(e.message || '')
+        ? 'We couldn’t reach GlassMeet. Check your connection and try again; your details are kept.'
+        : 'Something went wrong. Your details are kept; please try again.');
     }
     setSubmitting(false);
   };
@@ -320,9 +345,11 @@ export default function BookingPage() {
 
   const pickedDateLabel = selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const monthLabel = cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const now = new Date();
+  const now = today;
   const atCurrentMonth = cursor.getFullYear() === now.getFullYear() && cursor.getMonth() === now.getMonth();
-  const lastDay = lastBookableDay(event);
+  // the host's last day can reach into the next day for a guest ahead of them
+  const lastDay = lastBookableDay(event, today);
+  if (lastDay) lastDay.setDate(lastDay.getDate() + 1);
   const atLastMonth = lastDay && (cursor.getFullYear() * 12 + cursor.getMonth() >= lastDay.getFullYear() * 12 + lastDay.getMonth());
   const shiftMonth = (n) => { const d = new Date(cursor); d.setDate(1); d.setMonth(d.getMonth() + n); setCursor(d); };
   const wide = !selectedSlot && selectedDate;
@@ -474,8 +501,13 @@ export default function BookingPage() {
                   )}
 
                   <div className="mt-8">
-                    <div className="text-[15px] font-bold mb-2">Time zone</div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground"><Globe className="w-4 h-4" /> {guestTz}</div>
+                    <label htmlFor="guest-tz" className="block text-[15px] font-bold mb-2">Time zone</label>
+                    <div className="relative">
+                      <Globe className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                      <GlassSelect id="guest-tz" value={guestTz} onChange={(e) => { setGuestTz(e.target.value); setPendingSlot(null); }} className="pl-9">
+                        {tzOptions.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>)}
+                      </GlassSelect>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -484,6 +516,7 @@ export default function BookingPage() {
               {selectedDate && (
                 <section ref={slotsRef} className="scroll-mt-4 border-t border-border lg:border-t-0 md:col-span-2 lg:col-span-1 px-6 sm:px-8 lg:pl-0 lg:pr-8 pb-8 pt-6 lg:pt-[88px] animate-slide-in-right">
                   <h3 className="text-[15px] font-semibold mb-5">{pickedDateLabel}</h3>
+                  {slotGone && error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
                   {slots.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6">No times left on this day. Pick another date.</p>
                   ) : (
@@ -521,7 +554,11 @@ export default function BookingPage() {
           ) : (
             // Details form
             <section ref={formRef} className="scroll-mt-4 p-6 sm:p-8 animate-slide-in-right">
-              <h2 className="text-xl font-bold mb-6">Enter details</h2>
+              <h2 className="text-xl font-bold">Enter details</h2>
+              <p className="mt-1 mb-6 text-sm text-muted-foreground">
+                {formatMeetingDate(selectedSlot.date, guestTz)} · {selectedSlot.label} ·{' '}
+                <button type="button" onClick={backToTimes} className="font-semibold text-link hover:underline">Change</button>
+              </p>
               <form onSubmit={confirm} noValidate className="max-w-[440px] space-y-5">
                 {autofilled && (
                   <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary px-3.5 py-2.5 text-sm" role="status">
@@ -540,7 +577,7 @@ export default function BookingPage() {
                 <div>
                   <GlassLabel htmlFor="g-phone">WhatsApp number *</GlassLabel>
                   <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: e.target.value})} placeholder={phoneExample} />
-                  <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.{dialCode ? ` Numbers without a country code get +${dialCode}.` : ''}</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.{dialCode ? ` Numbers without a country code get +${dialCode}.` : ' Start with your country code.'}</p>
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-notes" className="leading-snug">Please share anything that will help prepare for our meeting.</GlassLabel>
@@ -550,25 +587,27 @@ export default function BookingPage() {
                 {/* Custom questions */}
                 {event?.custom_questions?.length > 0 && event.custom_questions.map((q, qi) => (
                   <div key={qi}>
-                    <GlassLabel className="leading-snug">{q.text}{q.required && ' *'}</GlassLabel>
+                    {q.type === 'multiple_choice'
+                      ? <div id={`q-${qi}-label`} className="mb-1.5 text-sm font-semibold leading-snug">{q.text}{q.required && ' *'}</div>
+                      : <GlassLabel htmlFor={`q-${qi}`} className="leading-snug">{q.text}{q.required && ' *'}</GlassLabel>}
                     {q.type === 'long_text' ? (
-                      <GlassTextarea rows={2} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
+                      <GlassTextarea id={`q-${qi}`} rows={2} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
                     ) : q.type === 'dropdown' ? (
-                      <GlassSelect value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})}>
+                      <GlassSelect id={`q-${qi}`} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})}>
                         <option value="">Select…</option>
                         {(q.options || []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
                       </GlassSelect>
                     ) : q.type === 'multiple_choice' ? (
-                      <div className="space-y-2.5">
+                      <div role="radiogroup" aria-labelledby={`q-${qi}-label`} className="space-y-2.5">
                         {(q.options || []).map((opt, oi) => (
                           <label key={oi} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 cursor-pointer text-[15px]">
-                            <input type="radio" name={`q-${qi}`} checked={customAnswers[qi] === opt} onChange={()=>setCustomAnswers({...customAnswers, [qi]: opt})} className="w-4 h-4" style={{ accentColor: 'var(--ev)' }} />
+                            <input type="radio" id={oi === 0 ? `q-${qi}` : undefined} name={`q-${qi}`} checked={customAnswers[qi] === opt} onChange={()=>setCustomAnswers({...customAnswers, [qi]: opt})} className="w-4 h-4" style={{ accentColor: 'var(--ev)' }} />
                             {opt}
                           </label>
                         ))}
                       </div>
                     ) : (
-                      <GlassInput value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
+                      <GlassInput id={`q-${qi}`} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
                     )}
                   </div>
                 ))}
@@ -578,7 +617,12 @@ export default function BookingPage() {
                   <Link to="/terms" {...outLink} className="font-semibold text-link hover:underline">Terms of Service</Link> and{' '}
                   <Link to="/privacy" {...outLink} className="font-semibold text-link hover:underline">Privacy Policy</Link>.
                 </p>
-                {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+                {error && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {error}
+                    {slotGone && <> <button type="button" onClick={backToTimes} className="font-semibold text-link hover:underline">See available times</button></>}
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={submitting}
@@ -613,13 +657,13 @@ const withDialCode = (raw, code) => {
 };
 
 // last day guests may book: the booking window, the event's end date or its last listed date
-function lastBookableDay(event) {
+function lastBookableDay(event, today = new Date()) {
   if (!event) return null;
   if (event.schedule === 'dates') { const last = [...(event.dates || [])].sort().pop(); return last ? new Date(`${last}T00:00`) : null; }
   if (event.end_date) return new Date(`${event.end_date}T00:00`);
   const days = bookingWindowDays(event);
   if (!days) return null;
-  const d = new Date(); d.setDate(d.getDate() + days); return d;
+  const d = new Date(today); d.setDate(d.getDate() + days); return d;
 }
 
 // Navy or white text, whichever reads on the event colour

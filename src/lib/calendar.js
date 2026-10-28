@@ -1,5 +1,5 @@
 // Calendar integration utilities for GlassMeet
-import { icsText, icsParam, icsFold } from '@/lib/ics.js';
+import { icsText, icsParam, icsFold, meetingLocation } from '@/lib/ics.js';
 // Apple Calendar (.ics) + Google Calendar (add-event URL)
 
 // Format a Date as an iCalendar UTC timestamp: YYYYMMDDTHHMMSSZ
@@ -28,9 +28,11 @@ const buildEventDescription = (booking, eventType, host) => {
 // Generate a full .ics calendar string for a booking
 export const generateIcsEvent = (booking, eventType, host) => {
   const hostName = host?.full_name || eventType?.host_name || 'Host';
-  const title = `${eventType?.name || 'Meeting'} with ${hostName}`;
+  // a request still waiting on the host's approval goes in as tentative
+  const pending = booking.approval_status === 'pending';
+  const title = `${pending ? '(Pending) ' : ''}${eventType?.name || 'Meeting'} with ${hostName}`;
   const description = buildEventDescription(booking, eventType, host);
-  const location = eventType?.address || booking.meeting_url || eventType?.meeting_url || eventType?.location || '';
+  const location = meetingLocation(booking, eventType);
   const tz = booking.timezone || 'UTC';
 
   const lines = [
@@ -47,7 +49,7 @@ export const generateIcsEvent = (booking, eventType, host) => {
     `SUMMARY:${escapeIcs(title)}`,
     `DESCRIPTION:${escapeIcs(description)}`,
     `LOCATION:${escapeIcs(location)}`,
-    `STATUS:CONFIRMED`,
+    `STATUS:${pending ? 'TENTATIVE' : 'CONFIRMED'}`,
     `TRANSP:OPAQUE`,
   ];
 
@@ -64,7 +66,8 @@ export const generateIcsEvent = (booking, eventType, host) => {
 
   lines.push('END:VEVENT', 'END:VCALENDAR');
 
-  return lines.map(foldLine).join('\r\n');
+  // RFC 5545: every line ends with CRLF, the last one too
+  return lines.map(foldLine).join('\r\n') + '\r\n';
 };
 
 // Trigger a download of the .ics file
@@ -87,7 +90,7 @@ export const googleCalendarUrl = (booking, eventType, host) => {
   const hostName = host?.full_name || eventType?.host_name || 'Host';
   const title = `${eventType?.name || 'Meeting'} with ${hostName}`;
   const description = buildEventDescription(booking, eventType, host);
-  const location = eventType?.address || booking.meeting_url || eventType?.meeting_url || '';
+  const location = meetingLocation(booking, eventType);
 
   const dates = `${formatIcsDate(booking.start_time)}/${formatIcsDate(booking.end_time)}`;
 

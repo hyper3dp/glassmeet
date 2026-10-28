@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/localApi';
 import { BarChart3, TrendingUp, Clock, Users, Calendar } from 'lucide-react';
-import { GlassCard, EmptyState, Spinner, PageHeader } from '@/components/glass';
+import { GlassCard, EmptyState, Spinner, LoadError, PageHeader } from '@/components/glass';
 import { detectTimezone } from '@/lib/Availability.js';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -28,8 +28,11 @@ export default function Analytics({ profile }) {
   // canceled and declined bookings don't count towards popularity, length or attendees
   const held = useMemo(() => bookings.filter((b) => b.status !== 'cancelled'), [bookings]);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloads, setReloads] = useState(0);
   useEffect(() => {
     (async () => {
+      setLoadFailed(false);
       try {
         const [b, e] = await Promise.all([
           api.entities.Booking.filter({ host_id: profile.id }, '-created_date', 200),
@@ -37,10 +40,12 @@ export default function Analytics({ profile }) {
         ]);
         setBookings(b);
         setEventTypes(e);
-      } catch {}
+      } catch {
+        setLoadFailed(true);
+      }
       setLoading(false);
     })();
-  }, [profile.id]);
+  }, [profile.id, reloads]);
 
   const stats = useMemo(() => {
     const total = bookings.length;
@@ -106,6 +111,7 @@ export default function Analytics({ profile }) {
   }, [held, timezone]);
 
   if (loading) return <div className="flex justify-center py-24"><Spinner className="w-8 h-8" /></div>;
+  if (loadFailed) return <LoadError what="Your analytics" onRetry={() => { setLoading(true); setReloads((n) => n + 1); }} />;
 
   return (
     <div className="space-y-6 animate-fade-in">

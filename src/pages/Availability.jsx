@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { api } from '@/lib/localApi';
 import { Plus, Trash2, CalendarOff, X, Globe, RefreshCw } from 'lucide-react';
-import { GlassButton, GlassInput, GlassLabel, Spinner, PageHeader, Tabs, TimeSelect, SaveStatus } from '@/components/glass';
+import { GlassButton, GlassInput, GlassLabel, Spinner, LoadError, PageHeader, Tabs, TimeSelect, SaveStatus } from '@/components/glass';
 import { formatDate } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,7 +38,14 @@ export default function Availability({ profile, updateProfile }) {
   const [exceptions, setExceptions] = useState([]);
   const [loading, setLoading] = useState(true);
   // the command palette's "Block time off" links here with ?block=true
-  const [showExc, setShowExc] = useState(() => new URLSearchParams(window.location.search).get('block') === 'true');
+  const [showExc, setShowExc] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // read on every visit (also when already on this page), then cleared so a refresh doesn't reopen it
+  useEffect(() => {
+    if (searchParams.get('block') !== 'true') return;
+    setShowExc(true);
+    setSearchParams((p) => { const next = new URLSearchParams(p); next.delete('block'); return next; }, { replace: true });
+  }, [searchParams]);
   const [saveState, setSaveState] = useState('idle');
   const [saveError, setSaveError] = useState('');
   const pending = useRef({});   // debounced rule updates, keyed by rule id
@@ -56,7 +65,9 @@ export default function Availability({ profile, updateProfile }) {
     });
   }, []);
 
+  const [loadFailed, setLoadFailed] = useState(false);
   const load = async () => {
+    setLoadFailed(false);
     try {
       const [r, e] = await Promise.all([
         api.entities.AvailabilityRule.filter({ created_by_id: profile.id }),
@@ -66,7 +77,9 @@ export default function Availability({ profile, updateProfile }) {
       // Each day shows all its ranges, earliest first; reading never changes them.
       setRules([...r].sort((a, b) => toMin(a.start_time) - toMin(b.start_time)));
       setExceptions(e);
-    } catch {}
+    } catch {
+      setLoadFailed(true);
+    }
     setLoading(false);
   };
 
@@ -102,7 +115,10 @@ export default function Availability({ profile, updateProfile }) {
     if (!extra && dayRules.length) return;
     const range = extra ? nextRange(dayRules) : { start_time: '09:00', end_time: '17:00' };
     if (!range) return;
-    const values = { day_of_week: dow, ...range };
+    createRule({ day_of_week: dow, ...range });
+  };
+
+  const createRule = (values) => {
     const id = tempId();
     // rulesRef follows right away, so a quick second "+" sees this range too
     rulesRef.current = [...rulesRef.current, { id, ...values }];
@@ -150,7 +166,20 @@ export default function Availability({ profile, updateProfile }) {
 
   const toggleDay = (dow, on) => {
     if (on) return addRule(dow);
-    rules.filter((r) => r.day_of_week === dow).forEach((r) => deleteRule(r.id));
+    const removed = rulesRef.current.filter((r) => r.day_of_week === dow);
+    removed.forEach((r) => deleteRule(r.id));
+    // a day can hold split ranges that turning it back on (9–5) wouldn't bring back
+    if (removed.length) {
+      toast(`${DAYS[dow]} turned off`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            if (rulesRef.current.some((r) => r.day_of_week === dow)) return;
+            removed.forEach(({ start_time, end_time }) => createRule({ day_of_week: dow, start_time, end_time }));
+          },
+        },
+      });
+    }
   };
 
   const addException = (exc) => {
@@ -172,6 +201,8 @@ export default function Availability({ profile, updateProfile }) {
   };
 
   if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
+  // editing hours that never loaded would add duplicates of the ones already saved
+  if (loadFailed) return <LoadError what="Your availability" onRetry={() => { setLoading(true); load(); }} />;
 
   return (
     <div className="animate-fade-in">

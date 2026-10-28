@@ -39,7 +39,6 @@ export default function Bookings({ profile, whatsapp }) {
   const timezone = profile?.timezone || detectTimezone();
 
   const setParam = (key, value) => setParams((p) => { const next = new URLSearchParams(p); if (value) next.set(key, value); else next.delete(key); return next; }, { replace: true });
-  const setFilter = (tab) => setParam('tab', tab === 'upcoming' ? '' : tab);
 
   useEffect(() => { load(); }, []);
 
@@ -60,6 +59,7 @@ export default function Bookings({ profile, whatsapp }) {
     if (!id || loading) return;
     const b = bookings.find((x) => x.id === id);
     if (b) setSelected({ booking: b, kind: defaultKind(b) });
+    else toast('That meeting is no longer listed.');
     setParam('id', '');
   }, [params, loading, bookings]);
 
@@ -138,7 +138,13 @@ export default function Bookings({ profile, whatsapp }) {
       <PageHeader title="Meetings">
         <Tabs
           value={query ? '' : filter}
-          onChange={(tab) => { setParam('q', ''); setFilter(tab); }}
+          onChange={(tab) => setParams((p) => {
+            // one update: two in a row would each start from this render's params
+            const next = new URLSearchParams(p);
+            next.delete('q');
+            if (tab === 'upcoming') next.delete('tab'); else next.set('tab', tab);
+            return next;
+          }, { replace: true })}
           tabs={[
             { value: 'upcoming', label: 'Upcoming', count: counts.upcoming || null },
             { value: 'pending', label: 'Pending', count: counts.pending || null },
@@ -184,7 +190,8 @@ export default function Bookings({ profile, whatsapp }) {
 
       {selected && (
         <BookingDetail key={selected.booking.id} booking={selected.booking} initialKind={selected.kind} justChanged={selected.justChanged} timezone={timezone} messageFor={messageFor}
-          onClose={()=>setSelected(null)} onCancel={()=>askCancel(selected.booking)} onApprove={()=>approve(selected.booking)} onDecline={()=>askDecline(selected.booking)} onChanged={load} />
+          onClose={()=>setSelected(null)} onCancel={()=>askCancel(selected.booking)} onApprove={()=>approve(selected.booking)} onDecline={()=>askDecline(selected.booking)}
+          onChanged={(fields) => setBookings((list) => list.map((x) => (x.id === selected.booking.id ? { ...x, ...fields } : x)))} />
       )}
 
       {confirming && (
@@ -253,6 +260,8 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
   const [copied, setCopied] = useState(false);
   const [meetingUrl, setMeetingUrl] = useState(booking.meeting_url || '');
   const [kind, setKind] = useState(initialKind || defaultKind(booking));
+  // cancelling or declining from this dialog keeps it open: switch to the matching message
+  useEffect(() => { setKind(initialKind || defaultKind(booking)); }, [initialKind, booking.status, booking.approval_status]);
   const cancelled = booking.status === 'cancelled';
   const pending = booking.approval_status === 'pending' && !cancelled;
   const message = messageFor({ ...booking, meeting_url: meetingUrl || booking.meeting_url }, kind);
@@ -265,8 +274,14 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
     catch { toast.error('Could not copy the link.'); }
   };
 
-  const saveState = useAutosave({ notes, meeting_url: meetingUrl }, (value) => api.entities.Booking.update(booking.id, value));
-  const close = () => { if (saveState !== 'idle') onChanged(); onClose(); };
+  const copyMessage = async () => {
+    try { await navigator.clipboard.writeText(waMsg); toast.success('Message copied'); }
+    catch { toast.error('Could not copy the message.'); }
+  };
+
+  const autosave = useAutosave({ notes, meeting_url: meetingUrl }, (value) => api.entities.Booking.update(booking.id, value));
+  // the list takes the edits straight away: a reload here would run before the last save does
+  const close = () => { if (autosave.state !== 'idle') onChanged({ notes, meeting_url: meetingUrl }); onClose(); };
   const link = meetingUrl || booking.meeting_url;
 
   return (
@@ -274,7 +289,7 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
       <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-lg p-6 block max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <DialogTitle>Meeting details</DialogTitle>
-          <div className="ml-auto mr-2"><SaveStatus state={saveState} /></div>
+          <div className="ml-auto mr-2"><SaveStatus state={autosave.state} error={autosave.error} onRetry={autosave.retry} /></div>
           <button onClick={close} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
 
@@ -318,17 +333,25 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
             <GlassTextarea id="bd-notes" rows={3} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
           </div>
 
-          {booking.guest_phone && (
-            <div className="rounded-lg bg-secondary p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="bd-msg" className="text-sm font-semibold flex items-center gap-1.5"><MessageCircle className="w-4 h-4" /> WhatsApp message</label>
-                <select aria-label="Message type" value={kind} onChange={(e) => setKind(e.target.value)} className="h-8 rounded-full border border-input bg-field px-3 text-sm font-semibold">
-                  {MESSAGE_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                </select>
-              </div>
-              <GlassTextarea id="bd-msg" rows={6} value={waMsg} onChange={(e) => setDraft(e.target.value)} />
+          {/* without a number the message can still be copied or emailed */}
+          <div className="rounded-lg bg-secondary p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="bd-msg" className="text-sm font-semibold flex items-center gap-1.5"><MessageCircle className="w-4 h-4" /> {booking.guest_phone ? 'WhatsApp message' : 'Message'}</label>
+              <select aria-label="Message type" value={kind} onChange={(e) => setKind(e.target.value)} className="h-8 rounded-full border border-input bg-field px-3 text-sm font-semibold">
+                {MESSAGE_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+              </select>
             </div>
-          )}
+            <GlassTextarea id="bd-msg" rows={6} value={waMsg} onChange={(e) => setDraft(e.target.value)} />
+            {!booking.guest_phone && (
+              <div className="flex flex-wrap gap-2">
+                <GlassButton type="button" size="sm" onClick={copyMessage}><Copy className="w-4 h-4" /> Copy message</GlassButton>
+                {booking.guest_email && (
+                  <a href={`mailto:${booking.guest_email}?subject=${encodeURIComponent(booking.event_name || 'Our meeting')}&body=${encodeURIComponent(waMsg)}`}
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold transition-all duration-200 hover:border-border-hover hover:bg-card"><Mail className="w-4 h-4" /> Email</a>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 mt-6">

@@ -15,11 +15,23 @@ const ICONS = {
   booking_request: Bell,
 };
 
+// "just now", "5m ago", "3h ago", "2d ago", then the date
+const timeAgo = (iso) => {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (!iso || Number.isNaN(mins)) return '';
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
+  if (mins < 10080) return `${Math.round(mins / 1440)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
 export default function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [markError, setMarkError] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const loaded = useRef(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -38,8 +50,13 @@ export default function NotificationCenter() {
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   // the interval keeps the first render's function, so "loaded once" lives in a ref: only the
@@ -50,7 +67,11 @@ export default function NotificationCenter() {
       const list = await api.entities.Notification.filter({}, '-created_date', 20);
       setNotifications(list);
       loaded.current = true;
-    } catch {}
+      setLoadFailed(false);
+    } catch {
+      // a later background check failing keeps the list already shown
+      if (!loaded.current) setLoadFailed(true);
+    }
     setLoading(false);
   };
 
@@ -79,7 +100,8 @@ export default function NotificationCenter() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        aria-label="Notifications"
+        aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-expanded={open}
         className="relative w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"
       >
         <Bell className="w-[18px] h-[18px]" />
@@ -104,6 +126,11 @@ export default function NotificationCenter() {
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading…</div>
+            ) : loadFailed ? (
+              <div role="alert" className="px-4 py-8 text-center text-sm text-muted-foreground">
+                Notifications couldn’t be loaded.{' '}
+                <button type="button" onClick={loadNotifications} className="font-semibold text-link hover:underline">Try again</button>
+              </div>
             ) : notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications.</div>
             ) : (
@@ -117,6 +144,7 @@ export default function NotificationCenter() {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{n.title}</div>
                     {n.message && <div className="text-xs text-muted-foreground line-clamp-2">{n.message}</div>}
+                    {n.created_date && <div className="mt-0.5 text-xs text-hint">{timeAgo(n.created_date)}</div>}
                   </div>
                 </button>
               ))

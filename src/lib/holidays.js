@@ -26,7 +26,9 @@ export const holidayClashes = (bookings, holidays, tz) => {
 export const rescheduleMessage = ({ booking, holiday, bookingLink, timezone }) => {
   const tz = booking.timezone || timezone;
   const first = (booking.guest_name || '').trim().split(/\s+/)[0];
-  return `Hi${first ? ` ${first}` : ''}, I'm sorry, I need to reschedule our meeting on ${formatMeetingDate(booking.start_time, tz)} at ${formatMeetingTime(booking.start_time, tz)} because of ${holiday}.
+  // booking.timezone is the host's: name it, as the guest may be somewhere else
+  const zone = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(new Date(booking.start_time)).find((p) => p.type === 'timeZoneName')?.value;
+  return `Hi${first ? ` ${first}` : ''}, I'm sorry, I need to reschedule our meeting on ${formatMeetingDate(booking.start_time, tz)} at ${formatMeetingTime(booking.start_time, tz)}${zone ? ` (${zone})` : ''} because of ${holiday}.
 
 Please pick a new time that suits you here: ${bookingLink}`;
 };

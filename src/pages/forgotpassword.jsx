@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
-import AuthLayout from "@/components/Authlayout.jsx";
+import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get("email") || "");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -37,7 +37,13 @@ export default function ForgotPassword() {
       }
     >
       {sent ? (
-        <p className="text-center text-sm text-foreground">If an account exists for that email, a password reset link has been sent.</p>
+        <div role="status" className="text-sm">
+          <p className="text-foreground">If an account exists for <span className="font-semibold">{email}</span>, we sent it a password reset link. It can take a minute, and may land in spam.</p>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            <ResendEmailButton onResend={() => api.auth.resetPasswordRequest(email)} />
+            <button type="button" onClick={() => setSent(false)} className="font-semibold text-link hover:underline">Use a different email</button>
+          </div>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

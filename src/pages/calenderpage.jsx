@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Zap } from 'lucide-react';
-import { GlassButton, Spinner, EmptyState, PageHeader } from '@/components/glass';
+import { GlassButton, Spinner, LoadError, EmptyState, PageHeader } from '@/components/glass';
 import { formatMeetingTime } from '@/lib/whatsapp';
 import { detectTimezone, dateInZone } from '@/lib/Availability.js';
 import FindATime from '@/components/FindAtime.jsx';
@@ -24,7 +24,14 @@ export default function CalendarPage({ profile }) {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
   // the command palette's "Find a time" links here with ?find=true
-  const [showFindTime, setShowFindTime] = useState(() => new URLSearchParams(window.location.search).get('find') === 'true');
+  const [showFindTime, setShowFindTime] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // read on every visit (also when already on this page), then cleared so a refresh doesn't reopen it
+  useEffect(() => {
+    if (searchParams.get('find') !== 'true') return;
+    setShowFindTime(true);
+    setSearchParams((p) => { const next = new URLSearchParams(p); next.delete('find'); return next; }, { replace: true });
+  }, [searchParams]);
   const timezone = profile?.timezone || detectTimezone();
 
   useEffect(() => { load(); }, []);
@@ -32,12 +39,16 @@ export default function CalendarPage({ profile }) {
     api.holidays.forRegion(profile?.holidays).then((h) => setHolidays(holidayMap(h))).catch(() => setHolidays({}));
   }, [profile?.holidays]);
 
+  const [loadFailed, setLoadFailed] = useState(false);
   const load = async () => {
+    setLoadFailed(false);
     try {
       const b = await api.entities.Booking.filter({ host_id: profile.id }, '-start_time', 1000);
       // everything still on (confirmed, completed, and requests awaiting approval)
       setBookings(b.filter((x) => x.status !== 'cancelled'));
-    } catch (e) {}
+    } catch {
+      setLoadFailed(true);
+    }
     setLoading(false);
   };
 
@@ -52,7 +63,8 @@ export default function CalendarPage({ profile }) {
 
   const move = (dir) => {
     const d = new Date(cursor);
-    if (view === 'month') d.setMonth(d.getMonth() + dir);
+    // from the 1st, so Oct 31 + 1 month is November rather than Dec 1
+    if (view === 'month') { d.setDate(1); d.setMonth(d.getMonth() + dir); }
     if (view === 'week') d.setDate(d.getDate() + dir * 7);
     if (view === 'day') d.setDate(d.getDate() + dir);
     setCursor(d);
@@ -67,6 +79,7 @@ export default function CalendarPage({ profile }) {
   }, [cursor, view]);
 
   if (loading) return <div className="flex justify-center py-24"><Spinner /></div>;
+  if (loadFailed) return <LoadError what="Your calendar" onRetry={() => { setLoading(true); load(); }} />;
 
   return (
     <div className="space-y-6 animate-fade-in">

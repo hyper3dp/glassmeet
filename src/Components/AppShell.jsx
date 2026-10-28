@@ -22,7 +22,7 @@ export default function AppShell() {
   // Command palette keyboard shortcut: Ctrl+K / Cmd+K
   useEffect(() => {
     const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key?.toLowerCase() === 'k') {
         e.preventDefault();
         setCmdOpen((v) => !v);
       }

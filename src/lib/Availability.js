@@ -37,6 +37,20 @@ export const intervalsForDate = (date, rules, exceptions) => {
   return intervals;
 };
 
+// Start minutes of an event with fixed times (eventType.fixed_times, "HH:MM" in the host's zone)
+// on a date: those times, whatever the weekly hours, minus any that run into time blocked off
+// on that date. Mirrored by the database's slot check.
+export const fixedStartsForDate = (date, times, duration, exceptions) => {
+  const dateStr = formatDate(date);
+  const blocked = exceptions.filter((e) => e.date === dateStr && e.type === 'blocked').map((e) => ({
+    start: e.start_time ? timeToMinutes(e.start_time) : 0,
+    end: e.end_time ? timeToMinutes(e.end_time) : 24 * 60,
+  }));
+  return [...new Set(times.map(timeToMinutes))]
+    .filter((t) => t + duration <= 24 * 60 && !blocked.some((b) => t < b.end && b.start < t + duration))
+    .sort((a, b) => a - b);
+};
+
 const subtractInterval = (intervals, bs, be) => {
   const result = [];
   for (const iv of intervals) {
@@ -142,7 +156,12 @@ export const zonedTimeToUtc = (y, m, d, minutes, tz) => {
   const guess = Date.UTC(y, m, d, 0, minutes);
   const first = guess - offsetMinutes(guess, tz) * 60000;
   const second = guess - offsetMinutes(first, tz) * 60000;
-  return second;
+  const wall = (ms) => { const p = zoneParts(ms, tz); return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute); };
+  if (wall(second) === guess) return second;
+  if (wall(first) === guess) return first;
+  // the time falls in a spring-forward gap (in some zones that's midnight): take the first
+  // instant after it, so the day still starts on its own date
+  return Math.max(first, second);
 };
 
 // calendar date of an instant in tz, as a local Date (for getDay / formatDate)
@@ -203,7 +222,11 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
   for (let k = -1; k <= 1; k++) {
     const hostDay = new Date(hostFirst.getFullYear(), hostFirst.getMonth(), hostFirst.getDate() + k);
     if (!eventRunsOn(eventType, hostDay)) continue;
-    for (const iv of intervalsForDate(hostDay, rules, exceptions)) {
+    // fixed times stand in for the open hours: each is a one-off range just long enough
+    const ranges = eventType.fixed_times?.length
+      ? fixedStartsForDate(hostDay, eventType.fixed_times, duration, exceptions).map((t) => ({ start: t, end: t + duration }))
+      : intervalsForDate(hostDay, rules, exceptions);
+    for (const iv of ranges) {
       for (let t = iv.start; t + duration <= iv.end; t += slotStep) {
         const start = zonedTimeToUtc(hostDay.getFullYear(), hostDay.getMonth(), hostDay.getDate(), t, tz);
         if (start < dayStart || start >= dayEnd || start < earliest || seen.has(start)) continue;
@@ -232,20 +255,18 @@ export const minutesTo24h = (mins) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
-// Check whether a date is within max_future_days from today
-export const isWithinMaxFuture = (date, maxFutureDays) => {
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+
+// Check whether a date is within max_future_days from today. today: a local Date for "today"
+// in the zone being shown (dateInZone(Date.now(), tz)); this browser's day by default.
+export const isWithinMaxFuture = (date, maxFutureDays, today = startOfToday()) => {
   if (!maxFutureDays) return true;
-  const max = new Date();
-  max.setHours(0, 0, 0, 0);
+  const max = new Date(today);
   max.setDate(max.getDate() + maxFutureDays);
   return date <= max;
 };
 
-export const isPastDate = (date) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date < today;
-};
+export const isPastDate = (date, today = startOfToday()) => date < today;
 
 // Get browser timezone
 export const detectTimezone = () => {

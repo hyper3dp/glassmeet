@@ -25,7 +25,7 @@ const savedBooking = (pathname) => {
 
 export default function BookingConfirmation() {
   const location = useLocation();
-  const { booking, event, host } = location.state || savedBooking(location.pathname);
+  const { booking, event, host, bookPath, guestTz } = location.state || savedBooking(location.pathname);
   const [copied, setCopied] = useState(false);
   const [embed] = useState(isEmbed);
   useEmbedResize(embed);
@@ -38,13 +38,13 @@ export default function BookingConfirmation() {
         <div className="w-14 h-14 rounded-full bg-primary-soft flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-link" /></div>
         <h1 className="text-xl font-bold">Booking details aren’t available here</h1>
         <p className="max-w-sm text-sm text-muted-foreground">If you just booked, your host has your request. Check your calendar or WhatsApp for the details.</p>
-        {!embed && <Link to="/"><GlassButton variant="primary" size="sm">Back to home</GlassButton></Link>}
+        {!embed && <GlassButton variant="primary" size="sm" type="button" onClick={() => window.history.back()}>Go back</GlassButton>}
       </div>
     );
   }
 
   // the guest's own zone, matching the times they picked from (booking.timezone is the host's)
-  const tz = detectTimezone() || booking.timezone || 'UTC';
+  const tz = guestTz || detectTimezone() || booking.timezone || 'UTC';
   const date = formatMeetingDate(booking.start_time, tz);
   const time = formatMeetingTime(booking.start_time, tz);
   const endTime = formatMeetingTime(booking.end_time, tz);
@@ -95,7 +95,7 @@ export default function BookingConfirmation() {
             </div>
             <h1 className="text-2xl sm:text-[28px] font-bold">{pending ? 'Request sent' : 'You are scheduled'}</h1>
             <p className="mt-2 text-[15px] text-muted-foreground">
-              {pending ? `${hostName} will review your request and reply on WhatsApp.` : `Your meeting with ${hostName} is booked. Confirm it on WhatsApp below.`}
+              {pending ? `${hostName} will review your request and reply on WhatsApp.` : `Your meeting with ${hostName} is booked. Send them a quick WhatsApp if you like.`}
             </p>
           </div>
 
@@ -155,7 +155,10 @@ export default function BookingConfirmation() {
             <pre className="mt-3 text-sm whitespace-pre-wrap font-body text-foreground">{waMsg}</pre>
           </details>
 
-          <p className="mt-8 text-center text-sm text-muted-foreground">Need to change something? Message {hostName} on WhatsApp.</p>
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            Need to change something? Message {hostName} on WhatsApp
+            {bookPath && <>, or <Link to={bookPath} className="font-semibold text-link hover:underline">pick another time</Link></>}.
+          </p>
         </div>
       </div>
     </div>
