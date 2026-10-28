@@ -34,6 +34,20 @@ async function writeSkippingMissingColumns(run, value) {
 const notDeployed = (error) => error && (error.code === 'PGRST202' || error.code === '42883' || /could not find the function|does not exist/i.test(error.message || ''));
 
 let googleBusyMissing = false; // the google-calendar edge function isn't there (see google.busy)
+
+const googleError = (code, message) => Object.assign(new Error(message), { code });
+// Calls the google-calendar edge function; a failure throws an Error with the function's `code`.
+// A function that isn't deployed (or can't be reached) is code 'unavailable'.
+async function invokeGoogle(body) {
+  const { data, error } = await supabase.functions.invoke('google-calendar', { body });
+  if (!error) return data;
+  const response = error.context;
+  if (error.name === 'FunctionsFetchError' || error.name === 'FunctionsRelayError' || response?.status === 404) {
+    throw googleError('unavailable', 'Google Calendar isn’t available yet.');
+  }
+  const detail = typeof response?.json === 'function' ? await response.json().catch(() => null) : null;
+  throw googleError(detail?.error || 'error', detail?.message || error.message || 'Google Calendar didn’t respond.');
+}
 let meCache = null;
 const sessionUser = async () => (await supabase.auth.getSession()).data.session?.user || null;
 // SIGNED_IN also fires when a tab regains focus; the cache is keyed by user id, so another user
@@ -313,53 +327,47 @@ export const api = {
     // same shape as supabase-js: { data: { subscription } }
     onAuthStateChange: (callback) => supabase.auth.onAuthStateChange((event, session) => callback(event, session)),
   },
+  // Google Calendar: the connection row is read directly (RLS: own row only); everything that
+  // needs Google goes through the google-calendar edge function. Errors carry a `code`
+  // ('not_configured', 'unavailable', 'not_connected', 'reconnect', ...).
   google: {
     status: async () => {
-      const { data, error } = await supabase.from('google_accounts').select('*').single();
-      if (error) return { connected: false };
-      return { connected: true, ...data };
+      const user = await sessionUser();
+      if (!user) return { connected: false };
+      const { data, error } = await supabase.from('google_accounts')
+        .select('email, calendar_id, calendar_name, auto_sync, connected, synced_date, connected_date')
+        .eq('user_id', user.id).maybeSingle();
+      // no table yet (migration not applied) or no row: simply not connected
+      if (error || !data) return { connected: false };
+      return { ...data, connected: Boolean(data.connected), needsReconnect: !data.connected };
     },
-    calendars: async () => {
-      const { data, error } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'listCalendars' }
-      });
-      if (error) throw new Error(error.message);
-      return data;
+    // starts the OAuth flow: Google's consent page, then back to returnTo
+    connect: async (returnTo = '/calendar-connections') => {
+      const { url } = await invokeGoogle({ action: 'authUrl', returnTo });
+      if (!url) throw googleError('unavailable', 'Google Calendar isn’t available yet.');
+      window.location.assign(url);
     },
+    // the app's half of the callback: hands Google's code to the function as the signed-in host
+    finish: (code, state) => invokeGoogle({ action: 'finish', code, state }),
+    calendars: () => invokeGoogle({ action: 'listCalendars' }),
     // Booking pages ask on every month change. Once the function turns out to be missing (not
     // deployed, or unreachable), stop asking for the rest of the session.
     busy: async (hostId, timeMin, timeMax) => {
       if (googleBusyMissing) return [];
-      const { data, error } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'freeBusy', hostId, timeMin, timeMax }
-      });
-      if (error) {
-        const status = error.context?.status;
-        if (error.name === 'FunctionsFetchError' || status === 404 || /not found/i.test(error.message || '')) googleBusyMissing = true;
-        throw new Error(error.message);
+      try {
+        const data = await invokeGoogle({ action: 'freeBusy', hostId, timeMin, timeMax });
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        if (error.code === 'unavailable') googleBusyMissing = true;
+        throw error;
       }
-      return data;
     },
-    saveSettings: async (value) => {
-      const { data, error } = await supabase.from('google_accounts').upsert({
-        user_id: (await supabase.auth.getUser()).data.user.id,
-        ...value
-      }).select().single();
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    sync: async () => {
-      const { data, error } = await supabase.functions.invoke('google-calendar', {
-        body: { action: 'sync' }
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    disconnect: async () => {
-      const { data, error } = await supabase.from('google_accounts').delete().eq('user_id', (await supabase.auth.getUser()).data.user.id);
-      if (error) throw new Error(error.message);
-      return { success: true };
-    },
+    // copies a booking to the host's Google Calendar; never fails the caller
+    pushBooking: (bookingId) => invokeGoogle({ action: 'pushBooking', bookingId }).catch(() => ({ pushed: false })),
+    // { calendarId?, autoSync? } -> { calendarId, calendarName, autoSync }
+    saveSettings: (value) => invokeGoogle({ action: 'saveSettings', ...value }),
+    sync: () => invokeGoogle({ action: 'sync' }),
+    disconnect: () => invokeGoogle({ action: 'disconnect' }),
   },
   // Profile photo: uploads to the public avatars bucket under the user's own folder
   storage: {

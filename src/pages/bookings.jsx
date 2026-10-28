@@ -93,6 +93,8 @@ export default function Bookings({ profile, whatsapp }) {
       // nothing updated: the meeting was deleted, or isn't this host's to change
       if (!saved) throw new Error('It may have been deleted. Reload the page.');
       const updated = { ...b, ...fields };
+      // approved, cancelled or declined: the host's Google Calendar follows (if connected)
+      if ('approval_status' in fields || 'status' in fields) api.google.pushBooking(b.id);
       setBookings((list) => list.map((x) => (x.id === b.id ? updated : x)));
       if (thenMessage) setSelected({ booking: updated, kind: thenMessage, justChanged: true });
       else setSelected((cur) => (cur?.booking.id === b.id ? { ...cur, booking: updated } : cur));

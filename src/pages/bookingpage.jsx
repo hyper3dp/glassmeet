@@ -148,7 +148,7 @@ export default function BookingPage() {
     // the neighbouring months in this browser's
     const timeMin = new Date(cursorYear, cursorMonth, 0).toISOString();
     const timeMax = new Date(cursorYear, cursorMonth + 1, 2).toISOString();
-    // Google Calendar busy times are optional (connections are "coming soon"); without them,
+    // Google Calendar busy times are optional (only hosts who connected Google have any); without them,
     // slots come from the host's availability and GlassMeet bookings.
     let current = true; // a slow answer for a month the guest has left doesn't overwrite this one
     // nothing busy keeps the same empty list, so the times aren't worked out again for nothing
@@ -332,6 +332,8 @@ export default function BookingPage() {
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
+      // copy it to the host's Google Calendar if they connected one (never holds up the guest)
+      if (!requiresApproval) api.google.pushBooking(booking.id);
       // the meeting link is private until booked; ask for it now (null while awaiting approval).
       // The booking is made by now, so a failure here must not read as a failed booking.
       const link = await api.bookings.meetingLink(booking.id).catch(() => undefined);

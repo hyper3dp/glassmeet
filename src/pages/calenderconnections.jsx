@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Calendar, CalendarCheck, RefreshCw, Unplug, CheckCircle2,
@@ -29,14 +30,26 @@ const SAMPLE_BOOKING = {
 };
 const SAMPLE_EVENT = { name: 'GlassMeet Test', duration: 30, location: 'Online', description: 'Test event', meeting_url: 'https://meet.glassmeet.app/sample' };
 
+const GOOGLE_UNAVAILABLE = 'Google Calendar isn’t available yet.';
+const unavailable = (error) => error?.code === 'not_configured' || error?.code === 'unavailable';
+// what to say when Google sends the host back without a connection (?google=error&reason=...)
+const GOOGLE_RETURN_ERRORS = {
+  denied: 'Google Calendar wasn’t connected: access was not allowed.',
+  state: 'That Google sign-in expired. Try connecting again.',
+};
+// Google's code is single use; StrictMode's second effect run must not send it again
+const finishedGoogleCodes = new Set();
+
 export default function CalendarConnections() {
   const { profile, updateProfile } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showGoogleSetup, setShowGoogleSetup] = useState(false);
   const [googleAccount, setGoogleAccount] = useState({ connected: false });
-  const [googleCalendarsList, setGoogleCalendarsList] = useState([]);
-  const [googleError, setGoogleError] = useState(() => new URLSearchParams(window.location.search).get('google_error') === 'not_configured'
-    ? 'Google Calendar is not configured yet. Add the Google OAuth values to .env.'
-    : '');
+  const [googleLoading, setGoogleLoading] = useState(true);
+  const [googleCalendarsList, setGoogleCalendarsList] = useState(null); // null: not loaded yet
+  const [googleError, setGoogleError] = useState('');
+  const [googleUnavailable, setGoogleUnavailable] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(''); // 'connect' | 'finish' | 'settings' | 'disconnect'
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [syncing, setSyncing] = useState(false);
@@ -47,9 +60,11 @@ export default function CalendarConnections() {
   const [feedResetting, setFeedResetting] = useState(false);
 
   const googleConnected = Boolean(googleAccount.connected);
+  const googleReconnect = Boolean(googleAccount.needsReconnect);
   const autoSync = googleAccount.auto_sync ?? true;
-  const selectedCalendars = googleAccount.calendar_name ? [googleAccount.calendar_name] : [];
-  const lastSynced = googleAccount.last_synced;
+  const calendarLabel = googleAccount.calendar_name
+    || (!googleAccount.calendar_id || googleAccount.calendar_id === 'primary' ? 'Primary calendar' : googleAccount.calendar_id);
+  const lastSynced = googleAccount.synced_date;
 
   // Microsoft Outlook connection state (Microsoft 365 + Outlook.com)
   // Uses Microsoft Graph API via platform OAuth — supports both work/school and personal accounts.
@@ -67,19 +82,63 @@ export default function CalendarConnections() {
 
   const refreshGoogle = async () => {
     try {
-      const status = await api.google.status();
-      setGoogleAccount(status);
-      setGoogleError('');
-      setGoogleCalendarsList(status.connected ? await api.google.calendars() : []);
-    } catch (error) {
-      setGoogleError(error.message);
+      setGoogleAccount(await api.google.status());
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
-  useEffect(() => { refreshGoogle(); }, []);
+  // "not set up yet" shows on the card; anything else as a message (and a toast when asked)
+  const showGoogleError = (error, toastPrefix) => {
+    if (unavailable(error)) { setGoogleUnavailable(true); setGoogleError(''); return; }
+    if (error?.code === 'reconnect' || error?.code === 'not_connected') refreshGoogle();
+    setGoogleError(error?.message || 'Google Calendar didn’t respond.');
+    if (toastPrefix) toast.error(`${toastPrefix} ${error?.message || ''}`.trim());
+  };
 
-  const handleConnectGoogle = () => {
-    api.auth.loginWithGoogle('/calendar-connections', 'calendar').catch((error) => setGoogleError(error.message));
+  // Back from Google: ?google=finish&code=&state= is finished here, by the signed-in host;
+  // ?google=error&reason= says what went wrong
+  useEffect(() => {
+    const result = searchParams.get('google');
+    if (!result) { refreshGoogle(); return; }
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const reason = searchParams.get('reason');
+    // the code must not stay in the address bar or the history
+    const rest = new URLSearchParams(searchParams);
+    ['google', 'code', 'state', 'reason'].forEach((key) => rest.delete(key));
+    setSearchParams(rest, { replace: true });
+
+    if (result === 'finish' && code && state) {
+      if (finishedGoogleCodes.has(code)) return;
+      finishedGoogleCodes.add(code);
+      setGoogleBusy('finish');
+      api.google.finish(code, state)
+        .then((done) => {
+          toast.success(done?.email ? `Google Calendar connected (${done.email}).` : 'Google Calendar connected.');
+          setGoogleError('');
+        })
+        .catch((error) => showGoogleError(error, 'Could not connect Google Calendar.'))
+        .finally(() => { setGoogleBusy(''); refreshGoogle(); });
+      return;
+    }
+    if (result === 'connected') toast.success('Google Calendar connected.');
+    else if (result === 'error') toast.error(GOOGLE_RETURN_ERRORS[reason] || 'Google Calendar wasn’t connected. Try again.');
+    refreshGoogle();
+    // once, for the address the page opened with
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleConnectGoogle = async () => {
+    setGoogleBusy('connect');
+    setGoogleError('');
+    try {
+      await api.google.connect('/calendar-connections');
+      // leaving for Google; the button stays busy until the page goes
+    } catch (error) {
+      showGoogleError(error);
+      setGoogleBusy('');
+    }
   };
 
   // a failed save says so instead of failing silently
@@ -87,24 +146,71 @@ export default function CalendarConnections() {
     try { await work(...args); } catch (error) { toast.error(`${failMessage} ${error?.message || ''}`.trim()); }
   };
 
-  const handleDisconnectGoogle = attempt(async () => {
-    await api.google.disconnect();
-    setGoogleAccount({ connected: false });
-    setGoogleCalendarsList([]);
-  }, 'Could not disconnect Google Calendar.');
+  const handleDisconnectGoogle = async () => {
+    if (!confirm('Disconnect Google Calendar? Busy times in Google stop hiding slots and new bookings stop being added. Events already in Google stay there.')) return;
+    setGoogleBusy('disconnect');
+    try {
+      await api.google.disconnect();
+      setGoogleAccount({ connected: false });
+      setGoogleCalendarsList(null);
+      setGoogleError('');
+      setTestResult(null);
+      toast.success('Google Calendar disconnected.');
+    } catch (error) {
+      showGoogleError(error, 'Could not disconnect Google Calendar.');
+    } finally {
+      setGoogleBusy('');
+    }
+  };
 
-  const toggleAutoSync = attempt(async () => {
-    const result = await api.google.saveSettings({ calendarId: googleAccount.calendar_id, autoSync: !autoSync });
-    setGoogleAccount((current) => ({ ...current, auto_sync: result.autoSync }));
-  }, 'Could not change auto-sync.');
+  const toggleAutoSync = async () => {
+    const next = !autoSync;
+    setGoogleAccount((current) => ({ ...current, auto_sync: next }));
+    try {
+      const result = await api.google.saveSettings({ autoSync: next });
+      setGoogleAccount((current) => ({ ...current, auto_sync: result.autoSync }));
+    } catch (error) {
+      setGoogleAccount((current) => ({ ...current, auto_sync: !next }));
+      showGoogleError(error, 'Could not change auto-sync.');
+    }
+  };
+
+  const openGoogleCalendars = async () => {
+    setShowGoogleSetup(true);
+    if (googleCalendarsList) return;
+    try {
+      setGoogleCalendarsList(await api.google.calendars());
+    } catch (error) {
+      setShowGoogleSetup(false);
+      showGoogleError(error, 'Could not load your Google calendars.');
+    }
+  };
+
+  const saveGoogleCalendar = async (calendarId) => {
+    setGoogleBusy('settings');
+    try {
+      const result = await api.google.saveSettings({ calendarId });
+      setGoogleAccount((current) => ({ ...current, calendar_id: result.calendarId, calendar_name: result.calendarName, auto_sync: result.autoSync }));
+      setShowGoogleSetup(false);
+      toast.success('Calendar saved. Sync now moves upcoming meetings there.');
+    } catch (error) {
+      showGoogleError(error, 'Could not save your calendar choice.');
+    } finally {
+      setGoogleBusy('');
+    }
+  };
 
   const syncNow = async () => {
     setSyncing(true);
+    setGoogleError('');
     try {
-      await api.google.sync();
-      await refreshGoogle();
+      const result = await api.google.sync();
+      const changed = (result?.created || 0) + (result?.updated || 0) + (result?.deleted || 0);
+      if (result?.failed) toast.error(`${result.failed} meeting${result.failed === 1 ? '' : 's'} could not be synced. Try again later.`);
+      else toast.success(changed ? `Synced ${changed} meeting${changed === 1 ? '' : 's'} to Google Calendar.` : 'Google Calendar is up to date.');
+      setGoogleAccount((current) => ({ ...current, synced_date: result?.syncedDate || new Date().toISOString() }));
     } catch (error) {
-      setGoogleError(error.message);
+      showGoogleError(error, 'Could not sync Google Calendar.');
     } finally {
       setSyncing(false);
     }
@@ -134,11 +240,11 @@ export default function CalendarConnections() {
   const testGoogle = async () => {
     setTesting('google');
     try {
-      await api.google.calendars();
+      setGoogleCalendarsList(await api.google.calendars());
       setTestResult({ type: 'google', ok: true });
       setGoogleError('');
     } catch (error) {
-      setGoogleError(error.message);
+      showGoogleError(error);
       setTestResult({ type: 'google', ok: false });
     } finally {
       setTesting(null);
@@ -210,7 +316,7 @@ export default function CalendarConnections() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Calendars" description="Keep your meetings in the calendar you already use. Google and Outlook account connections are coming soon." />
+      <PageHeader title="Calendars" description="Keep your meetings in the calendar you already use. Outlook account connections are coming soon." />
 
       {/* Subscribe: one auto-updating feed per host */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
@@ -271,22 +377,34 @@ export default function CalendarConnections() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-[17px] font-bold">Google Calendar</h2>
-              {googleConnected ? <StatusBadge connected /> : <ComingSoonBadge />}
+              {googleLoading ? null
+                : googleConnected ? <StatusBadge connected />
+                  : googleReconnect ? <ReconnectBadge />
+                    : googleUnavailable ? <ComingSoonBadge /> : <StatusBadge connected={false} />}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               {googleConnected
-                ? 'Connected. Availability is checked against your Google Calendar before booking slots are shown.'
-                : 'Soon you can connect Google Calendar so busy times stay off your booking page and new bookings are added to it. Until then, guests can add meetings to Google Calendar from their confirmation page.'}
+                ? `Connected${googleAccount.email ? ` to ${googleAccount.email}` : ''}. Times you’re busy in Google are hidden from your booking pages${autoSync ? ', and new bookings are added to Google Calendar' : ''}.`
+                : googleReconnect
+                  ? `Google stopped accepting the connection${googleAccount.email ? ` to ${googleAccount.email}` : ''}. Connect again to keep busy times and bookings in sync.`
+                  : googleUnavailable
+                    ? `${GOOGLE_UNAVAILABLE} Until then, guests can add meetings to Google Calendar from their confirmation page.`
+                    : 'Connect Google Calendar so times you’re busy stay off your booking pages and new bookings are added to your calendar.'}
             </p>
+
+            {googleLoading && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Checking your connection…</div>
+            )}
+            {googleBusy === 'finish' && (
+              <div role="status" className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Finishing the connection…</div>
+            )}
 
             {googleConnected && (
               <div className="mt-4 space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {selectedCalendars.length ? selectedCalendars.map((c) => (
-                    <span key={c} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-secondary">
-                      <Calendar className="w-3 h-3" /> {c}
-                    </span>
-                  )) : <span className="text-xs text-muted-foreground">Checking all calendars</span>}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-secondary">
+                    <Calendar className="w-3 h-3" /> {calendarLabel}
+                  </span>
                 </div>
                 {lastSynced && (
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -295,39 +413,46 @@ export default function CalendarConnections() {
                 )}
                 {testResult?.type === 'google' && testResult.ok && (
                   <p className="text-xs text-success flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3 h-3" /> Connection verified — token is valid.
+                    <CheckCircle2 className="w-3 h-3" /> Connection verified.
                   </p>
                 )}
-                {googleError && <p className="text-xs text-destructive">{googleError}</p>}
                 <label className="flex items-center gap-2.5 cursor-pointer pt-1">
                   <Switch checked={autoSync} onCheckedChange={toggleAutoSync} />
                   <span className="text-sm">Auto-sync new bookings to Google</span>
                 </label>
               </div>
             )}
+            {googleError && <p role="alert" className="mt-3 text-xs text-destructive">{googleError}</p>}
           </div>
         </div>
 
-        <div className="px-5 pb-5 flex flex-wrap gap-2">
-          {googleConnected ? (
-            <>
-              <GlassButton size="sm" onClick={() => setShowGoogleSetup(true)}>
-                <Settings2 className="w-4 h-4" /> Calendars
+        {!googleLoading && (
+          <div className="px-5 pb-5 flex flex-wrap gap-2">
+            {googleConnected ? (
+              <>
+                <GlassButton size="sm" type="button" onClick={openGoogleCalendars}>
+                  <Settings2 className="w-4 h-4" /> Calendar
+                </GlassButton>
+                <GlassButton size="sm" type="button" onClick={syncNow} disabled={syncing}>
+                  {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
+                </GlassButton>
+                <GlassButton size="sm" type="button" variant="ghost" onClick={testGoogle} disabled={testing === 'google'}>
+                  {testing === 'google' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Test
+                </GlassButton>
+                <GlassButton size="sm" type="button" variant="ghost" onClick={handleDisconnectGoogle} disabled={googleBusy === 'disconnect'}>
+                  {googleBusy === 'disconnect' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unplug className="w-4 h-4" />} Disconnect
+                </GlassButton>
+              </>
+            ) : googleUnavailable ? (
+              <ComingSoonButton label="Google Calendar" />
+            ) : (
+              <GlassButton size="sm" type="button" variant="primary" onClick={handleConnectGoogle} disabled={googleBusy === 'connect' || googleBusy === 'finish'}>
+                {googleBusy === 'connect' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarCheck className="w-4 h-4" />}
+                {googleReconnect ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
               </GlassButton>
-              <GlassButton size="sm" onClick={syncNow} disabled={syncing}>
-                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
-              </GlassButton>
-              <GlassButton size="sm" variant="ghost" onClick={testGoogle} disabled={testing === 'google'}>
-                {testing === 'google' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Test
-              </GlassButton>
-              <GlassButton size="sm" variant="ghost" onClick={handleDisconnectGoogle}>
-                <Unplug className="w-4 h-4" /> Disconnect
-              </GlassButton>
-            </>
-          ) : (
-            <ComingSoonButton label="Google Calendar" />
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </GlassCard>
 
       {/* Apple Calendar */}
@@ -429,15 +554,11 @@ export default function CalendarConnections() {
 
       {showGoogleSetup && (
         <GoogleSetupModal
-          connected={googleConnected}
           calendars={googleCalendarsList}
           selectedCalendarId={googleAccount.calendar_id || 'primary'}
+          saving={googleBusy === 'settings'}
           onClose={() => setShowGoogleSetup(false)}
-          onSave={attempt(async (calendarId) => {
-            const result = await api.google.saveSettings({ calendarId, autoSync });
-            setGoogleAccount((current) => ({ ...current, connected: true, calendar_id: result.calendarId, calendar_name: result.calendarName, auto_sync: result.autoSync }));
-            setShowGoogleSetup(false);
-          }, 'Could not save your calendar choice.')}
+          onSave={saveGoogleCalendar}
         />
       )}
 
@@ -475,6 +596,14 @@ function StatusBadge({ connected }) {
   );
 }
 
+function ReconnectBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-warning">
+      <AlertCircle className="w-3 h-3" /> Reconnect needed
+    </span>
+  );
+}
+
 function ComingSoonBadge() {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-soft text-link">
@@ -492,7 +621,7 @@ function ComingSoonButton({ label }) {
   );
 }
 
-function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, onSave }) {
+function GoogleSetupModal({ calendars, selectedCalendarId, saving, onClose, onSave }) {
   const [selected, setSelected] = useState(selectedCalendarId);
 
   return (
@@ -502,41 +631,32 @@ function GoogleSetupModal({ connected, calendars, selectedCalendarId, onClose, o
           <div className="w-10 h-10 rounded-lg border border-border bg-white flex items-center justify-center"><GoogleG /></div>
           <div>
             <DialogTitle>Google Calendar</DialogTitle>
-            <p className="text-xs text-muted-foreground">{connected ? 'Select calendars to check for conflicts' : 'OAuth authorization required'}</p>
+            <p className="text-xs text-muted-foreground">Where new bookings go</p>
           </div>
         </div>
 
-        {connected ? (
-          <>
-            <p className="text-sm text-muted-foreground mb-3">Choose the calendar where GlassMeet should create confirmed bookings.</p>
-            <div className="space-y-2 mb-5">
-              {calendars.map((calendar) => (
-                <label key={calendar.id} className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer transition-all duration-200 hover:border-border-hover">
-                  <input type="radio" name="google-calendar" checked={selected === calendar.id} onChange={() => setSelected(calendar.id)} className="accent-[hsl(var(--accent-color))]" />
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">{calendar.summary}{calendar.primary ? ' (primary)' : ''}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <GlassButton size="sm" variant="ghost" onClick={onClose}>Cancel</GlassButton>
-              <GlassButton size="sm" variant="primary" onClick={() => onSave(selected)} disabled={!selected}>Save</GlassButton>
-            </div>
-          </>
+        <p className="text-sm text-muted-foreground mb-3">Choose the calendar where GlassMeet adds confirmed bookings. Busy times are checked in this calendar and your primary one.</p>
+        {!calendars ? (
+          <div className="mb-5 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading your calendars…</div>
+        ) : !calendars.length ? (
+          <p className="mb-5 text-sm text-muted-foreground">No calendars you can add events to were found.</p>
         ) : (
-          <>
-            <div className="rounded-lg bg-secondary p-4 mb-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-              <div className="text-sm space-y-2">
-                <p className="font-medium">Connect a Google account to choose a calendar.</p>
-                <p className="text-muted-foreground text-xs">GlassMeet stores the Google refresh token encrypted on this server and creates events in the selected calendar.</p>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <GlassButton size="sm" variant="ghost" onClick={onClose}>Close</GlassButton>
-            </div>
-          </>
+          <div className="space-y-2 mb-5 max-h-[50vh] overflow-y-auto">
+            {calendars.map((calendar) => (
+              <label key={calendar.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selected === calendar.id ? 'border-primary bg-primary-soft' : 'border-border hover:border-border-hover'}`}>
+                <input type="radio" name="google-calendar" checked={selected === calendar.id} onChange={() => setSelected(calendar.id)} className="accent-primary" />
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm">{calendar.summary}{calendar.primary ? ' (primary)' : ''}</span>
+              </label>
+            ))}
+          </div>
         )}
+        <div className="flex gap-2 justify-end">
+          <GlassButton size="sm" type="button" variant="ghost" onClick={onClose}>Cancel</GlassButton>
+          <GlassButton size="sm" type="button" variant="primary" onClick={() => onSave(selected)} disabled={!selected || !calendars || saving}>
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save
+          </GlassButton>
+        </div>
       </DialogContent>
     </Dialog>
   );
