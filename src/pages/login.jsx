@@ -49,6 +49,8 @@ export default function Login() {
       setUnconfirmed(err.code === "email_not_confirmed");
       setError(err.code === "invalid_credentials" ? "That email and password don’t match. Try again, or reset your password." : authErrorMessage(err, "Invalid email or password"));
       setLoading(false);
+      // the disabled button dropped keyboard focus to the page; put it back on the form
+      document.getElementById("password")?.focus();
     }
   };
 

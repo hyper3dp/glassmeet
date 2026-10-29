@@ -171,6 +171,8 @@ function ClashRow({ clash, timezone, state, onKeep, onCancelled }) {
     try {
       const saved = await api.entities.Booking.update(booking.id, { status: 'cancelled' });
       if (!saved) throw new Error('This meeting may have been deleted. Reload the page.');
+      // the host's Google Calendar follows (if connected), as when cancelling from Meetings
+      api.google.pushBooking(booking.id);
       onCancelled();
     } catch (e) {
       setError(e?.message || 'Could not cancel this meeting.');

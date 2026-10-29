@@ -356,7 +356,8 @@ export const api = {
       if (googleBusyMissing) return [];
       try {
         const data = await invokeGoogle({ action: 'freeBusy', hostId, timeMin, timeMax });
-        return Array.isArray(data) ? data : [];
+        // in the bookings' shape: generateSlots only counts entries with start_time / end_time
+        return Array.isArray(data) ? data.map((x) => ({ start_time: x.start, end_time: x.end })) : [];
       } catch (error) {
         if (error.code === 'unavailable') googleBusyMissing = true;
         throw error;

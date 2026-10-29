@@ -6,23 +6,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
+import { authErrorMessage } from "@/lib/authReturnTo";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get("email") || "");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
+    setError("");
     try {
+      // an unknown address already succeeds (no account lookup), so an error here is real:
+      // offline, or the email rate limit. Saying "sent" then would leave them waiting.
       await api.auth.resetPasswordRequest(email);
-    } catch {
-      // Always show success regardless
+      setSent(true);
+    } catch (err) {
+      setError(authErrorMessage(err, "Could not send the reset link. Try again."));
     } finally {
       setLoading(false);
-      setSent(true);
     }
   };
 
@@ -47,6 +52,7 @@ export default function ForgotPassword() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <div role="alert" className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
           <div className="space-y-2">
             <Label htmlFor="email">Email address</Label>
             <div className="relative">

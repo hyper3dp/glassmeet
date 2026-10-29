@@ -113,6 +113,17 @@ export default function BookingPage() {
   // the picked time was taken while the guest filled in the form
   const [slotGone, setSlotGone] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  // the dialog unmounts on close and its focus return lands on <body>; put focus back on its
+  // button after that (a timer queued after the dialog's own)
+  const qrBtnRef = useRef(null);
+  const qrWasOpen = useRef(false);
+  useEffect(() => {
+    if (showQR) { qrWasOpen.current = true; return undefined; }
+    if (!qrWasOpen.current) return undefined;
+    const t = setTimeout(() => qrBtnRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [showQR]);
+  const closeQR = () => setShowQR(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [showMore, setShowMore] = useState(false);
 
@@ -451,7 +462,7 @@ export default function BookingPage() {
               </>
             )}
 
-            <button onClick={() => setShowQR(true)} className="mt-8 text-sm font-semibold text-link hidden md:flex items-center gap-1.5 hover:underline">
+            <button ref={qrBtnRef} onClick={() => setShowQR(true)} className="mt-8 text-sm font-semibold text-link hidden md:flex items-center gap-1.5 hover:underline">
               <QrCode className="w-4 h-4" /> Show QR code
             </button>
           </section>
@@ -573,7 +584,7 @@ export default function BookingPage() {
                           style={{ borderColor: 'color-mix(in srgb, var(--ev) 55%, transparent)', color: evText }}
                         >
                           {s.label}
-                          {isGroup && <span className="text-[11px] font-semibold opacity-80">{spotsLeftAt(s.date)} {spotsLeftAt(s.date) === 1 ? 'spot' : 'spots'} left</span>}
+                          {isGroup && <span className="text-[11px] font-semibold">{spotsLeftAt(s.date)} {spotsLeftAt(s.date) === 1 ? 'spot' : 'spots'} left</span>}
                         </button>
                       )))}
                     </div>
@@ -667,7 +678,7 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {showQR && <Suspense fallback={null}><QRCodeModal url={bookingUrl} open={showQR} onClose={() => setShowQR(false)} /></Suspense>}
+      {showQR && <Suspense fallback={null}><QRCodeModal url={bookingUrl} open={showQR} onClose={closeQR} /></Suspense>}
     </div>
   );
 }

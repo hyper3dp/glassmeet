@@ -153,13 +153,12 @@
     var url = tag && tag.getAttribute('data-button-url');
     if (!url || tag.getAttribute('data-glassmeet-mounted')) return;
     tag.setAttribute('data-glassmeet-mounted', '1');
-    var script = tag;
-    var color = script.getAttribute('data-button-color') || '#2b7a75';
+    var color = tag.getAttribute('data-button-color') || '#2b7a75';
     var btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = script.getAttribute('data-button-text') || 'Book a meeting';
+    btn.textContent = tag.getAttribute('data-button-text') || 'Book a meeting';
     btn.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483645;height:48px;padding:0 22px;border:0;border-radius:999px;font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.2);background:' + color + ';color:' + readableOn(color) + ';';
-    btn.addEventListener('click', function () { open(url, { theme: script.getAttribute('data-theme') }); });
+    btn.addEventListener('click', function () { open(url, { theme: tag.getAttribute('data-theme') }); });
     document.body.appendChild(btn);
   }
 

@@ -135,23 +135,26 @@ const tokenRequest = async (params: Record<string, string>) => {
   return { ok: res.ok, data };
 };
 
-const markDisconnected = async (userId: string) => {
-  await admin.from('google_tokens').delete().eq('user_id', userId);
-  await admin.from('google_accounts').update({ connected: false }).eq('user_id', userId);
+// only the refresh token Google refused: a reconnect that saved a new one meanwhile stays
+const markDisconnected = async (userId: string, refreshToken: string) => {
+  const { data: gone } = await admin.from('google_tokens').delete()
+    .eq('user_id', userId).eq('refresh_token', refreshToken).select('user_id');
+  if (gone?.length) await admin.from('google_accounts').update({ connected: false }).eq('user_id', userId);
 };
 
-// a valid access token for the host, refreshed when it is about to expire
-const accessToken = async (userId: string): Promise<string> => {
+// a valid access token for the host, refreshed when it is about to expire (or when Google
+// refused the cached one: `force`)
+const accessToken = async (userId: string, force = false): Promise<string> => {
   const { data: row, error } = await admin.from('google_tokens')
     .select('refresh_token, access_token, expires_at').eq('user_id', userId).maybeSingle();
   if (error) throw new Fail(500, 'db_error', 'Could not read the Google connection.');
   if (!row) throw new Fail(409, 'not_connected', 'Google Calendar is not connected.');
-  if (row.access_token && row.expires_at && new Date(row.expires_at).getTime() > Date.now() + 60_000) return row.access_token;
+  if (!force && row.access_token && row.expires_at && new Date(row.expires_at).getTime() > Date.now() + 60_000) return row.access_token;
 
   const { ok, data } = await tokenRequest({ grant_type: 'refresh_token', refresh_token: row.refresh_token });
   if (!ok) {
     if (data?.error === 'invalid_grant') {
-      await markDisconnected(userId);
+      await markDisconnected(userId, row.refresh_token);
       throw new Fail(409, 'reconnect', 'Google stopped accepting this connection. Connect Google Calendar again.');
     }
     console.error('google token refresh failed', data?.error ?? 'unknown');
@@ -166,11 +169,16 @@ const accessToken = async (userId: string): Promise<string> => {
 };
 
 const calendarApi = async (userId: string, path: string, init: RequestInit = {}) => {
-  const token = await accessToken(userId);
-  return googleFetch(`https://www.googleapis.com/calendar/v3${path}`, {
+  const send = (token: string) => googleFetch(`https://www.googleapis.com/calendar/v3${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
+  const res = await send(await accessToken(userId));
+  if (res.status !== 401) return res;
+  // the cached access token was revoked before it expired: refresh once (a revoked grant then
+  // reads as invalid_grant, i.e. "reconnect")
+  await res.body?.cancel();
+  return send(await accessToken(userId, true));
 };
 
 const cal = (id: string) => encodeURIComponent(id || 'primary');
@@ -231,8 +239,10 @@ const eventBody = (b: Booking) => {
     summary: `${b.event_name || 'Meeting'}${b.guest_name ? ` with ${b.guest_name}` : ''}`.slice(0, 500),
     description,
     ...(where ? { location: String(where).slice(0, 1000) } : {}),
-    start: { dateTime: new Date(b.start_time).toISOString(), ...(b.timezone ? { timeZone: b.timezone } : {}) },
-    end: { dateTime: new Date(b.end_time).toISOString(), ...(b.timezone ? { timeZone: b.timezone } : {}) },
+    // UTC instants; no timeZone: bookings.timezone is the guest's browser zone, which Google
+    // may not know (an unknown zone fails the whole write), and one-off events don't need it
+    start: { dateTime: new Date(b.start_time).toISOString() },
+    end: { dateTime: new Date(b.end_time).toISOString() },
     status: 'confirmed',
     // a group meeting with seats left must not read as busy on the booking page's own free/busy check
     transparency: e?.booking_type === 'group' ? 'transparent' : 'opaque',
@@ -280,8 +290,15 @@ const syncBooking = async (account: Account, b: Booking): Promise<'created' | 'u
   });
   let result: 'created' | 'updated' = 'created';
   if (res.status === 409) {
-    // the id exists (an earlier copy, or one deleted before): overwrite and restore it
+    // the id exists (an earlier copy, or one deleted before): overwrite and restore it, but only
+    // an event GlassMeet made for this booking (or a deleted one, which hides nothing of the host's)
     await res.body?.cancel();
+    const found = await calendarApi(userId, `/calendars/${cal(calendarId)}/events/${eventId}`);
+    const existing = found.ok ? await found.json() : (await found.body?.cancel(), null);
+    if (!existing || (existing.status !== 'cancelled' && existing.extendedProperties?.private?.glassmeet_booking !== b.id)) {
+      console.error('google event id taken', found.status);
+      throw new Fail(502, 'google_error', 'Google already has a different event with this meeting’s id.');
+    }
     res = await calendarApi(userId, `/calendars/${cal(calendarId)}/events/${eventId}?sendUpdates=none`, {
       method: 'PUT', body: JSON.stringify(body),
     });
@@ -328,6 +345,12 @@ const actions: Record<string, (req: Request, body: Body) => Promise<unknown>> = 
 
     const { ok, data } = await tokenRequest({ grant_type: 'authorization_code', code: body.code, redirect_uri: REDIRECT_URI });
     if (!ok || !data.access_token) {
+      // a code is single use: the same return handled twice (a second tab, a reload) finds the
+      // connection the first one just made
+      if (data?.error === 'invalid_grant') {
+        const { data: done } = await admin.from('google_accounts').select('email, connected, connected_date').eq('user_id', user.id).maybeSingle();
+        if (done?.connected && Date.now() - new Date(done.connected_date).getTime() < STATE_TTL_MS) return { connected: true, email: done.email };
+      }
       console.error('google code exchange failed', data?.error ?? 'unknown');
       throw new Fail(400, 'exchange', 'Google did not accept the sign-in. Try connecting again.');
     }
@@ -364,6 +387,11 @@ const actions: Record<string, (req: Request, body: Body) => Promise<unknown>> = 
       ...(sameAccount ? {} : { calendar_id: 'primary', calendar_name: primaryData?.summary ?? null }),
     });
     if (accountError) throw new Fail(500, 'db_error', 'Could not save the Google connection.');
+    // events copied before were in the other account: forget them, so a sync adds them here
+    if (!sameAccount) {
+      await admin.from('bookings').update({ google_event_id: null, google_cal: null, google_hash: null })
+        .eq('host_id', user.id).not('google_event_id', 'is', null);
+    }
     return { connected: true, email };
   },
 
@@ -483,7 +511,8 @@ const actions: Record<string, (req: Request, body: Body) => Promise<unknown>> = 
       if (!fresh || b.status !== 'confirmed' || b.approval_status !== 'approved' || b.google_event_id) return { pushed: false };
     }
     const account = await getAccount(b.host_id);
-    if (!account || !account.auto_sync) return { pushed: false };
+    // auto-sync off stops new copies; a host's change to one already in Google still follows
+    if (!account || (!account.auto_sync && !(isHost && b.google_event_id))) return { pushed: false };
     try {
       const result = await syncBooking(account, b);
       return { pushed: result !== 'unchanged' };

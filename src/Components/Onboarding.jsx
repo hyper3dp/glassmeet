@@ -9,6 +9,7 @@ import { normalizePhone } from '@/lib/whatsapp';
 import { cn } from '@/lib/utils';
 
 const MAX_PHOTO_MB = 5;
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STEPS = ['profile', 'whatsapp', 'hours'];
 const toMin = (t) => { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; };
@@ -31,7 +32,8 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
   const [error, setError] = useState('');
   const fileRef = useRef(null);
   const headingRef = useRef(null);
-  const timezone = useRef(detectTimezone()).current;
+  // the zone the hours are saved in (one already on the profile wins), as the hours step names it
+  const timezone = useRef(profile.timezone || detectTimezone()).current;
 
   // the hours new accounts already get (Mon–Fri 9–5), shown as days plus one range
   useEffect(() => {
@@ -56,7 +58,8 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
     e.target.value = '';
     if (!file) return;
     setError('');
-    if (!file.type.startsWith('image/')) { setError('Choose an image file (JPG, PNG or WebP).'); return; }
+    // the avatars bucket takes only these (HEIC, SVG, AVIF... would fail with a raw server error)
+    if (!PHOTO_TYPES.includes(file.type)) { setError('Choose an image file (JPG, PNG or WebP).'); return; }
     if (file.size > MAX_PHOTO_MB * 1024 * 1024) { setError(`Choose an image under ${MAX_PHOTO_MB} MB.`); return; }
     setUploading(true);
     try {
@@ -111,7 +114,7 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
         await Promise.all((was?.rules || []).map((r) => api.entities.AvailabilityRule.delete(r.id)));
         if (days.length) await api.entities.AvailabilityRule.bulkCreate(days.map((d) => ({ day_of_week: d, start_time: start, end_time: end })));
       }
-      await updateProfile({ timezone: profile.timezone || timezone, onboarded: true });
+      await updateProfile({ timezone, onboarded: true });
     }, () => navigate('/dashboard?tour=1', { replace: true }));
   };
 

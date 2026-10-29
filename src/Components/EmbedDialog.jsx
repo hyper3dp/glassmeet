@@ -47,7 +47,8 @@ export default function EmbedDialog({ event, onClose }) {
   }, [mode, theme, text, color, url]);
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(code); } catch { /* the code stays selectable */ }
+    // copying can be refused (permissions, http): select the code instead of saying "Copied"
+    try { await navigator.clipboard.writeText(code); } catch { document.getElementById('embed-code')?.select(); return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

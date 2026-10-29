@@ -404,6 +404,11 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
     if (repeats && form.ends === 'date' && form.end_date < form.start_date) { setError('The last date is before the start date.'); return; }
     if (!repeats && !form.dates.length) { setError('Pick at least one date.'); return; }
     if (form.times === 'fixed' && !form.fixed_times.some(Boolean)) { setError('Add at least one start time.'); return; }
+    // a meeting must end by midnight (the booking page and the server never offer one that runs past it)
+    const duration = Math.min(720, Math.max(5, Number(form.duration) || 30));
+    if (form.times === 'fixed' && form.fixed_times.some((t) => t && Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) + duration > 24 * 60)) {
+      setError('A start time is too late for a meeting this long to end by midnight.'); return;
+    }
     setSaving(true);
     try {
       if (kind === 'in_person' && addressChoice === 'new' && saveNewAddress && savedAddressesAvailable) {
@@ -612,7 +617,10 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
                     )}
                   </div>
                 ))}
-                <button type="button" onClick={() => setField('fixed_times', [...form.fixed_times, ''])} className="text-sm font-semibold text-link hover:underline">+ Add a start time</button>
+                {/* the database keeps at most 48 start times */}
+                {form.fixed_times.length < 48 && (
+                  <button type="button" onClick={() => setField('fixed_times', [...form.fixed_times, ''])} className="text-sm font-semibold text-link hover:underline">+ Add a start time</button>
+                )}
                 <p className="text-xs text-muted-foreground">Guests can only book these start times, in your time zone, on the days above. Your weekly hours don’t apply; days or hours you block off in Availability still do.</p>
               </div>
             ) : (

@@ -24,6 +24,7 @@ const DELETE_SECTION = { id: 'delete-account', label: 'Delete account', icon: Tr
 const UNLOCK_TAPS = 5;
 
 const MAX_PHOTO_MB = 5;
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export default function Settings({ profile, updateProfile }) {
   const [form, setForm] = useState(null);
@@ -102,7 +103,8 @@ export default function Settings({ profile, updateProfile }) {
     e.target.value = '';
     if (!file) return;
     setPhotoError('');
-    if (!file.type.startsWith('image/')) { setPhotoError('Choose an image file (JPG, PNG or WebP).'); return; }
+    // the avatars bucket takes only these (HEIC, SVG, AVIF... would fail with a raw server error)
+    if (!PHOTO_TYPES.includes(file.type)) { setPhotoError('Choose an image file (JPG, PNG or WebP).'); return; }
     if (file.size > MAX_PHOTO_MB * 1024 * 1024) { setPhotoError(`Choose an image under ${MAX_PHOTO_MB} MB.`); return; }
     setUploading(true);
     try {

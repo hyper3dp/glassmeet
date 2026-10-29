@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Bug } from 'lucide-react';
 import { reportsOpen } from '@/lib/bugReport.js';
@@ -18,9 +18,17 @@ export default function BugReport() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const { authChecked } = useAuth();
+  // the dialog unmounts on close and its own focus return lands on <body>; put focus back on
+  // the button that opened it (a timer queued after the dialog's own)
+  const opener = useRef(null);
+  useEffect(() => {
+    if (open || !opener.current) return undefined;
+    const t = setTimeout(() => { opener.current?.focus(); opener.current = null; }, 0);
+    return () => clearTimeout(t);
+  }, [open]);
   // after the sign-in check, so the link doesn't flash above the full-screen loader
   if (!authChecked || !reportsOpen() || isEmbed()) return null;
-  const show = () => setOpen(true);
+  const show = (e) => { opener.current = e.currentTarget; setOpen(true); };
   return (
     <>
       <button

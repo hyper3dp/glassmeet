@@ -53,15 +53,20 @@ export default function Bookings({ profile, whatsapp }) {
     setLoading(false);
   };
 
-  // notifications and the dashboard link straight to a meeting with ?id=
+  // notifications and the dashboard link straight to a meeting with ?id=. A meeting booked after
+  // this page loaded (a notification clicked while already here) isn't in the list yet: reload
+  // once before saying it's gone.
+  const refetchedFor = useRef(null);
   useEffect(() => {
     const id = params.get('id');
     if (!id || loading) return;
     const b = bookings.find((x) => x.id === id);
+    if (!b && refetchedFor.current !== id) { refetchedFor.current = id; load(); return; }
+    refetchedFor.current = null;
     if (b) setSelected({ booking: b, kind: defaultKind(b) });
     else toast('That meeting is no longer listed.');
     setParam('id', '');
-  }, [params, loading, bookings]);
+  }, [params, loading, bookings, loadError]);
 
   const now = new Date();
   // a meeting stays upcoming until it ends, so one in progress is still listed
@@ -295,7 +300,16 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
     catch { toast.error('Could not copy the message.'); }
   };
 
-  const autosave = useAutosave({ notes, meeting_url: meetingUrl }, (value) => api.entities.Booking.update(booking.id, value));
+  // the link is part of the Google Calendar copy (notes aren't), so a changed link updates it
+  const pushedUrl = useRef(booking.meeting_url || '');
+  const autosave = useAutosave({ notes, meeting_url: meetingUrl }, async (value) => {
+    const saved = await api.entities.Booking.update(booking.id, value);
+    if (value.meeting_url !== pushedUrl.current) {
+      pushedUrl.current = value.meeting_url;
+      api.google.pushBooking(booking.id);
+    }
+    return saved;
+  });
   // the list takes the edits straight away: a reload here would run before the last save does
   const close = () => { if (autosave.state !== 'idle') onChanged({ notes, meeting_url: meetingUrl }); onClose(); };
   const link = meetingUrl || booking.meeting_url;
