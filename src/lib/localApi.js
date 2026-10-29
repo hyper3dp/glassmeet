@@ -160,6 +160,11 @@ const entities = new Proxy({}, {
   },
 });
 
+// Auth waits up to 10s for the mail server to accept a sign-up or reset email, then answers 504.
+// The account or request is usually saved by then and the email often still goes out, so these
+// carry on to the code screen (which can send a new code) instead of reporting a failure.
+const emailTimedOut = (error) => error?.status === 504 || error?.code === 'request_timeout';
+
 export const api = {
   entities,
   app: { 
@@ -238,6 +243,7 @@ export const api = {
         err.code = 'user_exists';
         throw err;
       }
+      if (emailTimedOut(error)) return { user: null, access_token: undefined };
       if (error) throw new Error(error.message);
       // with confirmations on, an address that already has an account comes back with no
       // identities and no error, and no email is sent
@@ -255,7 +261,7 @@ export const api = {
         email,
         options: { emailRedirectTo: `${window.location.origin}${appPath(returnTo)}` },
       });
-      if (error) throw new Error(error.message);
+      if (error && !emailTimedOut(error)) throw new Error(error.message);
     },
     // LinkedIn's "Sign In with LinkedIn using OpenID Connect" provider in Supabase
     loginWithLinkedIn: async (returnTo = '/') => {
@@ -314,7 +320,7 @@ export const api = {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}${appPath('/reset-password')}`,
       });
-      if (error) throw new Error(error.message);
+      if (error && !emailTimedOut(error)) throw new Error(error.message);
       return { success: true };
     },
     resetPassword: async (value) => {
