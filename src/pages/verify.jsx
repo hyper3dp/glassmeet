@@ -1,99 +1,74 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ArrowLeft } from 'lucide-react';
-import AuthLayout from '@/components/Authlayout.jsx';
-import { authErrorMessage } from '@/lib/authReturnTo';
+import { Loader2, ArrowLeft, Mail } from 'lucide-react';
+import AuthLayout, { CodeInput, CODE_MIN, ResendEmailButton } from '@/components/Authlayout.jsx';
+import { appPath, safeReturnTo, authErrorMessage } from '@/lib/authReturnTo';
 
+// After sign-up (or a log-in with an unconfirmed address): the new account is confirmed with the
+// code from the "Confirm your email" message, which also signs them in.
 export default function Verify() {
-  const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
+  const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get('email') || '');
+  // the address came with the link: show it rather than ask for it again
+  const [knownEmail] = useState(() => Boolean(new URLSearchParams(window.location.search).get('email')));
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
-  // Get email from URL search params if available
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const emailParam = params.get('email');
-    if (emailParam) setEmail(emailParam);
-  }, []);
+  const busy = useRef(false);
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    if (loading) return;
+    if (busy.current) return;
+    if (code.length < CODE_MIN) { setError(`Enter the ${CODE_MIN}-digit code from the email.`); return; }
+    busy.current = true;
     setError('');
     setLoading(true);
     try {
-      await api.auth.verifyOtp({ email, token: token.trim() });
-      navigate('/dashboard', { replace: true });
+      await api.auth.verifyOtp({ email, token: code, type: 'signup' });
+      // signed in now; stay busy while the app loads (new hosts go through setup first)
+      window.location.assign(appPath(safeReturnTo() === '/' ? '/dashboard' : safeReturnTo()));
     } catch (err) {
-      setError(authErrorMessage(err, 'Invalid verification code'));
+      setError(authErrorMessage(err, 'That code didn’t work. Try again.'));
       setLoading(false);
+      busy.current = false;
     }
   };
 
   return (
     <AuthLayout
-      icon={null} 
-      title="Verify your email"
-      subtitle="Enter the 6-digit code sent to your email address"
+      icon={Mail}
+      title="Confirm your email"
+      subtitle={knownEmail ? <>We sent a code to <span className="font-semibold text-foreground">{email}</span></> : 'Enter the code from your confirmation email'}
       footer={
-        <button 
-          onClick={() => navigate('/register')} 
-          className="text-sm text-muted-foreground hover:text-link flex items-center gap-1"
-        >
-          <ArrowLeft className="w-3 h-3" /> Back to registration
-        </button>
+        <Link to="/register" className="text-link font-semibold hover:underline">
+          <ArrowLeft className="w-3 h-3 inline mr-1" />Use a different email
+        </Link>
       }
     >
-      <form onSubmit={handleVerify} className="space-y-6">
-        <div className="space-y-4">
+      <form onSubmit={handleVerify} className="space-y-4" noValidate>
+        {error && <div role="alert" className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+        {!knownEmail && (
           <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="token">Verification Code</Label>
-            <Input
-              id="token"
-              type="text"
-              placeholder="123456"
-              maxLength={6}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              required
-              className="text-center text-2xl tracking-widest font-mono"
-            />
-          </div>
-        </div>
-
-        {error && (
-          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12" required />
           </div>
         )}
-
+        <div className="space-y-2">
+          <Label htmlFor="code">Confirmation code</Label>
+          <CodeInput value={code} onChange={setCode} autoFocus={knownEmail} />
+          <p className="text-xs text-muted-foreground">It can take a minute to arrive, and may land in spam.</p>
+        </div>
         <Button type="submit" className="w-full h-12 text-[15px] font-bold" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verifying...
-            </>
-          ) : (
-            "Verify Account"
-          )}
+          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming...</> : 'Confirm and continue'}
         </Button>
+        {email && (
+          <p className="text-center text-sm text-muted-foreground">
+            No email? <ResendEmailButton label="Send a new code" onResend={() => api.auth.resendSignup(email, safeReturnTo())} />
+          </p>
+        )}
       </form>
     </AuthLayout>
   );

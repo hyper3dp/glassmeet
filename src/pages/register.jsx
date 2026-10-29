@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/localApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Lock, Loader2, User, Eye, EyeOff } from "lucide-react";
-import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
+import AuthLayout from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import LinkedInIcon from "@/components/linkedinicon.jsx";
 import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
@@ -17,8 +17,8 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [exists, setExists] = useState(false);
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,7 +38,11 @@ export default function Register() {
         window.location.assign(appPath(safeReturnTo()));
         return;
       }
-      setNotice("Check your email for a confirmation link before signing in.");
+      // confirmations on: the email carries a code, entered on the next page
+      const params = new URLSearchParams({ email: email.trim() });
+      if (safeReturnTo() !== "/") params.set("returnTo", safeReturnTo());
+      navigate(`/verify?${params}`);
+      return;
     } catch (err) {
       setExists(err.code === "user_exists");
       setError(authErrorMessage(err, "Registration failed"));
@@ -97,16 +101,6 @@ export default function Register() {
         </div>
       )}
 
-      {notice ? (
-        <div role="status" className="rounded-lg border border-border bg-secondary p-4 text-sm">
-          <p className="font-semibold text-foreground">Check your email</p>
-          <p className="mt-1 text-muted-foreground">We sent a confirmation link to <span className="font-semibold text-foreground">{email}</span>. Open it to finish creating your account. It can take a minute, and may land in spam.</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-            <ResendEmailButton onResend={() => api.auth.resendSignup(email, safeReturnTo())} />
-            <button type="button" onClick={() => setNotice("")} className="font-semibold text-link hover:underline">Use a different email</button>
-          </div>
-        </div>
-      ) : (
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Your name</Label>
@@ -184,7 +178,6 @@ export default function Register() {
           <Link to="/privacy" className="font-semibold text-link hover:underline">Privacy Policy</Link>.
         </p>
       </form>
-      )}
     </AuthLayout>
   );
 }

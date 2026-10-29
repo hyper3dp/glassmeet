@@ -18,6 +18,7 @@ const Login = lazy(PAGES.login);
 const Register = lazy(PAGES.register);
 const ForgotPassword = lazy(PAGES.forgotPassword);
 const ResetPassword = lazy(PAGES.resetPassword);
+const Verify = lazy(PAGES.verify);
 const Landing = lazy(PAGES.landing);
 const Dashboard = lazy(PAGES.dashboard);
 const CalendarPage = lazy(PAGES.calendar);
@@ -95,6 +96,7 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify" element={<Verify />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
 

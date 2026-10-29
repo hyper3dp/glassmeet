@@ -96,7 +96,12 @@ export default function Login() {
       {error && (
         <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}
-          {unconfirmed && <span className="mt-2 block"><ResendEmailButton onResend={() => api.auth.resendSignup(email, returnTo)} /></span>}
+          {unconfirmed && (
+            <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              <Link to={`/verify?${new URLSearchParams({ email: email.trim(), ...(returnTo !== "/" ? { returnTo } : {}) })}`} className="font-semibold underline">Enter your code</Link>
+              <ResendEmailButton label="Send a new code" onResend={() => api.auth.resendSignup(email, returnTo)} />
+            </span>
+          )}
         </div>
       )}
 

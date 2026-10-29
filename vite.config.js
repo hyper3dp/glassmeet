@@ -11,7 +11,7 @@ import path from 'node:path'
 // Google's OAuth verification see that 404. Copying index.html to <route>.html lets
 // Pages serve these routes directly with a 200; the app's router renders the page.
 // served as real files, so links to them (including auth links carrying #tokens) skip 404.html
-const STATIC_ROUTES = ['privacy', 'terms', 'login', 'register', 'forgot-password', 'reset-password', 'dashboard'];
+const STATIC_ROUTES = ['privacy', 'terms', 'login', 'register', 'forgot-password', 'reset-password', 'verify', 'dashboard'];
 
 function staticRoutes() {
   let outDir;

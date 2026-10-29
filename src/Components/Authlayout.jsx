@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Logo from "@/components/logo.jsx";
+import { Input } from "@/components/ui/input";
 
 // Calendly-style auth frame: logo, bold heading, one card. `icon` is accepted for older callers and not drawn.
 export default function AuthLayout({ icon: _icon, title, subtitle, footer, children }) {
@@ -22,8 +23,30 @@ export default function AuthLayout({ icon: _icon, title, subtitle, footer, child
   );
 }
 
-// "Resend email" link with a cooldown, for the confirmation and reset-link screens
-export function ResendEmailButton({ onResend, cooldown = 60 }) {
+// The emailed one-time code (Supabase sends 6 by default, up to 10 if configured). Digits only, so
+// a pasted "123 456" or "Code: 123456" still works; phones offer the number pad and can fill it
+// straight from the email.
+export const CODE_MIN = 6;
+export function CodeInput({ id = "code", value, onChange, autoFocus = true }) {
+  return (
+    <Input
+      id={id}
+      type="text"
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      autoFocus={autoFocus}
+      maxLength={10}
+      placeholder="123456"
+      value={value}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 10))}
+      className="h-14 text-center text-2xl md:text-2xl font-semibold tracking-[0.4em] tabular-nums"
+      required
+    />
+  );
+}
+
+// "Resend email" link with a cooldown, for the confirmation and reset-code screens
+export function ResendEmailButton({ onResend, cooldown = 60, label = "Resend email" }) {
   const [wait, setWait] = useState(0);
   const [status, setStatus] = useState("");
   useEffect(() => {
@@ -44,7 +67,7 @@ export function ResendEmailButton({ onResend, cooldown = 60 }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2">
       <button type="button" onClick={resend} disabled={wait > 0} className="font-semibold text-link hover:underline disabled:text-muted-foreground disabled:no-underline">
-        {wait > 0 ? `Resend email (${wait}s)` : "Resend email"}
+        {wait > 0 ? `${label} (${wait}s)` : label}
       </button>
       {status && <span role="status" className="text-muted-foreground">{status}</span>}
     </span>

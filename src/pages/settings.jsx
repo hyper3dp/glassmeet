@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone, Sparkles, FlaskConical } from 'lucide-react';
+import { User, Globe, Clock, Upload, Loader2, Trash2, Plug, MapPin, Smartphone, Sparkles, FlaskConical, KeyRound } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, Avatar, SaveStatus } from '@/components/glass';
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
@@ -169,6 +170,10 @@ export default function Settings({ profile, updateProfile }) {
                 <GlassInput id="s-email" value={profile.email || ''} disabled />
               </div>
               <div>
+                <GlassLabel htmlFor="s-password">Password</GlassLabel>
+                <ResetPassword email={profile.email} />
+              </div>
+              <div>
                 <GlassLabel htmlFor="s-wa">WhatsApp number</GlassLabel>
                 <GlassInput id="s-wa" type="tel" inputMode="tel" value={form.whatsapp_number} onChange={(e) => set('whatsapp_number', e.target.value)} placeholder="+971 50 123 4567" />
               </div>
@@ -259,6 +264,32 @@ export default function Settings({ profile, updateProfile }) {
 
 // Deletes the account after the host types DELETE. Everything goes: event types, hours, meetings,
 // notifications, templates, addresses, WhatsApp settings, calendar-feed links and photos.
+// emails a code, then the reset page takes it with the new password and comes back here. Also
+// sets a first password for hosts who signed up with Google or LinkedIn.
+function ResetPassword({ email }) {
+  const navigate = useNavigate();
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    if (sending || !email) return;
+    setSending(true);
+    try {
+      await api.auth.resetPasswordRequest(email);
+      navigate(`/reset-password?${new URLSearchParams({ email, returnTo: '/settings' })}`);
+    } catch (err) {
+      toast.error(/fetch|network/i.test(err.message || '') ? 'Couldn’t reach GlassMeet. Check your connection and try again.' : `Couldn’t send the code. ${err.message || ''}`.trim());
+      setSending(false);
+    }
+  };
+  return (
+    <>
+      <GlassButton id="s-password" type="button" onClick={send} disabled={sending || !email} aria-describedby="s-password-hint">
+        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} {sending ? 'Sending code…' : 'Reset password'}
+      </GlassButton>
+      <p id="s-password-hint" className="mt-1.5 text-xs text-muted-foreground">We’ll email you a code to set a new one.</p>
+    </>
+  );
+}
+
 function DeleteAccount({ email }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');

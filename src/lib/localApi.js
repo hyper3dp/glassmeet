@@ -274,14 +274,16 @@ export const api = {
       if (error) throw new Error(error.message);
       if (data?.url) window.location.assign(data.url);
     },
-    verifyOtp: async ({ email, token }) => {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'signup',
-      });
-      if (error) throw new Error(error.message);
-      return { user: await getProfile(data.user.id), session: data.session };
+    // the emailed code: 'signup' confirms a new account, 'recovery' signs in to set a new password.
+    // Either way the person is signed in afterwards.
+    verifyOtp: async ({ email, token, type = 'signup' }) => {
+      const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type });
+      if (error) {
+        const err = new Error(/expired|invalid/i.test(error.message) ? 'That code is wrong or has expired. Check the latest email, or send a new code.' : error.message);
+        err.code = error.code;
+        throw err;
+      }
+      return { user: data.user, session: data.session };
     },
     logout: async () => {
       // signOut reports a failure (e.g. offline) instead of throwing; then at least end the

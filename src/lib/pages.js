@@ -8,6 +8,7 @@ export const PAGES = {
   register: () => import('@/pages/register.jsx'),
   forgotPassword: () => import('@/pages/forgotpassword.jsx'),
   resetPassword: () => import('@/pages/resetpassword.jsx'),
+  verify: () => import('@/pages/verify.jsx'),
   landing: () => import('@/pages/Landing.jsx'),
   dashboard: () => import('@/pages/dashboard.jsx'),
   calendar: () => import('@/pages/calenderpage.jsx'),
@@ -42,6 +43,7 @@ const PUBLIC_ROUTES = {
   '/register': 'register',
   '/forgot-password': 'forgotPassword',
   '/reset-password': 'resetPassword',
+  '/verify': 'verify',
   '/terms': 'terms',
   '/privacy': 'privacy',
 };
