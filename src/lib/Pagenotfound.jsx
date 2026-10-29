@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Search, Globe } from 'lucide-react';
 import { useAuth } from '@/lib/Authcontext.jsx';
 import Logo from '@/components/logo.jsx';
 import { GlassButton, GlassInput } from '@/components/glass';
+import { LIMITS } from '@/lib/inputRules';
 
 const HOURS = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM'];
 
@@ -49,7 +50,7 @@ export default function PageNotFound() {
                     <label htmlFor="nf-search" className="sr-only">Search your meetings</label>
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-hint" aria-hidden="true" />
-                      <GlassInput id="nf-search" type="search" enterKeyHint="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search meetings by guest name or phone" className="pl-9 h-11" />
+                      <GlassInput id="nf-search" type="search" enterKeyHint="search" maxLength={LIMITS.search} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search meetings by guest name or phone" className="pl-9 h-11" />
                     </div>
                   </form>
                 )}

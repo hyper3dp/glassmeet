@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, ArrowLeft, Mail } from 'lucide-react';
 import AuthLayout, { CodeInput, CODE_MIN, ResendEmailButton } from '@/components/Authlayout.jsx';
 import { appPath, safeReturnTo, authErrorMessage } from '@/lib/authReturnTo';
+import { LIMITS, onlyEmail } from '@/lib/inputRules';
 
 // After sign-up (or a log-in with an unconfirmed address): the new account is confirmed with the
 // code from the "Confirm your email" message, which also signs them in.
@@ -53,7 +54,7 @@ export default function Verify() {
         {!knownEmail && (
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12" required />
+            <Input id="email" type="email" autoComplete="email" placeholder="you@example.com" maxLength={LIMITS.email} value={email} onChange={(e) => setEmail(onlyEmail(e.target.value))} className="h-12" required />
           </div>
         )}
         <div className="space-y-2">

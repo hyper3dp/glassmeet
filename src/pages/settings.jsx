@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { BETA_FEATURES, useBeta, unlockBeta, hideBeta, setBetaFeature } from '@/lib/beta';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { appPath } from '@/lib/authReturnTo';
+import { LIMITS, onlyName, onlyPhone } from '@/lib/inputRules';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -158,7 +159,7 @@ export default function Settings({ profile, updateProfile }) {
             <div className="grid sm:grid-cols-2 gap-5">
               <div>
                 <GlassLabel htmlFor="s-name">Name</GlassLabel>
-                <GlassInput id="s-name" maxLength={80} value={form.full_name} onChange={(e) => set('full_name', e.target.value)} />
+                <GlassInput id="s-name" maxLength={LIMITS.name} value={form.full_name} onChange={(e) => set('full_name', onlyName(e.target.value))} />
               </div>
               <div>
                 <GlassLabel htmlFor="s-user">Public username</GlassLabel>
@@ -175,7 +176,7 @@ export default function Settings({ profile, updateProfile }) {
               </div>
               <div>
                 <GlassLabel htmlFor="s-wa">WhatsApp number</GlassLabel>
-                <GlassInput id="s-wa" type="tel" inputMode="tel" value={form.whatsapp_number} onChange={(e) => set('whatsapp_number', e.target.value)} placeholder="+971 50 123 4567" />
+                <GlassInput id="s-wa" type="tel" inputMode="tel" maxLength={LIMITS.phone} value={form.whatsapp_number} onChange={(e) => set('whatsapp_number', onlyPhone(e.target.value))} placeholder="+971 50 123 4567" />
               </div>
             </div>
             <div className="mt-5">

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/Authlayout.jsx";
 import { authErrorMessage } from "@/lib/authReturnTo";
+import { LIMITS, onlyEmail } from '@/lib/inputRules';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get("email") || "");
@@ -55,7 +56,8 @@ export default function ForgotPassword() {
               autoFocus
               placeholder="you@example.com"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              maxLength={LIMITS.email}
+              onChange={(event) => setEmail(onlyEmail(event.target.value))}
               className="pl-10 h-12"
               required
             />

@@ -7,6 +7,7 @@ import Logo from '@/components/logo.jsx';
 import { detectTimezone } from '@/lib/Availability.js';
 import { normalizePhone } from '@/lib/whatsapp';
 import { cn } from '@/lib/utils';
+import { LIMITS, onlyName, onlyPhone } from '@/lib/inputRules';
 
 const MAX_PHOTO_MB = 5;
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -155,7 +156,7 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
                 </GlassButton>
               </div>
               <GlassLabel htmlFor="ob-name">Your name</GlassLabel>
-              <GlassInput id="ob-name" autoComplete="name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} placeholder="Sara Ahmed" />
+              <GlassInput id="ob-name" autoComplete="name" maxLength={LIMITS.name} value={name} onChange={(e) => setName(onlyName(e.target.value))} placeholder="Sara Ahmed" />
               {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
               <div className="mt-8 flex items-center justify-end gap-2">
                 {skip(() => setStep(1))}
@@ -168,8 +169,8 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
             <form onSubmit={(e) => { e.preventDefault(); saveWhatsApp(); }} noValidate>
               {heading('Your WhatsApp number', 'Guests and GlassMeet confirm meetings with you on WhatsApp.')}
               <GlassLabel htmlFor="ob-phone">WhatsApp number</GlassLabel>
-              <GlassInput id="ob-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={24} value={phone}
-                onChange={(e) => setPhone(e.target.value)} placeholder="+971 50 123 4567"
+              <GlassInput id="ob-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={LIMITS.phone} value={phone}
+                onChange={(e) => setPhone(onlyPhone(e.target.value))} placeholder="+971 50 123 4567"
                 aria-invalid={!!error} aria-describedby="ob-phone-hint" />
               <p id="ob-phone-hint" className="mt-1.5 text-xs text-muted-foreground">Start with your country code, like +971 or +44.</p>
               {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}

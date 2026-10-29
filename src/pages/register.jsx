@@ -9,6 +9,7 @@ import AuthLayout from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import LinkedInIcon from "@/components/linkedinicon.jsx";
 import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
+import { LIMITS, onlyName, onlyEmail } from '@/lib/inputRules';
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -113,7 +114,7 @@ export default function Register() {
               maxLength={80}
               placeholder="Sara Ahmed"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setName(onlyName(e.target.value))}
               className="pl-10 h-12"
               required
             />
@@ -130,7 +131,8 @@ export default function Register() {
               autoComplete="email"
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              maxLength={LIMITS.email}
+              onChange={(e) => setEmail(onlyEmail(e.target.value))}
               className="pl-10 h-12"
               required
             />
@@ -149,6 +151,7 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
               className="pl-10 pr-12 h-12"
               minLength={6}
+              maxLength={LIMITS.password}
               required
             />
             <button

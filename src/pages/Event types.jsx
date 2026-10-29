@@ -12,6 +12,7 @@ import { formatDate, eventRunsOn } from '@/lib/Availability.js';
 import { cn } from '@/lib/utils';
 import { BUILT_IN_TEMPLATES, templateData, templateSummary } from '@/lib/templates';
 import { appPath } from '@/lib/authReturnTo';
+import { LIMITS, onlyTitle } from '@/lib/inputRules';
 
 export default function EventTypes({ profile }) {
   const [eventTypes, setEventTypes] = useState([]);
@@ -111,7 +112,7 @@ export default function EventTypes({ profile }) {
       <div className="mb-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <GlassInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search event types" className="pl-10 rounded-full" aria-label="Search event types" />
+          <GlassInput maxLength={LIMITS.search} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search event types" className="pl-10 rounded-full" aria-label="Search event types" />
         </div>
       </div>
 
@@ -469,7 +470,7 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
         <form onSubmit={submit} className="space-y-5 px-6 pt-5">
           <div>
             <GlassLabel htmlFor="event-name">Name</GlassLabel>
-            <GlassInput id="event-name" value={form.name} maxLength={80} onChange={(e) => setField('name', e.target.value)} placeholder="30 minute meeting" required autoFocus />
+            <GlassInput id="event-name" value={form.name} maxLength={LIMITS.title} onChange={(e) => setField('name', onlyTitle(e.target.value))} placeholder="30 minute meeting" required autoFocus />
           </div>
           <div>
             <div className="flex items-center justify-between">
@@ -648,7 +649,7 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
                   <GlassTextarea id="event-address" rows={2} maxLength={300} value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Street, building, city" aria-label="New address" required />
                   {savedAddressesAvailable && (
                     <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-                      <GlassInput maxLength={40} value={newAddressLabel} onChange={(e) => setNewAddressLabel(e.target.value)} placeholder="Label, e.g. Office (optional)" aria-label="Address label" />
+                      <GlassInput maxLength={LIMITS.label} value={newAddressLabel} onChange={(e) => setNewAddressLabel(onlyTitle(e.target.value))} placeholder="Label, e.g. Office (optional)" aria-label="Address label" />
                       <label className="flex items-center gap-2 text-sm font-semibold">
                         <Switch checked={saveNewAddress} onCheckedChange={setSaveNewAddress} aria-label="Save to my addresses" /> Save to my addresses
                       </label>
@@ -662,13 +663,13 @@ function EventModal({ event, template, hostId, onClose, onSave, onSaveTemplate }
           {kind === 'other' && (
             <div>
               <GlassLabel htmlFor="event-custom-location">Where</GlassLabel>
-              <GlassInput id="event-custom-location" maxLength={80} value={form.custom_location} onChange={(e) => setField('custom_location', e.target.value)} placeholder="e.g. Webex, Signal" required />
+              <GlassInput id="event-custom-location" maxLength={LIMITS.title} value={form.custom_location} onChange={(e) => setField('custom_location', onlyTitle(e.target.value))} placeholder="e.g. Webex, Signal" required />
             </div>
           )}
           {(kind === 'video' || kind === 'other') && (
             <div>
               <GlassLabel htmlFor="event-meeting-url">Meeting link (optional)</GlassLabel>
-              <GlassInput id="event-meeting-url" type="url" inputMode="url" value={form.meeting_url} onChange={(e) => setField('meeting_url', e.target.value)} placeholder="https://" />
+              <GlassInput id="event-meeting-url" type="url" inputMode="url" maxLength={LIMITS.url} value={form.meeting_url} onChange={(e) => setField('meeting_url', e.target.value)} placeholder="https://" />
             </div>
           )}
           {kind === 'phone' && (

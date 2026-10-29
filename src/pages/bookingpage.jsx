@@ -15,6 +15,7 @@ import { holidayExceptions } from '@/lib/holidays.js';
 import { appPath } from '@/lib/authReturnTo';
 import { isEmbed, useEmbedResize } from '@/lib/embed.js';
 import { useAuth } from '@/lib/Authcontext.jsx';
+import { LIMITS, onlyName, onlyPhone, onlyEmail } from '@/lib/inputRules';
 
 // guests rarely open it (desktop only), so its dialog code loads on demand
 const QRCodeModal = lazy(() => import('@/components/QrcodeModal.jsx'));
@@ -609,15 +610,15 @@ export default function BookingPage() {
                 )}
                 <div>
                   <GlassLabel htmlFor="g-name">Name *</GlassLabel>
-                  <GlassInput id="g-name" autoComplete="name" enterKeyHint="next" maxLength={100} value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: e.target.value})} />
+                  <GlassInput id="g-name" autoComplete="name" enterKeyHint="next" maxLength={LIMITS.name} value={form.guest_name} onChange={(e)=>setForm({...form, guest_name: onlyName(e.target.value)})} />
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-email">{emailRequired ? 'Email *' : 'Email (optional)'}</GlassLabel>
-                  <GlassInput id="g-email" type="email" autoComplete="email" maxLength={254} value={form.guest_email} onChange={(e)=>setForm({...form, guest_email: e.target.value})} />
+                  <GlassInput id="g-email" type="email" autoComplete="email" maxLength={LIMITS.email} value={form.guest_email} onChange={(e)=>setForm({...form, guest_email: onlyEmail(e.target.value)})} />
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-phone">WhatsApp number *</GlassLabel>
-                  <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: e.target.value})} placeholder={phoneExample} />
+                  <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={LIMITS.phone} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: onlyPhone(e.target.value)})} placeholder={phoneExample} />
                   <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.{dialCode ? ` Numbers without a country code get +${dialCode}.` : ' Start with your country code.'}</p>
                 </div>
                 <div>
@@ -632,7 +633,7 @@ export default function BookingPage() {
                       ? <div id={`q-${qi}-label`} className="mb-1.5 text-sm font-semibold leading-snug">{q.text}{q.required && ' *'}</div>
                       : <GlassLabel htmlFor={`q-${qi}`} className="leading-snug">{q.text}{q.required && ' *'}</GlassLabel>}
                     {q.type === 'long_text' ? (
-                      <GlassTextarea id={`q-${qi}`} rows={2} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
+                      <GlassTextarea id={`q-${qi}`} rows={2} maxLength={LIMITS.note} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
                     ) : q.type === 'dropdown' ? (
                       <GlassSelect id={`q-${qi}`} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})}>
                         <option value="">Select…</option>
@@ -648,7 +649,7 @@ export default function BookingPage() {
                         ))}
                       </div>
                     ) : (
-                      <GlassInput id={`q-${qi}`} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
+                      <GlassInput id={`q-${qi}`} maxLength={LIMITS.answer} value={customAnswers[qi] || ''} onChange={(e)=>setCustomAnswers({...customAnswers, [qi]: e.target.value})} />
                     )}
                   </div>
                 ))}

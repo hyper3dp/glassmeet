@@ -25,6 +25,11 @@ export function authErrorMessage(err, fallback) {
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
     return 'Couldn’t reach GlassMeet. Check your connection and try again.';
   }
+  // Supabase's wording when an address it won't create an account for is used (a sign-up, or a
+  // Google / LinkedIn sign-in for a new email); guests are told plainly instead
+  if (err?.code === 'signup_disabled' || /signups? not allowed/i.test(message)) {
+    return 'Email invalid. Check the address and try again.';
+  }
   return message;
 }
 

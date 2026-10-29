@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MapPin, Pencil, Trash2, Plus, Check, X, Loader2 } from 'lucide-react';
 import { api } from '@/lib/localApi';
 import { GlassButton, GlassInput, GlassTextarea, GlassLabel } from '@/components/glass';
+import { LIMITS, onlyTitle } from '@/lib/inputRules';
 
 const ADDRESS_MAX = 300;
 
@@ -106,7 +107,7 @@ export function AddressForm({ initial, onSave, onCancel }) {
     <form onSubmit={submit} className="space-y-3">
       <div>
         <GlassLabel htmlFor={`addr-label-${initial?.id || 'new'}`}>Label</GlassLabel>
-        <GlassInput id={`addr-label-${initial?.id || 'new'}`} maxLength={40} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Office, Clinic, Home studio" />
+        <GlassInput id={`addr-label-${initial?.id || 'new'}`} maxLength={LIMITS.label} value={label} onChange={(e) => setLabel(onlyTitle(e.target.value))} placeholder="Office, Clinic, Home studio" />
       </div>
       <div>
         <GlassLabel htmlFor={`addr-text-${initial?.id || 'new'}`}>Address</GlassLabel>

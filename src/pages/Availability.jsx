@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import DatePicker from '@/components/DatePicker.jsx';
 import HolidaySettings from '@/components/HolidaySettings.jsx';
+import { onlyTitle } from '@/lib/inputRules';
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -371,7 +372,7 @@ function ExceptionModal({ onAdd, onClose }) {
           )}
           <div>
             <GlassLabel htmlFor="exc-label">Label (optional)</GlassLabel>
-            <GlassInput id="exc-label" maxLength={60} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Holiday, vacation…" />
+            <GlassInput id="exc-label" maxLength={60} value={label} onChange={(e) => setLabel(onlyTitle(e.target.value))} placeholder="Holiday, vacation…" />
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">

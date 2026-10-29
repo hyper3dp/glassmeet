@@ -6,6 +6,7 @@ import { useAutosave } from '@/lib/useAutosave';
 import {
   DEFAULT_CONFIRMATION_TEMPLATE, DEFAULT_REMINDER_24H, DEFAULT_REMINDER_1H,
 } from '@/lib/whatsapp';
+import { LIMITS, onlyPhone } from '@/lib/inputRules';
 
 export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
   const [form, setForm] = useState(null);
@@ -85,7 +86,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
         <div className="space-y-5">
           <div>
             <GlassLabel htmlFor="wa-phone">WhatsApp phone number</GlassLabel>
-            <GlassInput id="wa-phone" type="tel" value={form.phone_number} onChange={(e)=>set('phone_number', e.target.value)} placeholder="+971 50 123 4567" />
+            <GlassInput id="wa-phone" type="tel" inputMode="tel" maxLength={LIMITS.phone} value={form.phone_number} onChange={(e)=>set('phone_number', onlyPhone(e.target.value))} placeholder="+971 50 123 4567" />
           </div>
           <div>
             <GlassLabel htmlFor="wa-mode">Messaging mode</GlassLabel>
@@ -107,15 +108,15 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
         <div className="space-y-5">
           <div>
             <GlassLabel htmlFor="wa-confirm">Confirmation message</GlassLabel>
-            <GlassTextarea id="wa-confirm" rows={6} value={form.confirmation_template} onChange={(e)=>set('confirmation_template', e.target.value)} />
+            <GlassTextarea id="wa-confirm" rows={6} maxLength={LIMITS.note} value={form.confirmation_template} onChange={(e)=>set('confirmation_template', e.target.value)} />
           </div>
           <div>
             <GlassLabel htmlFor="wa-r24">Reminder the day before</GlassLabel>
-            <GlassTextarea id="wa-r24" rows={4} value={form.reminder_24h_template} onChange={(e)=>set('reminder_24h_template', e.target.value)} />
+            <GlassTextarea id="wa-r24" rows={4} maxLength={LIMITS.note} value={form.reminder_24h_template} onChange={(e)=>set('reminder_24h_template', e.target.value)} />
           </div>
           <div>
             <GlassLabel htmlFor="wa-r1">Reminder an hour before</GlassLabel>
-            <GlassTextarea id="wa-r1" rows={4} value={form.reminder_1h_template} onChange={(e)=>set('reminder_1h_template', e.target.value)} />
+            <GlassTextarea id="wa-r1" rows={4} maxLength={LIMITS.note} value={form.reminder_1h_template} onChange={(e)=>set('reminder_1h_template', e.target.value)} />
           </div>
         </div>
       </GlassCard>

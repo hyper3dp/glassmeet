@@ -9,6 +9,7 @@ import AuthLayout, { ResendEmailButton } from "@/components/Authlayout.jsx";
 import GoogleIcon from "@/components/googleicon.jsx";
 import LinkedInIcon from "@/components/linkedinicon.jsx";
 import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
+import { LIMITS, onlyEmail } from '@/lib/inputRules';
 
 // an auth link that failed (expired, already used, Google cancelled) leaves its message here;
 // see the inline script in index.html
@@ -16,7 +17,7 @@ const takeAuthError = () => {
   try {
     const message = sessionStorage.getItem('gm-auth-error');
     sessionStorage.removeItem('gm-auth-error');
-    return message;
+    return message ? authErrorMessage({ message }, message) : null;
   } catch {
     return null;
   }
@@ -117,7 +118,8 @@ export default function Login() {
               autoFocus
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              maxLength={LIMITS.email}
+              onChange={(e) => setEmail(onlyEmail(e.target.value))}
               className="pl-10 h-12"
               required
             />

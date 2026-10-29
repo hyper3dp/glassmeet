@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Lock, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import AuthLayout, { CodeInput, CODE_MIN, ResendEmailButton } from "@/components/Authlayout.jsx";
 import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
+import { LIMITS } from '@/lib/inputRules';
 
 // Two ways in. With ?email= (from Forgot password or Settings): the emailed code plus the new
 // password, on one screen. This has to be the page that checks the code: Supabase reports it as
@@ -123,6 +124,7 @@ export default function ResetPassword() {
               onChange={(e) => setNewPassword(e.target.value)}
               className="pl-10 pr-12 h-12"
               minLength={6}
+              maxLength={LIMITS.password}
               required
             />
             <button
@@ -147,6 +149,7 @@ export default function ResetPassword() {
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              maxLength={LIMITS.password}
               className="pl-10 h-12"
               required
             />

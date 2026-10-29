@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { GlassButton, GlassInput, GlassLabel, GlassSelect } from '@/components/glass';
 import { appPath } from '@/lib/authReturnTo';
 import { bookingUrlFor } from '@/components/eventcard.jsx';
+import { LIMITS, onlyTitle } from '@/lib/inputRules';
 
 const MODES = [
   { value: 'inline', label: 'Inline', hint: 'The calendar sits inside your page and grows to fit.' },
@@ -91,7 +92,7 @@ export default function EmbedDialog({ event, onClose }) {
             {mode !== 'inline' && (
               <div>
                 <GlassLabel htmlFor="embed-text">{mode === 'button' ? 'Button text' : 'Link text'}</GlassLabel>
-                <GlassInput id="embed-text" maxLength={40} value={text} onChange={(e) => setText(e.target.value)} />
+                <GlassInput id="embed-text" maxLength={LIMITS.label} value={text} onChange={(e) => setText(onlyTitle(e.target.value))} />
               </div>
             )}
             <div>

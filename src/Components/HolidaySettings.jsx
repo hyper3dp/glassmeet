@@ -9,6 +9,7 @@ import { HOLIDAY_REGIONS, holidayClashes, rescheduleMessage } from '@/lib/holida
 import { buildWhatsAppLink, formatMeetingDate, formatMeetingTime } from '@/lib/whatsapp';
 import { detectTimezone, formatDate } from '@/lib/Availability.js';
 import { appPath } from '@/lib/authReturnTo';
+import { LIMITS } from '@/lib/inputRules';
 
 const REGION = 'ae';
 const KEPT_KEY = 'gm-holiday-kept'; // bookings the host chose to keep (this browser)
@@ -213,7 +214,7 @@ function ClashRow({ clash, timezone, state, onKeep, onCancelled }) {
       {cancelled && (
         <div className="mt-4 space-y-3">
           <label htmlFor={`msg-${booking.id}`} className="block text-sm font-semibold">Message to {booking.guest_name?.split(' ')[0] || 'the guest'}</label>
-          <GlassTextarea id={`msg-${booking.id}`} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <GlassTextarea id={`msg-${booking.id}`} rows={5} maxLength={LIMITS.note} value={message} onChange={(e) => setMessage(e.target.value)} />
           <div className="flex flex-wrap gap-2">
             {booking.guest_phone ? (
               <GlassButton type="button" variant="primary" onClick={() => window.open(buildWhatsAppLink(booking.guest_phone, message), '_blank')}>

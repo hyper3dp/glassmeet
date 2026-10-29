@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { GlassButton, GlassInput, GlassLabel, GlassTextarea } from '@/components/glass';
 import { collectDetails, sendBugReport } from '@/lib/bugReport.js';
 import { useAuth } from '@/lib/Authcontext.jsx';
+import { LIMITS, onlyEmail } from '@/lib/inputRules';
 
 export default function BugReportDialog({ onClose }) {
   const { user } = useAuth();
@@ -57,7 +58,7 @@ export default function BugReportDialog({ onClose }) {
             {!user && (
               <div>
                 <GlassLabel htmlFor="bug-email">Email (optional)</GlassLabel>
-                <GlassInput id="bug-email" type="email" maxLength={320} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="So we can follow up" />
+                <GlassInput id="bug-email" type="email" maxLength={LIMITS.email} autoComplete="email" value={email} onChange={(e) => setEmail(onlyEmail(e.target.value))} placeholder="So we can follow up" />
               </div>
             )}
             <div className="rounded-lg border border-border p-3">

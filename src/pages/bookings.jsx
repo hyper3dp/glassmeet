@@ -15,6 +15,7 @@ import { detectTimezone } from '@/lib/Availability.js';
 import { withoutExpiredCancellations } from '@/lib/bookings';
 import { appPath } from '@/lib/authReturnTo';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { LIMITS } from '@/lib/inputRules';
 
 const TABS = ['upcoming', 'pending', 'past', 'cancelled'];
 // the messages a host can send from a meeting; the default follows what just happened
@@ -179,7 +180,7 @@ export default function Bookings({ profile, whatsapp }) {
           <label className="relative w-full sm:w-72">
             <span className="sr-only">Search meetings</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-hint" />
-            <GlassInput type="search" value={query} onChange={(e) => setParam('q', e.target.value)} placeholder="Search by name, phone or email" className="pl-9 h-10" />
+            <GlassInput type="search" maxLength={LIMITS.search} value={query} onChange={(e) => setParam('q', e.target.value)} placeholder="Search by name, phone or email" className="pl-9 h-10" />
           </label>
           <span>
             {query ? `${filtered.length} ${filtered.length === 1 ? 'match' : 'matches'}` : `Displaying ${filtered.length} ${filtered.length === 1 ? 'event' : 'events'}`}
@@ -353,14 +354,14 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
           <div>
             <GlassLabel htmlFor="bd-url">Meeting URL</GlassLabel>
             <div className="flex gap-2">
-              <GlassInput id="bd-url" value={meetingUrl} onChange={(e)=>setMeetingUrl(e.target.value)} placeholder="https://..." />
+              <GlassInput id="bd-url" type="url" inputMode="url" maxLength={LIMITS.url} value={meetingUrl} onChange={(e)=>setMeetingUrl(e.target.value)} placeholder="https://..." />
               <GlassButton type="button" onClick={copyLink} aria-label="Copy meeting link">{copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}</GlassButton>
             </div>
           </div>
 
           <div>
             <GlassLabel htmlFor="bd-notes">Host notes (saved automatically)</GlassLabel>
-            <GlassTextarea id="bd-notes" rows={3} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
+            <GlassTextarea id="bd-notes" rows={3} maxLength={LIMITS.note} value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Private notes about this meeting..." />
           </div>
 
           {/* without a number the message can still be copied or emailed */}
@@ -371,7 +372,7 @@ function BookingDetail({ booking, initialKind, justChanged, timezone, messageFor
                 {MESSAGE_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
               </select>
             </div>
-            <GlassTextarea id="bd-msg" rows={6} value={waMsg} onChange={(e) => setDraft(e.target.value)} />
+            <GlassTextarea id="bd-msg" rows={6} maxLength={LIMITS.note} value={waMsg} onChange={(e) => setDraft(e.target.value)} />
             {!booking.guest_phone && (
               <div className="flex flex-wrap gap-2">
                 <GlassButton type="button" size="sm" onClick={copyMessage}><Copy className="w-4 h-4" /> Copy message</GlassButton>
