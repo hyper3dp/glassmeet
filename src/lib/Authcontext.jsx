@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '@/lib/localApi';
-import { appPath } from '@/lib/authReturnTo';
+import { appPath, markRecovery } from '@/lib/authReturnTo';
 
 const AuthContext = createContext();
 
@@ -105,10 +105,12 @@ export const AuthProvider = ({ children }) => {
         setAuthError(null);
         userId.current = null;
         authed.current = false;
+        markRecovery(false);
         setUser(null);
         setIsAuthenticated(false);
         return;
       }
+      if (event === 'PASSWORD_RECOVERY') markRecovery(true);
       if (event === 'PASSWORD_RECOVERY' && !/\/reset-password\/?$/.test(window.location.pathname)) {
         window.location.replace(appPath('/reset-password'));
         return;

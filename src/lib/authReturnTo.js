@@ -33,6 +33,25 @@ export function authErrorMessage(err, fallback) {
   return message;
 }
 
+// A reset link signs the person in; only then may /reset-password set a password without a code.
+// Supabase reports the link as PASSWORD_RECOVERY, and Authcontext marks this tab.
+const RECOVERY_KEY = "gm-recovery";
+export function markRecovery(on) {
+  try {
+    if (on) sessionStorage.setItem(RECOVERY_KEY, "1");
+    else sessionStorage.removeItem(RECOVERY_KEY);
+  } catch {
+    // storage blocked: the link flow then asks for a code instead
+  }
+}
+export function inRecovery() {
+  try {
+    return sessionStorage.getItem(RECOVERY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function safeReturnTo() {
   const raw = new URLSearchParams(window.location.search).get("returnTo");
   if (!raw) return "/";

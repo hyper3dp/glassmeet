@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { embedTheme } from '@/lib/embed.js';
@@ -10,6 +10,7 @@ import { useApp } from '@/lib/useprofile.js';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { PAGES, preloadPage } from '@/lib/pages.js';
 import BugReport from '@/components/BugReport.jsx';
+import { safeReturnTo } from '@/lib/authReturnTo';
 
 // Pages load on demand (see lib/pages.js); the one being opened starts downloading right away
 const AppShell = lazy(PAGES.appShell);
@@ -56,6 +57,15 @@ function LoginRedirect() {
   return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
 }
 
+// Log in and Register are for signed-out visitors: a signed-in one goes on to where they were
+// heading, so they can't sign up a second account over the session they have
+function SignedOutOnly() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Outlet />;
+  const to = safeReturnTo();
+  return <Navigate to={to === '/' ? '/dashboard' : to} replace />;
+}
+
 const DashboardPage = () => { const { profile } = useApp(); return <Dashboard profile={profile} />; };
 const CalendarPagePage = () => { const { profile } = useApp(); return <CalendarPage profile={profile} />; };
 const EventTypesPage = () => { const { profile } = useApp(); return <EventTypes profile={profile} />; };
@@ -92,8 +102,10 @@ const AuthenticatedApp = () => {
       <Route path="/confirm/:bookingId" element={<BookingConfirmation />} />
 
       {/* Auth routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route element={<SignedOutOnly />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+      </Route>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify" element={<Verify />} />

@@ -25,7 +25,8 @@ const SCOPES = [
 const DEFAULT_RETURN = '/calendar-connections';
 const STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_TIMEOUT_MS = 10_000;
-const MAX_WINDOW_MS = 62 * 864e5;
+const DAY_MS = 864e5;
+const MAX_WINDOW_MS = 62 * DAY_MS;
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const configured = () => Boolean(CLIENT_ID && CLIENT_SECRET && SUPABASE_URL && SERVICE_KEY);
@@ -466,13 +467,22 @@ const actions: Record<string, (req: Request, body: Body) => Promise<unknown>> = 
   },
 
   // PUBLIC: busy intervals for a host's booking page. Times only, nothing about the events.
+  // Only for hosts with a switched-on event (the ones whose booking pages are public), and only
+  // from yesterday to as far ahead as a booking page can show, so it can't replay anyone's past.
   freeBusy: async (_req, body) => {
     const { hostId, timeMin, timeMax } = body;
     if (typeof hostId !== 'string' || !UUID.test(hostId)) throw new Fail(400, 'input', 'hostId must be a uuid.');
-    const min = new Date(String(timeMin)), max = new Date(String(timeMax));
-    if (Number.isNaN(min.getTime()) || Number.isNaN(max.getTime()) || max <= min || max.getTime() - min.getTime() > MAX_WINDOW_MS) {
+    const asked = { min: new Date(String(timeMin)), max: new Date(String(timeMax)) };
+    if (Number.isNaN(asked.min.getTime()) || Number.isNaN(asked.max.getTime()) || asked.max <= asked.min || asked.max.getTime() - asked.min.getTime() > MAX_WINDOW_MS) {
       throw new Fail(400, 'input', 'timeMin and timeMax must be a window of at most 62 days.');
     }
+    const now = Date.now();
+    const min = new Date(Math.max(asked.min.getTime(), now - DAY_MS));
+    const max = new Date(Math.min(asked.max.getTime(), now + 400 * DAY_MS));
+    if (max <= min) return [];
+    const { data: open, error: openError } = await admin.from('event_types').select('id')
+      .eq('created_by_id', hostId).eq('active', true).limit(1);
+    if (openError || !open?.length) return [];
     const account = await getAccount(hostId);
     if (!account) return [];
     const ids = [...new Set([account.calendar_id || 'primary', 'primary'])];

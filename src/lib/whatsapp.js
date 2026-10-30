@@ -47,15 +47,16 @@ export const formatMeetingTime = (date, timezone) => {
 // is left out rather than sent half empty.
 export const fillTemplate = (template, ctx) => {
   if (!template) return '';
+  // replacer functions: a guest named "Ann $'" mustn't be read as a replacement pattern
   const filled = template
-    .replace(/\[Name\]/g, ctx.guestName || '')
-    .replace(/\[Host\]/g, ctx.hostName || '')
-    .replace(/\[Date\]/g, ctx.date || '')
-    .replace(/\[Time\]/g, ctx.time || '')
-    .replace(/\[Duration\]/g, ctx.duration || '')
-    .replace(/\[Meeting Link\]/g, ctx.meetingUrl || '')
-    .replace(/\[Booking Link\]/g, ctx.bookingLink || '')
-    .replace(/\[Timezone\]/g, ctx.timezone || '');
+    .replace(/\[Name\]/g, () => ctx.guestName || '')
+    .replace(/\[Host\]/g, () => ctx.hostName || '')
+    .replace(/\[Date\]/g, () => ctx.date || '')
+    .replace(/\[Time\]/g, () => ctx.time || '')
+    .replace(/\[Duration\]/g, () => ctx.duration || '')
+    .replace(/\[Meeting Link\]/g, () => ctx.meetingUrl || '')
+    .replace(/\[Booking Link\]/g, () => ctx.bookingLink || '')
+    .replace(/\[Timezone\]/g, () => ctx.timezone || '');
   return filled.split('\n').filter((line) => !/^[^:\n]{1,20}:\s*(\(\s*\))?\s*$/.test(line)).join('\n');
 };
 

@@ -162,13 +162,18 @@ export default function BookingPage() {
     const timeMax = new Date(cursorYear, cursorMonth + 1, 2).toISOString();
     // Google Calendar busy times are optional (only hosts who connected Google have any); without them,
     // slots come from the host's availability and GlassMeet bookings.
-    let current = true; // a slow answer for a month the guest has left doesn't overwrite this one
-    // nothing busy keeps the same empty list, so the times aren't worked out again for nothing
-    const take = (busy) => { if (current) setGoogleBusy((cur) => (busy.length || cur.length ? busy : cur)); };
+    // Each month's answer is added to what's known, never swapped for it: a day picked in one
+    // month stays on screen after the guest moves to the next, and must keep its busy times.
+    // A failed request keeps what's known rather than offering every time as free.
+    const take = (busy) => setGoogleBusy((cur) => {
+      const seen = new Set(cur.map((b) => `${b.start_time}|${b.end_time}`));
+      const fresh = busy.filter((b) => !seen.has(`${b.start_time}|${b.end_time}`));
+      return fresh.length ? [...cur, ...fresh] : cur;
+    });
     api.google.busy(event.created_by_id, timeMin, timeMax)
       .then((busy) => take(Array.isArray(busy) ? busy : []))
-      .catch(() => take([]));
-    return () => { current = false; };
+      .catch(() => {});
+    return undefined;
   }, [event, cursorYear, cursorMonth]);
 
   useEffect(() => { load(); }, []);

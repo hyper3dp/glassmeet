@@ -1,6 +1,11 @@
 .env  
 backend/service-account.json  
-authgoogle/*.json  
+authgoogle/
+.env.*
+!.env.example
+*.pem
+*.p8
+*.key
 node_modules/  
 dist/  
 data/  

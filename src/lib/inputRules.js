@@ -11,6 +11,7 @@ export const LIMITS = {
   phone: 24,
   url: 500,
   password: 72, // what Supabase Auth (bcrypt) reads
+  passwordMin: 8,
   answer: 500,
   note: 2000,
   search: 100,

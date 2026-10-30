@@ -226,11 +226,12 @@ export const api = {
     loginViaEmailPassword: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        const err = new Error(error.code === 'email_not_confirmed' ? 'Confirm your email before logging in. Check your inbox (and spam) for the link.' : error.message);
+        const err = new Error(error.code === 'email_not_confirmed' ? 'Confirm your email before logging in. Check your inbox (and spam) for the code.' : error.message);
         err.code = error.code;
         throw err;
       }
-      return { user: await getProfile(data.user.id), access_token: data.session.access_token };
+      // signed in now; a profile that doesn't load is the app's to retry, not a failed login
+      return { user: await getProfile(data.user.id).catch(() => null), access_token: data.session.access_token };
     },
     register: async (value) => {
       // The confirmation link returns to the page the user was heading for (the app root by
@@ -256,7 +257,7 @@ export const api = {
         throw err;
       }
       if (!data.session) return { user: null, access_token: undefined };
-      return { user: await getProfile(data.user.id), access_token: data.session.access_token };
+      return { user: await getProfile(data.user.id).catch(() => null), access_token: data.session.access_token };
     },
     resendSignup: async (email, returnTo = '/') => {
       const { error } = await supabase.auth.resend({
@@ -300,21 +301,24 @@ export const api = {
       const { error } = await supabase.auth.signOut();
       if (error) await supabase.auth.signOut({ scope: 'local' });
     },
-    // Deletes the signed-in account and all its data: profile photos first (Storage doesn't
-    // cascade), then the login, which takes every table with it (see delete_my_account()).
+    // Deletes the signed-in account and all its data: Google's access is revoked first (the
+    // cascade only drops our copy of the token), then the login, which takes every table with it
+    // (see delete_my_account()), then the profile photos (Storage doesn't cascade). Photos go
+    // last so a failed delete never leaves a live account with broken pictures; the session's
+    // token still works for Storage until this device signs out.
     deleteAccount: async () => {
       const user = await sessionUser();
       if (!user) throw new Error('Sign in first.');
-      const bucket = supabase.storage.from('avatars');
-      const { data: files, error: listError } = await bucket.list(user.id, { limit: 1000 });
-      if (listError && !/not found/i.test(listError.message)) throw new Error(listError.message);
-      if (files?.length) {
-        const { error: removeError } = await bucket.remove(files.map((f) => `${user.id}/${f.name}`));
-        if (removeError) throw new Error(removeError.message);
-      }
+      await invokeGoogle({ action: 'disconnect' }).catch(() => {});
       const { error } = await supabase.rpc('delete_my_account');
       if (notDeployed(error)) throw new Error('Deleting accounts isn’t available yet. Please try again later.');
       if (error) throw new Error(error.message);
+      const bucket = supabase.storage.from('avatars');
+      const { data: files } = await bucket.list(user.id, { limit: 1000 }).catch(() => ({ data: null }));
+      if (files?.length) {
+        const { error: removeError } = await bucket.remove(files.map((f) => `${user.id}/${f.name}`));
+        if (removeError) console.warn('Profile photos not removed:', removeError.message);
+      }
       meCache = null;
       // the session belonged to the deleted login; clear it on this device
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});

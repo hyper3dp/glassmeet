@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import AuthLayout, { CodeInput, CODE_MIN, ResendEmailButton } from "@/components/Authlayout.jsx";
-import { appPath, safeReturnTo, authErrorMessage } from "@/lib/authReturnTo";
+import { appPath, safeReturnTo, authErrorMessage, inRecovery, markRecovery } from "@/lib/authReturnTo";
 import { LIMITS } from '@/lib/inputRules';
 
 // Two ways in. With ?email= (from Forgot password or Settings): the emailed code plus the new
 // password, on one screen. This has to be the page that checks the code: Supabase reports it as
 // PASSWORD_RECOVERY, and Authcontext sends that event here. Without an email: an older reset link
-// that already signed the person in, so only the new password is asked for.
+// that already signed the person in, so only the new password is asked for. Being signed in alone
+// isn't enough: anyone at an unlocked computer could then change the password.
 export default function ResetPassword() {
   const [email] = useState(() => new URLSearchParams(window.location.search).get("email") || "");
   const withCode = Boolean(email);
@@ -32,7 +33,7 @@ export default function ResetPassword() {
   useEffect(() => {
     if (withCode) return undefined;
     let alive = true;
-    api.auth.hasSession().then((ok) => { if (alive) setLinkValid(ok); }).catch(() => { if (alive) setLinkValid(false); });
+    api.auth.hasSession().then((ok) => { if (alive) setLinkValid(ok && inRecovery()); }).catch(() => { if (alive) setLinkValid(false); });
     return () => { alive = false; };
   }, [withCode]);
 
@@ -43,8 +44,8 @@ export default function ResetPassword() {
       setError(`Enter the ${CODE_MIN}-digit code from the email.`);
       return;
     }
-    if (newPassword.length < 6) {
-      setError("Use at least 6 characters for your password.");
+    if (newPassword.length < LIMITS.passwordMin) {
+      setError(`Use at least ${LIMITS.passwordMin} characters for your password.`);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -58,13 +59,14 @@ export default function ResetPassword() {
       if (withCode && !verified.current) {
         await api.auth.verifyOtp({ email, token: code, type: "recovery" });
         verified.current = true;
-      } else if (!withCode && !(await api.auth.hasSession())) {
+      } else if (!withCode && !(inRecovery() && await api.auth.hasSession())) {
         setLinkValid(false);
         setLoading(false);
         busy.current = false;
         return;
       }
       await api.auth.resetPassword({ newPassword });
+      markRecovery(false);
       // signed in with the new password; stay busy while the app loads
       window.location.assign(appPath(safeReturnTo() === "/" ? "/dashboard" : safeReturnTo()));
     } catch (err) {
@@ -119,11 +121,11 @@ export default function ResetPassword() {
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
               autoFocus={!withCode}
-              placeholder="At least 6 characters"
+              placeholder={`At least ${LIMITS.passwordMin} characters`}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className="pl-10 pr-12 h-12"
-              minLength={6}
+              minLength={LIMITS.passwordMin}
               maxLength={LIMITS.password}
               required
             />

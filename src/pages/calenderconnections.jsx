@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Calendar, CalendarCheck, RefreshCw, Unplug, CheckCircle2,
-  Apple, AlertCircle, Loader2, Settings2,
+  AlertCircle, Loader2, Settings2,
   Rss, Copy, RotateCcw, Clock,
 } from 'lucide-react';
 import { GlassCard, GlassButton, GlassInput, PageHeader } from '@/components/glass';
@@ -13,6 +13,7 @@ import { useApp } from '@/lib/useprofile.js';
 import { downloadIcs } from '@/lib/calendar';
 import { downloadICSFeed } from '@/lib/calendarFeed';
 import OutlookIcon from '@/components/outlookicon.jsx';
+import AppleIcon from '@/components/appleicon.jsx';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -358,7 +359,7 @@ export default function CalendarConnections() {
         </div>
         {feedState === 'ready' && feedUrl && (
           <div className="px-5 pb-5 flex flex-wrap gap-2">
-            <GlassButton as="a" href={feedUrl.replace(/^https:/, 'webcal:')} size="sm" variant="primary"><Apple className="w-4 h-4" /> Apple Calendar</GlassButton>
+            <GlassButton as="a" href={feedUrl.replace(/^https:/, 'webcal:')} size="sm" variant="primary"><AppleIcon className="w-4 h-4" /> Apple Calendar</GlassButton>
             <GlassButton as="a" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl.replace(/^https:/, 'webcal:'))}`} target="_blank" rel="noreferrer" size="sm"><Calendar className="w-4 h-4" /> Google Calendar</GlassButton>
             <GlassButton as="a" href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feedUrl)}&name=${encodeURIComponent('GlassMeet')}`} target="_blank" rel="noreferrer" size="sm"><OutlookIcon className="w-4 h-4" /> Outlook</GlassButton>
             <GlassButton size="sm" variant="ghost" type="button" onClick={resetFeed} disabled={feedResetting}>
@@ -459,7 +460,7 @@ export default function CalendarConnections() {
       <GlassCard hover={false} className="p-0 overflow-hidden">
         <div className="p-5 flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-black border border-border flex items-center justify-center shrink-0">
-            <Apple className="w-6 h-6 text-white" />
+            <AppleIcon className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -480,7 +481,7 @@ export default function CalendarConnections() {
         </div>
         <div className="px-5 pb-5 flex flex-wrap gap-2">
           <GlassButton size="sm" variant="primary" type="button" onClick={exportMyMeetings} disabled={!!testing}>
-            {testing === 'apple' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Apple className="w-4 h-4" />}
+            {testing === 'apple' ? <Loader2 className="w-4 h-4 animate-spin" /> : <AppleIcon className="w-4 h-4" />}
             Add my meetings
           </GlassButton>
           <GlassButton size="sm" variant="ghost" type="button" onClick={testAppleCalendar} disabled={!!testing}>

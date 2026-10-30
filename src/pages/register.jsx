@@ -25,8 +25,8 @@ export default function Register() {
     e.preventDefault();
     setError("");
     setExists(false);
-    if (password.length < 6) {
-      setError("Use at least 6 characters for your password.");
+    if (password.length < LIMITS.passwordMin) {
+      setError(`Use at least ${LIMITS.passwordMin} characters for your password.`);
       return;
     }
     if (loading) return;
@@ -146,11 +146,11 @@ export default function Register() {
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="At least 6 characters"
+              placeholder={`At least ${LIMITS.passwordMin} characters`}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="pl-10 pr-12 h-12"
-              minLength={6}
+              minLength={LIMITS.passwordMin}
               maxLength={LIMITS.password}
               required
             />

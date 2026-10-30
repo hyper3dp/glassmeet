@@ -15,8 +15,9 @@ const started = Date.now();
 const push = (list, item) => { list.push(item); if (list.length > MAX) list.shift(); };
 const at = () => Math.round((Date.now() - started) / 1000); // seconds since the page loaded
 
-// sign-in links carry tokens in the hash and query; never send those
-const SECRET_PARAMS = /^(access_token|refresh_token|token|code|state|provider_token|key|apikey)$/i;
+// sign-in links carry tokens in the hash and query; never send those, nor the emails, phone
+// numbers and guest searches some pages keep in their address
+const SECRET_PARAMS = /^(access_token|refresh_token|token|code|state|provider_token|key|apikey|email|phone|q|returnTo)$/i;
 export const cleanUrl = (raw) => {
   try {
     const url = new URL(raw, window.location.origin);
