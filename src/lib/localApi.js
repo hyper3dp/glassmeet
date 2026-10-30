@@ -163,7 +163,9 @@ const entities = new Proxy({}, {
 // Auth waits up to 10s for the mail server to accept a sign-up or reset email, then answers 504
 // and drops the request: no account is created and no code is sent. Say so plainly instead of
 // passing on the gateway's error.
-const emailTimedOut = (error) => error?.status === 504 || error?.code === 'request_timeout';
+const emailTimedOut = (error) => error?.status === 504 || error?.code === 'request_timeout'
+  // the mail server answered but refused (bad SMTP login, quota): same outcome for the person
+  || /error sending (confirmation|recovery|magic link|invite)/i.test(error?.message || '');
 const EMAIL_DOWN = 'We couldn’t send the email just now. Please try again in a few minutes.';
 
 export const api = {
