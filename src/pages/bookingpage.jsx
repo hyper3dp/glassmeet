@@ -9,13 +9,15 @@ import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/c
 import {
   generateSlots, isPastDate, isWithinMaxFuture, detectTimezone, bookingWindowDays, COMMON_TIMEZONES, dateInZone,
 } from '@/lib/Availability.js';
-import { formatMeetingDate, normalizePhone } from '@/lib/whatsapp';
+import { formatMeetingDate } from '@/lib/whatsapp';
+import { isValidPhone } from '@/lib/phone';
+import PhoneInput from '@/components/PhoneInput.jsx';
 import { getDevice } from '@/lib/devicedetect.js';
 import { holidayExceptions } from '@/lib/holidays.js';
 import { appPath } from '@/lib/authReturnTo';
 import { isEmbed, useEmbedResize } from '@/lib/embed.js';
 import { useAuth } from '@/lib/Authcontext.jsx';
-import { LIMITS, onlyName, onlyPhone, onlyEmail } from '@/lib/inputRules';
+import { LIMITS, onlyName, onlyEmail } from '@/lib/inputRules';
 
 // guests rarely open it (desktop only), so its dialog code loads on demand
 const QRCodeModal = lazy(() => import('@/components/QrcodeModal.jsx'));
@@ -143,11 +145,9 @@ export default function BookingPage() {
   const [detectedTz] = useState(detectTimezone);
   const [guestTz, setGuestTz] = useState(detectedTz);
   const tzOptions = useMemo(() => [...new Set([detectedTz, ...COMMON_TIMEZONES])], [detectedTz]);
-  const dialCode = DIAL_CODES[detectedTz];
   // "today" in the zone the guest is viewing, which may not be this browser's
   const todayKey = dateInZone(Date.now(), guestTz).getTime();
   const today = new Date(todayKey);
-  const phoneExample = PHONE_EXAMPLES[dialCode] || (dialCode ? `+${dialCode} …` : '+1 415 555 0123');
   // weekly hours are in the host's zone; everything the guest sees is in the guest's zone
   const hostTz = event?.host_timezone || 'UTC'; // same fallback as the server's booking check
   const emailRequired = event?.email_required ?? true;
@@ -285,12 +285,9 @@ export default function BookingPage() {
     if (emailRequired && !form.guest_email.trim()) return fail('Enter your email.', 'g-email');
     if (form.guest_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) return fail('That email address doesn’t look right.', 'g-email');
     if (!form.guest_phone.trim()) return fail('Enter your WhatsApp number.', 'g-phone');
-    // the host reaches the guest on WhatsApp, so the number has to be dialable; outside the
-    // zones we know a dial code for, it must start with the country code
-    const phone = withDialCode(form.guest_phone, dialCode);
-    if (!/^\+?\d{7,15}$/.test(normalizePhone(phone)) || (!dialCode && !phone.startsWith('+'))) {
-      return fail(`Enter your WhatsApp number with the country code, e.g. ${phoneExample}.`, 'g-phone');
-    }
+    // the host reaches the guest on WhatsApp, so it has to be a real mobile number
+    const phone = form.guest_phone;
+    if (!isValidPhone(phone)) return fail('That isn’t a valid WhatsApp number. Check the country and the number.', 'g-phone');
     if (!selectedSlot) return;
     // Validate required custom questions
     if (event?.custom_questions) {
@@ -623,8 +620,7 @@ export default function BookingPage() {
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-phone">WhatsApp number *</GlassLabel>
-                  <GlassInput id="g-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={LIMITS.phone} value={form.guest_phone} onChange={(e)=>setForm({...form, guest_phone: onlyPhone(e.target.value)})} placeholder={phoneExample} />
-                  <p className="mt-1.5 text-xs text-muted-foreground">The host confirms your meeting on WhatsApp.{dialCode ? ` Numbers without a country code get +${dialCode}.` : ' Start with your country code.'}</p>
+                  <PhoneInput id="g-phone" value={form.guest_phone} onChange={(guest_phone)=>setForm((f) => ({...f, guest_phone}))} hint="The host confirms your meeting on WhatsApp." />
                 </div>
                 <div>
                   <GlassLabel htmlFor="g-notes" className="leading-snug">Please share anything that will help prepare for our meeting.</GlassLabel>
@@ -688,20 +684,6 @@ export default function BookingPage() {
     </div>
   );
 }
-
-// Country dial codes for the guest's time zone: a local number ("050 123 4567") gets the code
-const DIAL_CODES = {
-  'Asia/Dubai': '971', 'Asia/Riyadh': '966', 'Asia/Qatar': '974', 'Asia/Kuwait': '965', 'Asia/Bahrain': '973',
-  'Asia/Muscat': '968', 'Asia/Amman': '962', 'Asia/Beirut': '961', 'Africa/Cairo': '20', 'Asia/Kolkata': '91',
-  'Asia/Calcutta': '91', 'Asia/Karachi': '92', 'Asia/Dhaka': '880', 'Asia/Manila': '63', 'Europe/London': '44',
-  'Africa/Lagos': '234', 'Africa/Nairobi': '254', 'Africa/Johannesburg': '27', 'America/Sao_Paulo': '55', 'America/Mexico_City': '52',
-};
-const PHONE_EXAMPLES = { 971: '+971 50 123 4567', 966: '+966 50 123 4567', 91: '+91 98765 43210', 44: '+44 7700 900123' };
-const withDialCode = (raw, code) => {
-  const v = (raw || '').trim();
-  if (!code || /^(\+|00)/.test(v)) return v.replace(/^00/, '+');
-  return `+${code}${v.replace(/^0+/, '')}`;
-};
 
 // last day guests may book: the booking window, the event's end date or its last listed date
 function lastBookableDay(event, today = new Date()) {

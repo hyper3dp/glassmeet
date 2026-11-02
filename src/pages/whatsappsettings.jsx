@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/localApi';
 import { MessageCircle, Info } from 'lucide-react';
-import { GlassCard, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, SaveStatus } from '@/components/glass';
+import { GlassCard, GlassTextarea, GlassLabel, GlassSelect, Spinner, PageHeader, SaveStatus } from '@/components/glass';
 import { useAutosave } from '@/lib/useAutosave';
 import {
   DEFAULT_CONFIRMATION_TEMPLATE, DEFAULT_REMINDER_24H, DEFAULT_REMINDER_1H,
 } from '@/lib/whatsapp';
-import { LIMITS, onlyPhone } from '@/lib/inputRules';
+import { LIMITS } from '@/lib/inputRules';
+import { isValidPhone } from '@/lib/phone';
+import PhoneInput from '@/components/PhoneInput.jsx';
 
 export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
   const [form, setForm] = useState(null);
@@ -42,7 +44,10 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
   if (!idRef.current && whatsapp?.id) idRef.current = whatsapp.id;
 
   const creating = useRef(null); // the first save's create, so a second save waits for it
-  const autosave = useAutosave(form, async (payload) => {
+  const autosave = useAutosave(form, async (value) => {
+    // a half-typed or mistyped number keeps the saved one until it's a real number
+    const { phone_number, ...rest } = value;
+    const payload = !phone_number || isValidPhone(phone_number) ? value : rest;
     if (!idRef.current && creating.current) await creating.current;
     if (idRef.current) {
       const updated = await api.entities.WhatsAppSetting.update(idRef.current, payload);
@@ -86,7 +91,7 @@ export default function WhatsAppSettings({ profile, whatsapp, setWhatsapp }) {
         <div className="space-y-5">
           <div>
             <GlassLabel htmlFor="wa-phone">WhatsApp phone number</GlassLabel>
-            <GlassInput id="wa-phone" type="tel" inputMode="tel" maxLength={LIMITS.phone} value={form.phone_number} onChange={(e)=>set('phone_number', onlyPhone(e.target.value))} placeholder="+971 50 123 4567" />
+            <PhoneInput id="wa-phone" value={form.phone_number} onChange={(v)=>set('phone_number', v)} />
           </div>
           <div>
             <GlassLabel htmlFor="wa-mode">Messaging mode</GlassLabel>

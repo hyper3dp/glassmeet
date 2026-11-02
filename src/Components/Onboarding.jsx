@@ -5,9 +5,10 @@ import { api } from '@/lib/localApi';
 import { GlassButton, GlassInput, GlassLabel, TimeSelect, Avatar, Spinner } from '@/components/glass';
 import Logo from '@/components/logo.jsx';
 import { detectTimezone } from '@/lib/Availability.js';
-import { normalizePhone } from '@/lib/whatsapp';
+import { isValidPhone } from '@/lib/phone';
+import PhoneInput from '@/components/PhoneInput.jsx';
 import { cn } from '@/lib/utils';
-import { LIMITS, onlyName, onlyPhone } from '@/lib/inputRules';
+import { LIMITS, onlyName } from '@/lib/inputRules';
 
 const MAX_PHOTO_MB = 5;
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -52,7 +53,7 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
   // each screen's heading takes focus, so screen readers announce the new step
   useEffect(() => { headingRef.current?.focus(); setError(''); }, [step]);
 
-  const phoneOk = /^\+\d{7,15}$/.test(normalizePhone(phone.trim().replace(/^00/, '+')));
+  const phoneOk = isValidPhone(phone);
 
   const onPickPhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -92,9 +93,9 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
   }, () => setStep(1));
 
   const saveWhatsApp = () => {
-    if (!phoneOk) { setError('Enter your WhatsApp number with the country code, e.g. +971 50 123 4567.'); return; }
+    if (!phoneOk) { setError('That isn’t a valid WhatsApp number. Check the country and the number.'); return; }
     run(async () => {
-      const number = normalizePhone(phone.trim().replace(/^00/, '+'));
+      const number = phone;
       await updateProfile({ whatsapp_number: number });
       // the WhatsApp page keeps its own copy of the number; keep the two the same. The profile
       // number is the one that counts, so a failure here doesn't hold the host up.
@@ -169,10 +170,7 @@ export default function Onboarding({ profile, updateProfile, whatsapp, setWhatsa
             <form onSubmit={(e) => { e.preventDefault(); saveWhatsApp(); }} noValidate>
               {heading('Your WhatsApp number', 'Guests and GlassMeet confirm meetings with you on WhatsApp.')}
               <GlassLabel htmlFor="ob-phone">WhatsApp number</GlassLabel>
-              <GlassInput id="ob-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={LIMITS.phone} value={phone}
-                onChange={(e) => setPhone(onlyPhone(e.target.value))} placeholder="+971 50 123 4567"
-                aria-invalid={!!error} aria-describedby="ob-phone-hint" />
-              <p id="ob-phone-hint" className="mt-1.5 text-xs text-muted-foreground">Start with your country code, like +971 or +44.</p>
+              <PhoneInput id="ob-phone" value={phone} onChange={setPhone} invalid={!!error} hint="Pick your country, then type your number." />
               {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
               <div className="mt-8 flex items-center justify-between gap-2">
                 <GlassButton type="button" variant="ghost" onClick={() => setStep(0)} disabled={saving}>Back</GlassButton>

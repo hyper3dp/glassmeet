@@ -13,7 +13,9 @@ import { Switch } from '@/components/ui/switch';
 import { BETA_FEATURES, useBeta, unlockBeta, hideBeta, setBetaFeature } from '@/lib/beta';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { appPath } from '@/lib/authReturnTo';
-import { LIMITS, onlyName, onlyPhone } from '@/lib/inputRules';
+import { LIMITS, onlyName } from '@/lib/inputRules';
+import { isValidPhone } from '@/lib/phone';
+import PhoneInput from '@/components/PhoneInput.jsx';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -70,8 +72,11 @@ export default function Settings({ profile, updateProfile }) {
   // profiles), so changes to them are copied onto the host's event types too.
   const savedHost = useRef({ host_timezone: profile?.timezone || null, host_name: profile?.full_name || null, host_photo: profile?.profile_photo || null });
   const save = async (value) => {
+    // a half-typed or mistyped WhatsApp number keeps the saved one until it's a real number
+    const { whatsapp_number, ...rest } = value;
+    const phone = !whatsapp_number || isValidPhone(whatsapp_number) ? { whatsapp_number } : {};
     try {
-      await updateProfile({ ...value, username: value.username.trim() || null });
+      await updateProfile({ ...rest, ...phone, username: value.username.trim() || null });
     } catch (e) {
       throw /duplicate key|unique/i.test(e?.message || '') && /username/i.test(e.message) ? new Error('that username is taken') : e;
     }
@@ -176,7 +181,7 @@ export default function Settings({ profile, updateProfile }) {
               </div>
               <div>
                 <GlassLabel htmlFor="s-wa">WhatsApp number</GlassLabel>
-                <GlassInput id="s-wa" type="tel" inputMode="tel" maxLength={LIMITS.phone} value={form.whatsapp_number} onChange={(e) => set('whatsapp_number', onlyPhone(e.target.value))} placeholder="+971 50 123 4567" />
+                <PhoneInput id="s-wa" value={form.whatsapp_number} onChange={(v) => set('whatsapp_number', v)} />
               </div>
             </div>
             <div className="mt-5">
