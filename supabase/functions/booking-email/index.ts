@@ -8,7 +8,7 @@
 // is emailed at most once (public.booking_emails), always to that booking's own host.
 //
 // Secrets: SMTP_HOST, SMTP_PORT (465), SMTP_USER, SMTP_PASS, SMTP_FROM ("GlassMeet <bookings@…>"),
-// APP_URL (https://hyper3dp.github.io/glassmeet). SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are
+// APP_URL (https://glassmeet.run.place). SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are
 // provided by Supabase. The SMTP password is never logged.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import nodemailer from 'npm:nodemailer@6.9.16';
@@ -20,7 +20,7 @@ const SMTP_PORT = Number(Deno.env.get('SMTP_PORT') || 465);
 const SMTP_USER = Deno.env.get('SMTP_USER') ?? '';
 const SMTP_PASS = Deno.env.get('SMTP_PASS') ?? '';
 const SMTP_FROM = Deno.env.get('SMTP_FROM') || SMTP_USER;
-const APP_URL = (Deno.env.get('APP_URL') ?? 'https://hyper3dp.github.io/glassmeet').replace(/\/+$/, '');
+const APP_URL = (Deno.env.get('APP_URL') ?? 'https://glassmeet.run.place').replace(/\/+$/, '');
 const FRESH_MS = 15 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

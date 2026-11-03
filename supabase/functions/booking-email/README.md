@@ -23,7 +23,7 @@ supabase secrets set --project-ref sjxraemrdpzleipfmwun \
   SMTP_USER="<smtp username>" \
   SMTP_PASS="<smtp password>" \
   SMTP_FROM="GlassMeet <bookings@your-domain.com>" \
-  APP_URL="https://hyper3dp.github.io/glassmeet"
+  APP_URL="https://glassmeet.run.place"
 ```
 
 Without the SMTP secrets the function answers `not_configured` and no email is sent; bookings work as usual.
