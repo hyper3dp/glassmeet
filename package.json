@@ -2,7 +2,7 @@
   "name": "glassmeet",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://hyper3dp.github.io/glassmeet",
+  "homepage": "https://glassmeet.run.place",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

@@ -9,15 +9,13 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Book a time · GlassMeet" />
     <meta property="og:description" content="Pick a time that suits you. Your meeting is confirmed on WhatsApp." />
-    <meta property="og:image" content="https://hyper3dp.github.io/glassmeet/apple-touch-icon.png" />
+    <meta property="og:image" content="https://glassmeet.run.place/apple-touch-icon.png" />
     <meta name="twitter:card" content="summary" />
     <script>
-      const basePath = '/glassmeet/';
-      const routePath = location.pathname.startsWith('/glassmeet')
-        ? location.pathname.slice('/glassmeet'.length)
-        : location.pathname;
+      // old hyper3dp.github.io/glassmeet links arrive with the /glassmeet prefix; drop it
+      const routePath = location.pathname.replace(/^\/glassmeet(?=\/|$)/, '') || '/';
       const route = `${routePath}${location.search}${location.hash}`;
-      location.replace(`${basePath}?__gh_pages_route=${encodeURIComponent(route)}`);
+      location.replace(`/?__gh_pages_route=${encodeURIComponent(route)}`);
     </script>
   </head>
   <body></body>

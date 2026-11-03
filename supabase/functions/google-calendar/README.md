@@ -30,7 +30,7 @@ Use the same project and OAuth client that Supabase Auth's "Sign in with Google"
 supabase secrets set --project-ref sjxraemrdpzleipfmwun \
   GOOGLE_CLIENT_ID="<client id>.apps.googleusercontent.com" \
   GOOGLE_CLIENT_SECRET="<client secret>" \
-  APP_URL="https://hyper3dp.github.io/glassmeet"
+  APP_URL="https://glassmeet.run.place"
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided automatically. Without the Google secrets the function answers `not_configured`, and the app shows "Google Calendar isn't available yet".

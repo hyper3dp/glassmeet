@@ -81,7 +81,7 @@ function securityHeaders() {
 }
 
 export default defineConfig({
-  base: '/glassmeet/',
+  base: '/',
   plugins: [react(), tailwindcss(), securityHeaders(), staticRoutes()],
   build: {
     rolldownOptions: {

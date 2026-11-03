@@ -2,15 +2,15 @@
  * GlassMeet embed: put a GlassMeet booking page on any website.
  *
  * Inline (the calendar sits in the page and grows to fit):
- *   <div class="glassmeet-inline" data-url="https://hyper3dp.github.io/glassmeet/book/EVENT_ID"></div>
- *   <script src="https://hyper3dp.github.io/glassmeet/embed.js" async></script>
+ *   <div class="glassmeet-inline" data-url="https://glassmeet.run.place/book/EVENT_ID"></div>
+ *   <script src="https://glassmeet.run.place/embed.js" async></script>
  *
  * Pop-up from your own link or button:
- *   <a href="#" data-glassmeet-popup="https://hyper3dp.github.io/glassmeet/book/EVENT_ID">Book a call</a>
+ *   <a href="#" data-glassmeet-popup="https://glassmeet.run.place/book/EVENT_ID">Book a call</a>
  *
  * Floating button in the corner of every page:
- *   <script src="https://hyper3dp.github.io/glassmeet/embed.js" async
- *     data-button-url="https://hyper3dp.github.io/glassmeet/book/EVENT_ID"
+ *   <script src="https://glassmeet.run.place/embed.js" async
+ *     data-button-url="https://glassmeet.run.place/book/EVENT_ID"
  *     data-button-text="Book a call" data-button-color="#2b7a75"></script>
  *
  * Optional on any of them: data-theme="light" or "dark" (default: follows the visitor's device).

@@ -30,7 +30,7 @@ jobs:
       - name: Build static site
         run: npm run build
         env:
-          VITE_BASE_PATH: /glassmeet/
+          VITE_BASE_PATH: /
           VITE_API_URL: ${{ vars.VITE_API_URL }}
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

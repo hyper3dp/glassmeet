@@ -6,7 +6,7 @@
 // belong to a host check the caller's session themselves (supabase.auth.getUser):
 //   supabase functions deploy google-calendar --no-verify-jwt
 //
-// Secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_URL (https://hyper3dp.github.io/glassmeet).
+// Secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_URL (https://glassmeet.run.place).
 // SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 // Tokens are never logged or returned to the browser.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -16,7 +16,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '';
-const APP_URL = (Deno.env.get('APP_URL') ?? 'https://hyper3dp.github.io/glassmeet').replace(/\/+$/, '');
+const APP_URL = (Deno.env.get('APP_URL') ?? 'https://glassmeet.run.place').replace(/\/+$/, '');
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/google-calendar/callback`;
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events', // create, change and delete the booking events
@@ -32,7 +32,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: 
 const configured = () => Boolean(CLIENT_ID && CLIENT_SECRET && SUPABASE_URL && SERVICE_KEY);
 
 // ── HTTP helpers ─────────────────────────────────────────────────────────────
-const ALLOWED_ORIGIN = /^(https:\/\/hyper3dp\.github\.io|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
+const ALLOWED_ORIGIN = /^(https:\/\/glassmeet\.run\.place|https:\/\/hyper3dp\.github\.io|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
 const cors = (req: Request): Record<string, string> => {
   const origin = req.headers.get('Origin') ?? '';
   return {
