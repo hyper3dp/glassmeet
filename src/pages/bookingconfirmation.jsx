@@ -85,17 +85,11 @@ export default function BookingConfirmation() {
   const secondaryButtons = orderedButtons.filter((b) => !b.primary);
 
   return (
-    <div className={embed ? 'sm:p-2' : 'min-h-screen bg-background sm:px-4 sm:py-10 lg:py-16'}>
+    <div className={embed ? 'sm:p-2' : 'min-h-screen bg-background sm:bg-secondary dark:sm:bg-background sm:px-4 sm:py-10 lg:py-16'}>
       <div className="relative mx-auto max-w-[860px] overflow-hidden bg-card sm:rounded-xl sm:border sm:border-border sm:shadow-card animate-scale-in">
-        <a href={appPath('/')} {...(embed ? { target: '_blank', rel: 'noreferrer' } : {})} className="absolute right-0 top-0 z-10 hidden sm:block w-28 h-28 overflow-hidden" aria-label="Powered by GlassMeet">
-          <span className="absolute right-[-36px] top-[22px] w-[150px] rotate-45 bg-foreground py-1 text-center text-[9px] font-bold leading-tight text-background">
-            POWERED BY<br />GLASSMEET
-          </span>
-        </a>
-
         <div className="px-6 py-10 sm:px-14 sm:py-14">
           <div className="text-center">
-            <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-success text-white flex items-center justify-center">
+            <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-success text-white dark:text-primary-foreground flex items-center justify-center">
               <Check className="w-6 h-6" strokeWidth={3} />
             </div>
             <h1 className="text-2xl sm:text-[28px] font-bold">{pending ? 'Request sent' : 'You are scheduled'}</h1>
@@ -166,6 +160,9 @@ export default function BookingConfirmation() {
           </p>
         </div>
       </div>
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        Scheduling by <a href={appPath('/')} {...(embed ? { target: '_blank', rel: 'noreferrer' } : {})} className="font-semibold text-foreground hover:text-link hover:underline">GlassMeet</a>
+      </p>
     </div>
   );
 }

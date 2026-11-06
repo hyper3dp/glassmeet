@@ -408,10 +408,11 @@ export const api = {
   events: {
     getPublic: async (id) => {
       const { data, error } = await supabase.rpc('public_event_type', { p_id: id });
-      if (notDeployed(error)) return entities.EventType.get(id);
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error('This booking page could not be found.');
-      return data;
+      const event = notDeployed(error) ? await entities.EventType.get(id) : data;
+      if (error && !notDeployed(error)) throw new Error(error.message);
+      if (!event) throw new Error('This booking page could not be found.');
+      // older events saved the host's email as their name; guests see "Host" until a name is set
+      return event.host_name?.includes('@') ? { ...event, host_name: null } : event;
     },
   },
   bookings: {

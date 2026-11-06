@@ -69,7 +69,6 @@ export default function Login() {
     <AuthLayout
       icon={LogIn}
       title="Log in to your account"
-      subtitle="Welcome back to GlassMeet"
       footer={
         <>
           Don't have an account?{" "}
@@ -92,7 +91,7 @@ export default function Login() {
       </div>
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-        <div className="relative flex justify-center text-sm"><span className="bg-card px-3 text-muted-foreground">OR</span></div>
+        <div className="relative flex justify-center text-sm"><span className="bg-card px-3 text-muted-foreground">or</span></div>
       </div>
       {error && (
         <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">

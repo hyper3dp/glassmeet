@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Route, Routes, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useLayoutEffect } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { embedTheme } from '@/lib/embed.js';
 import { AuthProvider, useAuth } from '@/lib/Authcontext.jsx';
@@ -83,6 +83,14 @@ const LandingPage = () => {
   return authChecked ? <Landing /> : <FullScreenLoader />;
 };
 
+// Public pages have their own look (html.site in Index.css); the host app keeps the app tokens.
+const HOST_APP = /^\/(dashboard|calendar|event-types|bookings|availability|whatsapp|settings|calendar-connections|analytics)(\/|$)/;
+const SiteTheme = () => {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => { document.documentElement.classList.toggle('site', !HOST_APP.test(pathname)); }, [pathname]);
+  return null;
+};
+
 const AuthenticatedApp = () => {
   const { authError } = useAuth();
 
@@ -139,6 +147,7 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem forcedTheme={embedTheme()} disableTransitionOnChange>
       <AuthProvider>
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
+            <SiteTheme />
             <ScrollToTop />
             <AuthenticatedApp />
             <BugReport />

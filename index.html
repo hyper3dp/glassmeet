@@ -10,8 +10,8 @@
     <link rel="dns-prefetch" href="https://sjxraemrdpzleipfmwun.supabase.co" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <style>html{background:#f6f9f9}@media (prefers-color-scheme: dark){html{background:#0f1516}}</style>
-    <meta name="description" content="GlassMeet — beautiful scheduling for people who actually use WhatsApp. Create booking pages, share your link, and confirm meetings on WhatsApp." />
+    <style>html{background:#f6f9f9}html.site{background:#fff}@media (prefers-color-scheme: dark){html{background:#0f1516}html.site{background:#18191a}}</style>
+    <meta name="description" content="Share one booking link. Guests pick a time without making an account, and you confirm the meeting in WhatsApp." />
     <title>GlassMeet — Schedule meetings. Stay on WhatsApp.</title>
     <meta property="og:site_name" content="GlassMeet" />
     <meta property="og:type" content="website" />
@@ -28,6 +28,13 @@
           var restored = new URL(route, location.origin);
           var base = location.pathname.replace(/\/?$/, '/');
           history.replaceState(null, '', base + restored.pathname.replace(/^\/+/, '') + restored.search + restored.hash);
+        }
+        // Public pages paint their own colours from the first frame (same list as HOST_APP in APP.jsx)
+        if (!/^\/(dashboard|calendar|event-types|bookings|availability|whatsapp|settings|calendar-connections|analytics)(\/|$)/.test(location.pathname)) {
+          document.documentElement.classList.add('site');
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          metas[0].content = '#ffffff';
+          metas[1].content = '#18191a';
         }
         // An expired or used auth link comes back as #error_description=...; show it on Log in.
         var hash = new URLSearchParams(location.hash.slice(1));

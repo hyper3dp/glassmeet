@@ -19,7 +19,7 @@ export function ContactEmails({ className }) {
 export default function LegalPage({ title, intro, sections, otherDoc }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-card">
+      <header className="sticky top-0 z-30 border-b border-border bg-background">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Logo to="/" />
           <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground transition-all duration-200 hover:text-link">
@@ -36,7 +36,7 @@ export default function LegalPage({ title, intro, sections, otherDoc }) {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-          <nav aria-label="On this page" className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
+          <nav aria-label="On this page" className="-ml-2 hidden lg:sticky lg:top-24 lg:block lg:self-start">
             <p className="mb-3 px-2 text-sm font-bold">On this page</p>
             <ol className="space-y-0.5 text-sm">
               {sections.map((section, i) => (
@@ -53,7 +53,7 @@ export default function LegalPage({ title, intro, sections, otherDoc }) {
             </ol>
           </nav>
 
-          <article className="max-w-[720px] rounded-xl border border-border bg-card p-6 shadow-card sm:p-10">
+          <article className="max-w-[34rem]">
             {sections.map((section, i) => (
               <section
                 key={section.id}

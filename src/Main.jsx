@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/APP.jsx'
+import '@fontsource-variable/figtree/wght.css'
 import '@/Index.css'
 import { isEmbed } from '@/lib/embed.js'
 import { installBugCollector } from '@/lib/bugReport.js'

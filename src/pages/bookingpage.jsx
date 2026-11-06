@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '@/lib/localApi';
 import {
   Clock, Calendar, Globe, ChevronLeft, ChevronRight, ArrowLeft, Loader2, Video, MessageCircle,
-  Users, QrCode, Clock3, CreditCard, MapPin, Phone,
+  User, Users, QrCode, Clock3, CreditCard, MapPin, Phone,
 } from 'lucide-react';
 import { GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinner } from '@/components/glass';
 import {
@@ -221,6 +221,8 @@ export default function BookingPage() {
   }, [selectedDate, event, rules, exceptions, busyTimes, hostTz, guestTz]);
 
   const color = event?.color || '#2B7A75';
+  // an event left on the default colour takes the site's teal; a colour the host picked stays theirs
+  const usesDefaultColor = color.toLowerCase() === '#2b7a75';
 
   const monthDays = useMemo(() => {
     if (!event) return [];
@@ -401,19 +403,13 @@ export default function BookingPage() {
 
   return (
     <div
-      className={embed ? 'sm:p-2' : 'min-h-screen bg-background sm:px-4 sm:py-10 lg:py-16'}
-      style={{ ['--accent-color']: hexToHsl(color), ['--ev']: color, ['--ev-fg']: readableOn(color) }}
+      className={embed ? 'sm:p-2' : 'min-h-screen bg-background sm:bg-secondary dark:sm:bg-background sm:px-4 sm:py-10 lg:py-16'}
+      style={{ ['--accent-color']: hexToHsl(color), ...(usesDefaultColor ? { ['--ev']: 'var(--primary)', ['--ev-fg']: 'var(--primary-foreground)' } : { ['--ev']: color, ['--ev-fg']: readableOn(color) }) }}
     >
       <div
         className={`relative mx-auto overflow-hidden bg-card sm:rounded-xl sm:border sm:border-border sm:shadow-card transition-[max-width] duration-300 ease-out animate-fade-in
           ${wide ? 'max-w-[1060px]' : 'max-w-[860px]'}`}
       >
-        <a href={appPath('/')} {...outLink} className="absolute right-0 top-0 z-10 hidden sm:block w-28 h-28 overflow-hidden" aria-label="Powered by GlassMeet">
-          <span className="absolute right-[-36px] top-[22px] w-[150px] rotate-45 bg-foreground py-1 text-center text-[9px] font-bold leading-tight text-background">
-            POWERED BY<br />GLASSMEET
-          </span>
-        </a>
-
         <div className={`grid md:min-h-[620px] ${wide ? 'md:grid-cols-[320px_1fr] lg:grid-cols-[320px_1fr_270px]' : 'md:grid-cols-[340px_1fr]'}`}>
           {/* Event details */}
           <section className="border-b md:border-b-0 md:border-r border-border p-6 sm:p-8">
@@ -428,7 +424,7 @@ export default function BookingPage() {
             )}
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-soft text-link flex items-center justify-center font-bold">
-                {event.host_photo ? <img src={event.host_photo} alt="" className="w-full h-full object-cover" /> : (event.host_name || '?')[0]}
+                {event.host_photo ? <img src={event.host_photo} alt="" className="w-full h-full object-cover" /> : event.host_name ? event.host_name[0] : <User className="w-5 h-5" aria-hidden="true" />}
               </div>
               <div className="text-[15px] font-semibold text-muted-foreground">{event.host_name || 'Host'}</div>
             </div>
@@ -679,6 +675,10 @@ export default function BookingPage() {
           )}
         </div>
       </div>
+
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        Scheduling by <a href={appPath('/')} {...outLink} className="font-semibold text-foreground hover:text-link hover:underline">GlassMeet</a>
+      </p>
 
       {showQR && <Suspense fallback={null}><QRCodeModal url={bookingUrl} open={showQR} onClose={closeQR} /></Suspense>}
     </div>
