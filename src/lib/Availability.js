@@ -203,7 +203,7 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
 
   const dayStart = zonedTimeToUtc(date.getFullYear(), date.getMonth(), date.getDate(), 0, vtz);
   const dayEnd = zonedTimeToUtc(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, vtz);
-  const earliest = Date.now() + (eventType.min_notice || 0) * 3600000;
+  const earliest = Date.now() + (eventType.min_notice || 0) * 60000;
 
   const capacity = eventType.booking_type === 'group' ? (eventType.max_attendees || 1) : 1;
   const live = bookings.filter((b) => b.status !== 'cancelled' && b.approval_status !== 'declined' && b.start_time && b.end_time);
@@ -234,6 +234,12 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
   for (let k = -1; k <= 1; k++) {
     const hostDay = new Date(hostFirst.getFullYear(), hostFirst.getMonth(), hostFirst.getDate() + k);
     if (!eventRunsOn(eventType, hostDay)) continue;
+    const startsToday = eventType.max_per_day ? new Set(live.filter((b) => {
+      if (b.event_type_id !== eventType.id) return false;
+      const day = dateInZone(new Date(b.start_time).getTime(), tz);
+      return day.getFullYear() === hostDay.getFullYear() && day.getMonth() === hostDay.getMonth() && day.getDate() === hostDay.getDate();
+    }).map((b) => new Date(b.start_time).getTime())) : null;
+    const dayFull = startsToday && startsToday.size >= eventType.max_per_day;
     // fixed times stand in for the open hours: each is a one-off range just long enough
     const ranges = eventType.fixed_times?.length
       ? fixedStartsForDate(hostDay, eventType.fixed_times, duration, exceptions).map((t) => ({ start: t, end: t + duration }))
@@ -242,6 +248,7 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
       for (let t = iv.start; t + duration <= iv.end; t += slotStep) {
         const start = zonedTimeToUtc(hostDay.getFullYear(), hostDay.getMonth(), hostDay.getDate(), t, tz);
         if (start < dayStart || start >= dayEnd || start < earliest || seen.has(start)) continue;
+        if (dayFull && !startsToday.has(start)) continue;
         const end = start + duration * 60000;
         if (busy.some((b) => clashes(b, start, end))) continue;
         seen.add(start);

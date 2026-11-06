@@ -6,6 +6,7 @@ export const TEMPLATE_FIELDS = [
   'name', 'description', 'duration', 'location', 'meeting_url', 'address',
   'booking_type', 'max_attendees', 'requires_approval', 'email_required',
   'schedule', 'freq', 'every', 'days', 'fixed_times',
+  'note', 'max_future_days', 'min_notice', 'max_per_day', 'buffer_before', 'buffer_after', 'custom_questions',
 ];
 
 export const BUILT_IN_TEMPLATES = [
