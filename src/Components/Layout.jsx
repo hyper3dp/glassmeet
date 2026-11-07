@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/glass';
 import Logo, { LogoMark } from '@/components/logo.jsx';
 import NotificationCenter from '@/components/Notificationcenter.jsx';
+import NextMeeting, { useNextMeeting } from '@/components/NextMeeting.jsx';
 
 const Tour = lazy(() => import('@/components/Tour.jsx')); // loads when a tour starts
 
@@ -100,6 +101,7 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const nextMeeting = useNextMeeting(profile?.id);
   // ?tour=1 (after onboarding, or "Take the tour") starts the tour, then leaves the address
   const [searchParams, setSearchParams] = useSearchParams();
   const [touring, setTouring] = useState(false);
@@ -148,7 +150,8 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
             <div className="lg:hidden max-[359px]:hidden"><Logo to="/dashboard" size="sm" /></div>
             <Link to="/dashboard" aria-label="GlassMeet home" className="hidden max-[359px]:block"><LogoMark size={28} /></Link>
 
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="ml-auto flex min-w-0 items-center gap-1.5">
+              <NextMeeting next={nextMeeting} className="hidden lg:flex" />
               {onOpenCommandPalette && (
                 <button
                   onClick={onOpenCommandPalette}
@@ -197,6 +200,8 @@ export default function Layout({ children, profile, onOpenCommandPalette }) {
 
         <main className="min-h-[calc(100vh-4rem)] pb-24 md:pb-10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 sm:pt-6">
+            {/* the top bar has no room for it below desktop width */}
+            <NextMeeting next={nextMeeting} className="mb-4 flex lg:hidden" />
             {children}
           </div>
         </main>

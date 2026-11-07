@@ -22,6 +22,9 @@ import { LIMITS, onlyName, onlyEmail } from '@/lib/inputRules';
 // guests rarely open it (desktop only), so its dialog code loads on demand
 const QRCodeModal = lazy(() => import('@/components/QrcodeModal.jsx'));
 
+// locations whose meeting can be created for each booking through the host's connection
+const LINK_MADE_ON_BOOKING = ['Google Meet', 'Microsoft Teams'];
+
 export default function BookingPage() {
   const { eventTypeId } = useParams();
   const navigate = useNavigate();
@@ -160,7 +163,7 @@ export default function BookingPage() {
     // the neighbouring months in this browser's
     const timeMin = new Date(cursorYear, cursorMonth, 0).toISOString();
     const timeMax = new Date(cursorYear, cursorMonth + 1, 2).toISOString();
-    // Google Calendar busy times are optional (only hosts who connected Google have any); without them,
+    // Google and Outlook busy times are optional (only hosts who connected one have any); without them,
     // slots come from the host's availability and GlassMeet bookings.
     // Each month's answer is added to what's known, never swapped for it: a day picked in one
     // month stays on screen after the guest moves to the next, and must keep its busy times.
@@ -170,9 +173,9 @@ export default function BookingPage() {
       const fresh = busy.filter((b) => !seen.has(`${b.start_time}|${b.end_time}`));
       return fresh.length ? [...cur, ...fresh] : cur;
     });
-    api.google.busy(event.created_by_id, timeMin, timeMax)
+    [api.google.busy, api.connections.busy].forEach((ask) => ask(event.created_by_id, timeMin, timeMax)
       .then((busy) => take(Array.isArray(busy) ? busy : []))
-      .catch(() => {});
+      .catch(() => {}));
     return undefined;
   }, [event, cursorYear, cursorMonth]);
 
@@ -348,8 +351,14 @@ export default function BookingPage() {
         custom_answers: event.custom_questions ? event.custom_questions.map((q, qi) => ({ question: q.text, answer: customAnswers[qi] || '' })) : [],
         attendee_count: 1,
       });
-      // copy it to the host's Google Calendar if they connected one (never holds up the guest)
-      if (!requiresApproval) api.google.pushBooking(booking.id);
+      // copy it to the host's connected calendars. An online meeting may get its link from this, so
+      // the guest waits briefly for that; otherwise nothing holds them up.
+      if (!requiresApproval) {
+        const pushed = api.bookings.pushToCalendars(booking.id);
+        if (LINK_MADE_ON_BOOKING.includes(event.location)) {
+          await Promise.race([pushed, new Promise((done) => setTimeout(done, 8000))]);
+        }
+      }
       // the meeting link is private until booked; ask for it now (null while awaiting approval).
       // The booking is made by now, so a failure here must not read as a failed booking.
       const link = await api.bookings.meetingLink(booking.id).catch(() => undefined);
@@ -363,7 +372,7 @@ export default function BookingPage() {
     } catch (e) {
       // the database's own booking checks speak to guests; anything else stays generic
       const message = e?.message || '';
-      if (/^(Sorry, that time|That time can no longer)/.test(message)) timeGone(message);
+      if (/^(Sorry, that time|That time can no longer|That day is fully booked)/.test(message)) timeGone(message);
       else if (/^(This event is not taking|Too many bookings)/.test(message)) setError(message);
       else {
         setError(/fetch|network/i.test(message)

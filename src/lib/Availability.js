@@ -234,12 +234,20 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
   for (let k = -1; k <= 1; k++) {
     const hostDay = new Date(hostFirst.getFullYear(), hostFirst.getMonth(), hostFirst.getDate() + k);
     if (!eventRunsOn(eventType, hostDay)) continue;
-    const startsToday = eventType.max_per_day ? new Set(live.filter((b) => {
-      if (b.event_type_id !== eventType.id) return false;
+    const onHostDay = (b) => {
       const day = dateInZone(new Date(b.start_time).getTime(), tz);
       return day.getFullYear() === hostDay.getFullYear() && day.getMonth() === hostDay.getMonth() && day.getDate() === hostDay.getDate();
-    }).map((b) => new Date(b.start_time).getTime())) : null;
+    };
+    const startsToday = eventType.max_per_day
+      ? new Set(live.filter((b) => b.event_type_id === eventType.id && onHostDay(b)).map((b) => new Date(b.start_time).getTime()))
+      : null;
     const dayFull = startsToday && startsToday.size >= eventType.max_per_day;
+    // The host's own limit, across all their events. Only GlassMeet bookings count (they have a
+    // status; busy times from other calendars don't), and a group session is one meeting.
+    const meetingsToday = eventType.host_max_per_day
+      ? new Set(live.filter((b) => b.status && onHostDay(b)).map((b) => `${b.event_type_id}|${new Date(b.start_time).getTime()}`))
+      : null;
+    const hostFull = meetingsToday && meetingsToday.size >= eventType.host_max_per_day;
     // fixed times stand in for the open hours: each is a one-off range just long enough
     const ranges = eventType.fixed_times?.length
       ? fixedStartsForDate(hostDay, eventType.fixed_times, duration, exceptions).map((t) => ({ start: t, end: t + duration }))
@@ -249,6 +257,7 @@ export const generateSlots = (date, eventType, rules, exceptions, bookings, host
         const start = zonedTimeToUtc(hostDay.getFullYear(), hostDay.getMonth(), hostDay.getDate(), t, tz);
         if (start < dayStart || start >= dayEnd || start < earliest || seen.has(start)) continue;
         if (dayFull && !startsToday.has(start)) continue;
+        if (hostFull && !meetingsToday.has(`${eventType.id}|${start}`)) continue;
         const end = start + duration * 60000;
         if (busy.some((b) => clashes(b, start, end))) continue;
         seen.add(start);

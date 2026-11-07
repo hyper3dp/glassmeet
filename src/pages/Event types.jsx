@@ -753,6 +753,13 @@ export function EventModal({ event, template, hostId, onClose, onSave, onSaveTem
                 <div>
                   <GlassLabel htmlFor="event-meeting-url">Meeting link (optional)</GlassLabel>
                   <GlassInput id="event-meeting-url" type="url" inputMode="url" maxLength={LIMITS.url} value={form.meeting_url} onChange={(e) => setField('meeting_url', e.target.value)} placeholder="https://" />
+                  {kind === 'video' && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      {form.location === 'Zoom'
+                        ? 'Paste your Zoom link. Guests get it after they book.'
+                        : `Leave this blank to create a new link for each booking. ${form.location === 'Google Meet' ? 'Google' : 'Microsoft'} must be connected on the Calendars page.`}
+                    </p>
+                  )}
                 </div>
               )}
               {kind === 'phone' && (

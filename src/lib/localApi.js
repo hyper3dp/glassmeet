@@ -35,7 +35,20 @@ const notDeployed = (error) => error && (error.code === 'PGRST202' || error.code
 
 let googleBusyMissing = false; // the google-calendar edge function isn't there (see google.busy)
 
+let outlookBusyMissing = false; // same for the connections function
+
 const googleError = (code, message) => Object.assign(new Error(message), { code });
+// Calls the connections edge function (Outlook, Teams); same errors as invokeGoogle below
+async function invokeConnections(body) {
+  const { data, error } = await supabase.functions.invoke('connections', { body });
+  if (!error) return data;
+  const response = error.context;
+  if (error.name === 'FunctionsFetchError' || error.name === 'FunctionsRelayError' || response?.status === 404) {
+    throw googleError('unavailable', 'This connection isn’t available yet.');
+  }
+  const detail = typeof response?.json === 'function' ? await response.json().catch(() => null) : null;
+  throw googleError(detail?.error || 'error', detail?.message || error.message || 'The connection didn’t respond.');
+}
 // Calls the google-calendar edge function; a failure throws an Error with the function's `code`.
 // A function that isn't deployed (or can't be reached) is code 'unavailable'.
 async function invokeGoogle(body) {
@@ -310,6 +323,7 @@ export const api = {
       const user = await sessionUser();
       if (!user) throw new Error('Sign in first.');
       await invokeGoogle({ action: 'disconnect' }).catch(() => {});
+      await invokeConnections({ action: 'disconnect', provider: 'microsoft' }).catch(() => {});
       const { error } = await supabase.rpc('delete_my_account');
       if (notDeployed(error)) throw new Error('Deleting accounts isn’t available yet. Please try again later.');
       if (error) throw new Error(error.message);
@@ -385,6 +399,42 @@ export const api = {
     sync: () => invokeGoogle({ action: 'sync' }),
     disconnect: () => invokeGoogle({ action: 'disconnect' }),
   },
+  // Microsoft (Outlook, Teams). The connection rows are read directly (RLS: own rows
+  // only); everything else goes through the connections edge function.
+  connections: {
+    // { microsoft: {...} }, with only the ones the host has connected or must reconnect
+    list: async () => {
+      const user = await sessionUser();
+      if (!user) return {};
+      const { data, error } = await supabase.from('connections')
+        .select('provider, email, teams, auto_sync, connected, synced_date').eq('user_id', user.id);
+      if (error) return {}; // no table yet (migration not applied): simply not connected
+      return Object.fromEntries((data || []).map((row) => [row.provider, row]));
+    },
+    // which providers can be offered; none while the function isn't deployed
+    available: () => invokeConnections({ action: 'available' }).catch(() => ({ microsoft: false })),
+    connect: async (provider, returnTo = '/calendar-connections') => {
+      const { url } = await invokeConnections({ action: 'authUrl', provider, returnTo });
+      if (!url) throw googleError('unavailable', 'This connection isn’t available yet.');
+      window.location.assign(url);
+    },
+    finish: (code, state) => invokeConnections({ action: 'finish', code, state }),
+    saveSettings: (provider, autoSync) => invokeConnections({ action: 'saveSettings', provider, autoSync }),
+    sync: (provider) => invokeConnections({ action: 'sync', provider }),
+    disconnect: (provider) => invokeConnections({ action: 'disconnect', provider }),
+    // Outlook busy times, in the bookings' shape; see google.busy
+    busy: async (hostId, timeMin, timeMax) => {
+      if (outlookBusyMissing) return [];
+      try {
+        const data = await invokeConnections({ action: 'freeBusy', hostId, timeMin, timeMax });
+        return Array.isArray(data) ? data.map((x) => ({ start_time: x.start, end_time: x.end })) : [];
+      } catch (error) {
+        if (error.code === 'unavailable') outlookBusyMissing = true;
+        throw error;
+      }
+    },
+    pushBooking: (bookingId) => invokeConnections({ action: 'pushBooking', bookingId }).catch(() => ({ pushed: false })),
+  },
   // Profile photo: uploads to the public avatars bucket under the user's own folder
   storage: {
     uploadAvatar: async (file) => {
@@ -416,6 +466,8 @@ export const api = {
     },
   },
   bookings: {
+    // the host's connected calendars and meeting apps follow a new or changed booking; never fails
+    pushToCalendars: (id) => Promise.all([api.google.pushBooking(id), api.connections.pushBooking(id)]),
     createAsGuest: async (value) => {
       const row = { id: uuid(), ...value };
       const { error } = await supabase.from('bookings').insert([row]);
@@ -467,10 +519,17 @@ export const api = {
     urlFor: (token) => `${supabaseUrl}/functions/v1/calendar-feed/${token}.ics`,
     mine: async () => {
       const user = await sessionUser();
-      const { data, error } = await supabase.from('cal_feeds').select('token').eq('owner', user.id).maybeSingle();
+      const read = () => supabase.from('cal_feeds').select('token').eq('owner', user.id).maybeSingle();
+      const { data, error } = await read();
       if (error) throw new Error(error.message);
       if (data) return data.token;
       const { data: created, error: createError } = await supabase.from('cal_feeds').insert({ owner: user.id }).select('token').single();
+      // another tab or page load made the host's one link first: use that one
+      if (createError?.code === '23505') {
+        const again = await read();
+        if (again.error) throw new Error(again.error.message);
+        if (again.data) return again.data.token;
+      }
       if (createError) throw new Error(createError.message);
       return created.token;
     },

@@ -6,11 +6,9 @@ import { GlassButton, GlassInput, GlassTextarea, GlassLabel, GlassSelect, Spinne
 import { COMMON_TIMEZONES, detectTimezone } from '@/lib/Availability.js';
 import { api } from '@/lib/localApi';
 import { useAutosave } from '@/lib/useAutosave';
-import OutlookIcon from '@/components/outlookicon.jsx';
-import GoogleIcon from '@/components/googleicon.jsx';
 import AddressManager from '@/components/AddressManager.jsx';
 import { Switch } from '@/components/ui/switch';
-import { BETA_FEATURES, useBeta, unlockBeta, hideBeta, setBetaFeature } from '@/lib/beta';
+import { BETA_FEATURES, useBeta, unlockBeta, hideBeta, setBetaFeature, betaFeatureOn } from '@/lib/beta';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { appPath } from '@/lib/authReturnTo';
 import { LIMITS, onlyName } from '@/lib/inputRules';
@@ -222,18 +220,7 @@ export default function Settings({ profile, updateProfile }) {
                 name="Stripe"
                 body="Take payment when guests book paid meetings."
               />
-              <ComingSoonRow
-                icon={<span className="w-10 h-10 rounded-lg border border-border bg-white flex items-center justify-center"><GoogleIcon className="w-5 h-5" /></span>}
-                name="Google Calendar"
-                body="Hide busy times from your booking page and add new bookings to your calendar."
-              />
-              <ComingSoonRow
-                icon={<span className="w-10 h-10 rounded-lg bg-[#0078D4] flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></span>}
-                name="Microsoft Outlook"
-                body="Connect a Microsoft 365 or Outlook.com calendar for availability and sync."
-              />
             </ul>
-            <p className="mt-3 text-sm text-muted-foreground">Until then, subscribe to your GlassMeet calendar from the Calendars page to see bookings in any calendar app.</p>
           </Section>
 
           {/* Beta features: hidden until unlocked from Coming soon */}
@@ -250,7 +237,7 @@ export default function Settings({ profile, updateProfile }) {
                         </span>
                         <span className="mt-0.5 block text-sm text-muted-foreground">{f.body}</span>
                       </span>
-                      <Switch id={`beta-${f.id}`} checked={!!beta[f.id]} onCheckedChange={(on) => setBetaFeature(f.id, on)} className="mt-0.5" />
+                      <Switch id={`beta-${f.id}`} checked={betaFeatureOn(beta, f.id)} onCheckedChange={(on) => setBetaFeature(f.id, on)} className="mt-0.5" />
                     </label>
                   </li>
                 ))}

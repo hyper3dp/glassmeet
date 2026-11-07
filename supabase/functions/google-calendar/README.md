@@ -4,6 +4,7 @@ Connects a host's Google Calendar to GlassMeet:
 
 - **Busy times**: booking pages hide slots where the host is busy in Google (their chosen calendar + primary).
 - **Bookings to Google**: new confirmed bookings are added to the chosen calendar (auto-sync), and "Sync now" creates, updates and removes events for upcoming bookings.
+- **Google Meet**: an event whose location is Google Meet, with no link typed in, gets a Meet link for each booking, made through its Google Calendar event. A group session shares one link. This needs no extra scope.
 
 Tokens are stored in `public.google_tokens`, which only the service role can read. Hosts see their own `public.google_accounts` row.
 

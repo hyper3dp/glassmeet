@@ -210,13 +210,13 @@ const writableCalendars = async (userId: string) => {
 
 // ── bookings → Google events ─────────────────────────────────────────────────
 type Booking = {
-  id: string; host_id: string; event_name: string | null; guest_name: string | null; guest_email: string | null;
+  id: string; host_id: string; event_type_id: string | null; event_name: string | null; guest_name: string | null; guest_email: string | null;
   guest_phone: string | null; guest_notes: string | null; meeting_url: string | null; start_time: string; end_time: string;
   timezone: string | null; status: string; approval_status: string; created_date: string;
   google_event_id: string | null; google_cal: string | null; google_hash: string | null;
   event_types: { address?: string | null; location?: string | null; meeting_url?: string | null; booking_type?: string | null } | null;
 };
-const BOOKING_FIELDS = 'id, host_id, event_name, guest_name, guest_email, guest_phone, guest_notes, meeting_url, start_time, end_time, timezone, status, approval_status, created_date, google_event_id, google_cal, google_hash, event_types(address, location, meeting_url, booking_type)';
+const BOOKING_FIELDS = 'id, host_id, event_type_id, event_name, guest_name, guest_email, guest_phone, guest_notes, meeting_url, start_time, end_time, timezone, status, approval_status, created_date, google_event_id, google_cal, google_hash, event_types(address, location, meeting_url, booking_type)';
 
 // Google event ids may use 0-9 and a-v; a booking's uuid in hex fits, so each booking has one
 // fixed event id. Re-sending a booking can't create a second event, and the function never acts
@@ -224,6 +224,23 @@ const BOOKING_FIELDS = 'id, host_id, event_name, guest_name, guest_email, guest_
 const eventIdFor = (bookingId: string) => `gm${bookingId.replace(/-/g, '').toLowerCase()}`;
 
 const isActive = (b: Booking) => b.status !== 'cancelled' && b.approval_status === 'approved';
+
+// An event held on Google Meet with no link of its own gets one from Google for each booking
+const wantsMeet = (b: Booking) => {
+  const e = Array.isArray(b.event_types) ? b.event_types[0] : b.event_types;
+  return e?.location === 'Google Meet' && !b.meeting_url && !e?.meeting_url;
+};
+
+// a group session shares one link: the one an earlier guest's booking already got
+const sharedLink = async (b: Booking) => {
+  const e = Array.isArray(b.event_types) ? b.event_types[0] : b.event_types;
+  if (e?.booking_type !== 'group' || !b.event_type_id) return null;
+  const { data } = await admin.from('bookings').select('meeting_url')
+    .eq('event_type_id', b.event_type_id).eq('start_time', b.start_time).neq('id', b.id)
+    .neq('status', 'cancelled').neq('approval_status', 'declined').neq('meeting_url', '')
+    .not('meeting_url', 'is', null).limit(1);
+  return data?.[0]?.meeting_url ?? null;
+};
 
 const eventBody = (b: Booking) => {
   const e = Array.isArray(b.event_types) ? b.event_types[0] : b.event_types;
@@ -277,17 +294,31 @@ const syncBooking = async (account: Account, b: Booking): Promise<'created' | 'u
   }
 
   const calendarId = account.calendar_id || 'primary';
+  let meet = wantsMeet(b);
+  if (meet) {
+    const link = await sharedLink(b);
+    if (link) {
+      await admin.from('bookings').update({ meeting_url: link }).eq('id', b.id);
+      b.meeting_url = link;
+      meet = false;
+    }
+  }
   const body = eventBody(b);
   const hash = await digest({ calendarId, body });
-  if (b.google_event_id && b.google_hash === hash) return 'unchanged';
+  if (!meet && b.google_event_id && b.google_hash === hash) return 'unchanged';
+  // Google only reads conferenceData when conferenceDataVersion is sent
+  const conference = meet ? '&conferenceDataVersion=1' : '';
+  const send = meet
+    ? { ...body, conferenceData: { createRequest: { requestId: b.id, conferenceSolutionKey: { type: 'hangoutsMeet' } } } }
+    : body;
 
   // the host picked another calendar since: move the event
   if (b.google_event_id && b.google_cal && b.google_cal !== calendarId) {
     await deleteEvent(userId, b.google_cal, eventId).catch(() => undefined);
   }
 
-  let res = await calendarApi(userId, `/calendars/${cal(calendarId)}/events?sendUpdates=none`, {
-    method: 'POST', body: JSON.stringify({ id: eventId, ...body }),
+  let res = await calendarApi(userId, `/calendars/${cal(calendarId)}/events?sendUpdates=none${conference}`, {
+    method: 'POST', body: JSON.stringify({ id: eventId, ...send }),
   });
   let result: 'created' | 'updated' = 'created';
   if (res.status === 409) {
@@ -300,17 +331,37 @@ const syncBooking = async (account: Account, b: Booking): Promise<'created' | 'u
       console.error('google event id taken', found.status);
       throw new Fail(502, 'google_error', 'Google already has a different event with this meeting’s id.');
     }
-    res = await calendarApi(userId, `/calendars/${cal(calendarId)}/events/${eventId}?sendUpdates=none`, {
-      method: 'PUT', body: JSON.stringify(body),
+    res = await calendarApi(userId, `/calendars/${cal(calendarId)}/events/${eventId}?sendUpdates=none${conference}`, {
+      method: 'PUT', body: JSON.stringify(send),
     });
     result = 'updated';
   }
-  await res.body?.cancel();
   if (!res.ok) {
+    await res.body?.cancel();
     console.error('google event write failed', res.status);
     throw new Fail(502, 'google_error', `Google refused to save an event (${res.status}).`);
   }
-  await saveLink(b.id, { google_event_id: eventId, google_cal: calendarId, google_hash: hash });
+  const saved = await res.json();
+  let savedHash = hash;
+  if (meet) {
+    let link: string | null = saved?.hangoutLink ?? null;
+    // Google usually answers at once, but may still be making the meeting
+    if (!link) {
+      await new Promise((done) => setTimeout(done, 1500));
+      const found = await calendarApi(userId, `/calendars/${cal(calendarId)}/events/${eventId}`);
+      const again = found.ok ? await found.json() : (await found.body?.cancel(), null);
+      link = again?.hangoutLink ?? null;
+    }
+    if (link) {
+      await admin.from('bookings').update({ meeting_url: link }).eq('id', b.id);
+      b.meeting_url = link;
+      // from the booking as it now stands, so the next sync finds nothing to change
+      savedHash = await digest({ calendarId, body: eventBody(b) });
+    } else {
+      console.error('google meet link missing');
+    }
+  }
+  await saveLink(b.id, { google_event_id: eventId, google_cal: calendarId, google_hash: savedHash });
   return result;
 };
 
@@ -521,8 +572,9 @@ const actions: Record<string, (req: Request, body: Body) => Promise<unknown>> = 
       if (!fresh || b.status !== 'confirmed' || b.approval_status !== 'approved' || b.google_event_id) return { pushed: false };
     }
     const account = await getAccount(b.host_id);
-    // auto-sync off stops new copies; a host's change to one already in Google still follows
-    if (!account || (!account.auto_sync && !(isHost && b.google_event_id))) return { pushed: false };
+    // auto-sync off stops new copies, except where the event's Meet link depends on one; a host's
+    // change to one already in Google still follows
+    if (!account || (!account.auto_sync && !wantsMeet(b) && !(isHost && b.google_event_id))) return { pushed: false };
     try {
       const result = await syncBooking(account, b);
       return { pushed: result !== 'unchanged' };

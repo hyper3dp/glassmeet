@@ -16,7 +16,6 @@ import OutlookIcon from '@/components/outlookicon.jsx';
 import AppleIcon from '@/components/appleicon.jsx';
 import { getCalendarPriority } from '@/lib/devicedetect.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 
 const SAMPLE_BOOKING = {
   id: 'sample',
@@ -40,6 +39,10 @@ const GOOGLE_RETURN_ERRORS = {
 };
 // Google's code is single use; StrictMode's second effect run must not send it again
 const finishedGoogleCodes = new Set();
+const CONNECT_RETURN_ERRORS = {
+  denied: 'It wasn’t connected: access was not allowed.',
+  state: 'That sign-in expired. Try connecting again.',
+};
 
 export default function CalendarConnections() {
   const { profile, updateProfile } = useApp();
@@ -67,16 +70,37 @@ export default function CalendarConnections() {
     || (!googleAccount.calendar_id || googleAccount.calendar_id === 'primary' ? 'Primary calendar' : googleAccount.calendar_id);
   const lastSynced = googleAccount.synced_date;
 
-  // Microsoft Outlook connection state (Microsoft 365 + Outlook.com)
-  // Uses Microsoft Graph API via platform OAuth — supports both work/school and personal accounts.
-  const outlookConnected = !!profile?.outlook_connected;
-  const outlookEmail = profile?.outlook_email || '';
-  const outlookAccountType = profile?.outlook_account_type || '';
-  const outlookCalendars = profile?.outlook_calendars || [];
-  const outlookAutoSync = profile?.outlook_auto_sync !== false;
-  const outlookLastSynced = profile?.outlook_last_synced;
-  const [showOutlookSetup, setShowOutlookSetup] = useState(false);
+  // Microsoft: the connections edge function
+  const [connections, setConnections] = useState({});
+  const [connectionsAvailable, setConnectionsAvailable] = useState(null); // null: not known yet
 
+  const refreshConnections = () => api.connections.list().then(setConnections);
+
+  useEffect(() => {
+    refreshConnections();
+    api.connections.available().then(setConnectionsAvailable);
+
+    // Back from Microsoft: finished here by the signed-in host, as with Google
+    const result = searchParams.get('connect');
+    if (!result) return;
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const reason = searchParams.get('reason');
+    const rest = new URLSearchParams(searchParams);
+    ['connect', 'provider', 'code', 'state', 'reason'].forEach((key) => rest.delete(key));
+    setSearchParams(rest, { replace: true });
+    if (result === 'error') {
+      toast.error(CONNECT_RETURN_ERRORS[reason] || 'It wasn’t connected. Try again.');
+    } else if (result === 'finish' && code && state && !finishedGoogleCodes.has(code)) {
+      finishedGoogleCodes.add(code);
+      api.connections.finish(code, state)
+        .then((done) => toast.success(done?.email ? `Connected (${done.email}).` : 'Connected.'))
+        .catch((error) => toast.error(error?.message || 'It wasn’t connected. Try again.'))
+        .finally(refreshConnections);
+    }
+    // once, for the address the page opened with
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Device-aware calendar ordering
   const calendarPriority = getCalendarPriority();
@@ -217,27 +241,6 @@ export default function CalendarConnections() {
     }
   };
 
-  // Microsoft Outlook handlers
-  const handleConnectOutlook = () => setShowOutlookSetup(true);
-
-  const handleDisconnectOutlook = attempt(async () => {
-    await updateProfile({ outlook_connected: false, outlook_email: '', outlook_calendars: [], outlook_last_synced: null, outlook_account_type: '' });
-  }, 'Could not disconnect Outlook.');
-
-  const toggleOutlookAutoSync = attempt(async () => {
-    await updateProfile({ outlook_auto_sync: !outlookAutoSync });
-  }, 'Could not change auto-sync.');
-
-  const syncOutlookNow = async () => {
-    setSyncing(true);
-    try {
-      await updateProfile({ outlook_last_synced: new Date().toISOString() });
-    } catch (error) {
-      toast.error(`Could not sync Outlook. ${error?.message || ''}`.trim());
-    }
-    setSyncing(false);
-  };
-
   const testGoogle = async () => {
     setTesting('google');
     try {
@@ -290,7 +293,8 @@ export default function CalendarConnections() {
     api.calendarFeed.mine()
       .then((token) => { setFeedToken(token); setFeedState('ready'); })
       .catch((error) => {
-        setFeedError(/cal_feeds|relation|schema cache/i.test(error.message)
+        // only a missing table; other errors also name cal_feeds, and need their real message
+        setFeedError(/relation .* does not exist|schema cache/i.test(error.message)
           ? 'Calendar subscriptions are not set up on the server yet.'
           : `Could not load your subscription link: ${error.message}`);
         setFeedState('error');
@@ -317,7 +321,7 @@ export default function CalendarConnections() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Calendars" description="Keep your meetings in the calendar you already use. Outlook account connections are coming soon." />
+      <PageHeader title="Calendars" description="Keep your meetings in the calendar you already use, and create a video link for each booking." />
 
       {/* Subscribe: one auto-updating feed per host */}
       <GlassCard hover={false} className="p-0 overflow-hidden">
@@ -385,12 +389,12 @@ export default function CalendarConnections() {
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               {googleConnected
-                ? `Connected${googleAccount.email ? ` to ${googleAccount.email}` : ''}. Times you’re busy in Google are hidden from your booking pages${autoSync ? ', and new bookings are added to Google Calendar' : ''}.`
+                ? `Connected${googleAccount.email ? ` to ${googleAccount.email}` : ''}. Times you’re busy in Google are hidden from your booking pages${autoSync ? ', and new bookings are added to Google Calendar' : ''}. Events held on Google Meet get a new Meet link for each booking.`
                 : googleReconnect
                   ? `Google stopped accepting the connection${googleAccount.email ? ` to ${googleAccount.email}` : ''}. Connect again to keep busy times and bookings in sync.`
                   : googleUnavailable
                     ? `${GOOGLE_UNAVAILABLE} Until then, guests can add meetings to Google Calendar from their confirmation page.`
-                    : 'Connect Google Calendar so times you’re busy stay off your booking pages and new bookings are added to your calendar.'}
+                    : 'Connect Google Calendar so times you’re busy stay off your booking pages, new bookings are added to your calendar, and events held on Google Meet get a link for each booking.'}
             </p>
 
             {googleLoading && (
@@ -490,68 +494,18 @@ export default function CalendarConnections() {
         </div>
       </GlassCard>
 
-      {/* Microsoft Outlook */}
-      <GlassCard hover={false} className="p-0 overflow-hidden">
-        <div className="p-5 flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-[#0078D4] shadow-xs flex items-center justify-center shrink-0">
-            <OutlookIcon className="w-6 h-6" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-[17px] font-bold">Microsoft Outlook</h2>
-              {outlookConnected ? <StatusBadge connected /> : <ComingSoonBadge />}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {outlookConnected
-                ? `Connected to ${outlookEmail}. Availability is checked against your Outlook calendar before booking slots are shown.`
-                : 'Soon you can connect a Microsoft 365 or Outlook.com account to check availability and sync meetings. Until then, guests can add meetings to Outlook from their confirmation page.'}
-            </p>
-
-            {outlookConnected && (
-              <div className="mt-4 space-y-3">
-                <div className="text-sm space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-medium">Account</span> {outlookEmail}</div>
-                  <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-medium">Type</span> {outlookAccountType === 'microsoft_365' ? 'Microsoft 365 (Work/School)' : 'Personal (Outlook.com)'}</div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {outlookCalendars.length ? outlookCalendars.map((c) => (
-                    <span key={c} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-secondary">
-                      <Calendar className="w-3 h-3" /> {c}
-                    </span>
-                  )) : <span className="text-xs text-muted-foreground">Checking all calendars</span>}
-                </div>
-                {outlookLastSynced && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <RefreshCw className="w-3 h-3" /> Last synced {new Date(outlookLastSynced).toLocaleString()}
-                  </div>
-                )}
-                <label className="flex items-center gap-2.5 cursor-pointer pt-1">
-                  <Switch checked={outlookAutoSync} onCheckedChange={toggleOutlookAutoSync} />
-                  <span className="text-sm">Auto-sync new bookings to Outlook</span>
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="px-5 pb-5 flex flex-wrap gap-2">
-          {outlookConnected ? (
-            <>
-              <GlassButton size="sm" onClick={() => setShowOutlookSetup(true)}>
-                <Settings2 className="w-4 h-4" /> Calendars
-              </GlassButton>
-              <GlassButton size="sm" onClick={syncOutlookNow} disabled={syncing}>
-                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
-              </GlassButton>
-              <GlassButton size="sm" variant="ghost" onClick={handleDisconnectOutlook}>
-                <Unplug className="w-4 h-4" /> Disconnect
-              </GlassButton>
-            </>
-          ) : (
-            <ComingSoonButton label="Microsoft Outlook" />
-          )}
-        </div>
-      </GlassCard>
+      <ConnectionCard
+        provider="microsoft"
+        title="Microsoft Outlook and Teams"
+        icon={<div className="w-11 h-11 rounded-lg bg-[#0078D4] shadow-xs flex items-center justify-center shrink-0"><OutlookIcon className="w-6 h-6" /></div>}
+        account={connections.microsoft}
+        available={connectionsAvailable?.microsoft}
+        pitch="Connect a Microsoft 365 or Outlook.com account so times you’re busy stay off your booking pages and new bookings are added to your calendar. Events held on Microsoft Teams get a link for each booking, with a work or school account."
+        unavailable="Microsoft isn’t available yet. Until then, guests can add meetings to Outlook from their confirmation page."
+        describe={(account) => `Times you’re busy in Outlook are hidden from your booking pages${account.auto_sync ? ', and new bookings are added to Outlook' : ''}. ${account.teams ? 'Events held on Microsoft Teams get a new link for each booking.' : 'This account can’t create Teams meetings, which need a work or school account.'}`}
+        autoSyncLabel="Auto-sync new bookings to Outlook"
+        onChanged={refreshConnections}
+      />
 
       {showGoogleSetup && (
         <GoogleSetupModal
@@ -563,25 +517,105 @@ export default function CalendarConnections() {
         />
       )}
 
-      {showOutlookSetup && (
-        <OutlookSetupModal
-          connected={outlookConnected}
-          selectedCalendars={outlookCalendars}
-          accountEmail={outlookEmail}
-          accountType={outlookAccountType}
-          onClose={() => setShowOutlookSetup(false)}
-          onSave={attempt(async (cals, accountType) => {
-            await updateProfile({
-              outlook_calendars: cals,
-              outlook_connected: true,
-              outlook_last_synced: new Date().toISOString(),
-              outlook_account_type: accountType || 'outlook_com',
-            });
-            setShowOutlookSetup(false);
-          }, 'Could not save your calendars.')}
-        />
-      )}
     </div>
+  );
+}
+
+// One connection, Microsoft for now. The account row is read directly; the rest goes through the
+// connections edge function.
+function ConnectionCard({ provider, title, icon, account, available, pitch, unavailable, describe, autoSyncLabel, onChanged }) {
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const connected = Boolean(account?.connected);
+  const reconnect = Boolean(account) && !connected;
+  const failed = (work, name) => async () => {
+    setBusy(name);
+    setError('');
+    try {
+      await work();
+    } catch (e) {
+      setError(e?.message || 'The connection didn’t respond.');
+      if (e?.code === 'reconnect' || e?.code === 'not_connected') onChanged();
+    }
+    setBusy('');
+  };
+  // leaving for the provider; the button stays busy until the page goes
+  const connect = failed(async () => {
+    await api.connections.connect(provider);
+    await new Promise(() => {});
+  }, 'connect');
+  const sync = failed(async () => {
+    const result = await api.connections.sync(provider);
+    if (result?.failed) toast.error(`${result.failed} meeting${result.failed === 1 ? '' : 's'} could not be synced. Try again later.`);
+    else toast.success(result?.changed ? `Updated ${result.changed} meeting${result.changed === 1 ? '' : 's'}.` : 'Everything is up to date.');
+    await onChanged();
+  }, 'sync');
+  const toggleSync = failed(async () => {
+    await api.connections.saveSettings(provider, !account.auto_sync);
+    await onChanged();
+  }, 'settings');
+  const disconnect = async () => {
+    if (!confirm(`Disconnect ${title}? New bookings stop using it. Meetings and events it already made stay, and links already sent keep working.`)) return;
+    await failed(async () => {
+      await api.connections.disconnect(provider);
+      toast.success(`${title} disconnected.`);
+      await onChanged();
+    }, 'disconnect')();
+  };
+
+  return (
+    <GlassCard hover={false} className="p-0 overflow-hidden">
+      <div className="p-5 flex items-start gap-4">
+        {icon}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-[17px] font-bold">{title}</h2>
+            {available === null || available === undefined ? null
+              : connected ? <StatusBadge connected />
+                : reconnect ? <ReconnectBadge />
+                  : available ? <StatusBadge connected={false} /> : <ComingSoonBadge />}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            {connected
+              ? `Connected${account.email ? ` to ${account.email}` : ''}. ${describe(account)}`
+              : reconnect
+                ? `${title} stopped accepting the connection${account.email ? ` to ${account.email}` : ''}. Connect again to keep it working.`
+                : available === false ? unavailable : pitch}
+          </p>
+          {connected && account.synced_date && (
+            <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1.5">
+              <RefreshCw className="w-3 h-3" /> Last synced {new Date(account.synced_date).toLocaleString()}
+            </div>
+          )}
+          {connected && autoSyncLabel && (
+            <label className="mt-3 flex items-center gap-2.5 cursor-pointer">
+              <Switch checked={account.auto_sync} onCheckedChange={toggleSync} disabled={busy === 'settings'} />
+              <span className="text-sm">{autoSyncLabel}</span>
+            </label>
+          )}
+          {error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}
+        </div>
+      </div>
+      <div className="px-5 pb-5 flex flex-wrap gap-2">
+        {connected ? (
+          <>
+            <GlassButton size="sm" type="button" onClick={sync} disabled={busy === 'sync'}>
+              {busy === 'sync' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
+            </GlassButton>
+            <GlassButton size="sm" type="button" variant="ghost" onClick={disconnect} disabled={busy === 'disconnect'}>
+              {busy === 'disconnect' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unplug className="w-4 h-4" />} Disconnect
+            </GlassButton>
+          </>
+        ) : available || reconnect ? (
+          <GlassButton size="sm" type="button" variant="primary" onClick={connect} disabled={busy === 'connect'}>
+            {busy === 'connect' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarCheck className="w-4 h-4" />}
+            {reconnect ? 'Reconnect' : 'Connect'}
+          </GlassButton>
+        ) : available === false ? (
+          <ComingSoonButton label={title} />
+        ) : null}
+      </div>
+    </GlassCard>
   );
 }
 
@@ -671,87 +705,5 @@ function GoogleG() {
       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
     </svg>
-  );
-}
-
-function OutlookSetupModal({ connected, selectedCalendars, accountEmail, accountType, onClose, onSave }) {
-  const [selected, setSelected] = useState(selectedCalendars);
-  const [acctType, setAcctType] = useState(accountType || 'outlook_com');
-  const calendars = ['Calendar', 'Work', 'Personal', 'Family', 'Team'];
-
-  const toggle = (cal) => setSelected((s) => s.includes(cal) ? s.filter((c) => c !== cal) : [...s, cal]);
-
-  return (
-    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent showCloseButton={false} aria-describedby={undefined} className="sm:max-w-md p-6 block">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-[#0078D4] shadow-xs flex items-center justify-center"><OutlookIcon className="w-6 h-6" /></div>
-          <div>
-            <DialogTitle>Microsoft Outlook</DialogTitle>
-            <p className="text-xs text-muted-foreground">{connected ? 'Select calendars to check for conflicts' : 'OAuth authorization required'}</p>
-          </div>
-        </div>
-
-        {connected ? (
-          <>
-            {accountEmail && (
-              <div className="rounded-lg bg-secondary p-3 mb-3 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-                <div>
-                  <div className="text-sm font-medium">{accountEmail}</div>
-                  <div className="text-xs text-muted-foreground">{acctType === 'microsoft_365' ? 'Microsoft 365 (Work/School)' : 'Personal (Outlook.com)'}</div>
-                </div>
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground mb-3">Choose which Outlook calendars GlassMeet checks when showing available slots.</p>
-            <div className="space-y-2 mb-5">
-              {calendars.map((cal) => (
-                <label key={cal} className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer transition-all duration-200 hover:border-border-hover">
-                  <Checkbox checked={selected.includes(cal)} onCheckedChange={() => toggle(cal)} />
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">{cal}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <GlassButton size="sm" variant="ghost" onClick={onClose}>Cancel</GlassButton>
-              <GlassButton size="sm" variant="primary" onClick={() => onSave(selected, acctType)}>Save</GlassButton>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="rounded-lg bg-secondary p-4 mb-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-              <div className="text-sm space-y-2">
-                <p className="font-medium">Microsoft Outlook two-way sync requires OAuth setup.</p>
-                <p className="text-muted-foreground text-xs">
-                  Connecting your Microsoft account uses secure OAuth 2.0 with Microsoft Graph API
-                  (scopes: <code>Calendars.Read</code>, <code>Calendars.ReadWrite</code>).
-                  This requires a Builder+ plan and a Microsoft OAuth client configured in your workspace.
-                </p>
-              </div>
-            </div>
-            <div className="rounded-lg bg-secondary p-3 mb-4">
-              <p className="text-xs font-medium mb-2">Account type</p>
-              <div className="flex gap-2">
-                <button onClick={() => setAcctType('microsoft_365')} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${acctType === 'microsoft_365' ? 'border-primary bg-primary-soft text-link' : 'border-border hover:border-border-hover'}`}>
-                  Microsoft 365<br /><span className="text-xs text-muted-foreground">Work / School</span>
-                </button>
-                <button onClick={() => setAcctType('outlook_com')} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${acctType === 'outlook_com' ? 'border-primary bg-primary-soft text-link' : 'border-border hover:border-border-hover'}`}>
-                  Outlook.com<br /><span className="text-xs text-muted-foreground">Personal</span>
-                </button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Use the <strong>connection card in chat</strong> to authorize your Microsoft account securely.
-              We never store your password. Outlook.com, Hotmail, and Live.com accounts are all supported.
-            </p>
-            <div className="flex justify-end">
-              <GlassButton size="sm" variant="ghost" onClick={onClose}>Close</GlassButton>
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }

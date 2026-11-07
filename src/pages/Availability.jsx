@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '@/lib/localApi';
-import { Plus, Trash2, CalendarOff, X, Globe, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, CalendarOff, X, Globe, RefreshCw, CalendarCheck } from 'lucide-react';
 import { GlassButton, GlassInput, GlassLabel, Spinner, LoadError, PageHeader, Tabs, TimeSelect, SaveStatus } from '@/components/glass';
 import { formatDate } from '@/lib/Availability.js';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import DatePicker from '@/components/DatePicker.jsx';
 import HolidaySettings from '@/components/HolidaySettings.jsx';
 import { onlyTitle } from '@/lib/inputRules';
@@ -300,12 +301,75 @@ export default function Availability({ profile, updateProfile }) {
             </div>
           </section>
         </div>
+
+        <DailyLimit value={profile?.max_per_day ?? null} onSave={(max_per_day) => track(() => updateProfile({ max_per_day }))} />
       </div>
 
       <HolidaySettings profile={profile} updateProfile={updateProfile} />
 
       {showExc && <ExceptionModal onAdd={addException} onClose={() => setShowExc(false)} />}
     </div>
+  );
+}
+
+const LIMIT_MAX = 100;
+
+// The most meetings guests can book on one day, across all the host's events
+function DailyLimit({ value, onSave }) {
+  const [on, setOn] = useState(value != null);
+  const [draft, setDraft] = useState(String(value ?? 5));
+  const [saved, setSaved] = useState(value);
+
+  // a failed save reloads nothing here, so follow what the profile says once it changes
+  useEffect(() => {
+    setSaved(value);
+    setOn(value != null);
+    if (value != null) setDraft(String(value));
+  }, [value]);
+
+  const commit = (next) => {
+    if (next === saved) return;
+    setSaved(next);
+    onSave(next);
+  };
+  const toggle = (next) => {
+    setOn(next);
+    commit(next ? Math.min(Math.max(Number(draft) || 5, 1), LIMIT_MAX) : null);
+  };
+  // an empty or out-of-range number settles on the nearest allowed one
+  const settle = () => {
+    const number = Math.min(Math.max(Math.round(Number(draft)) || saved || 1, 1), LIMIT_MAX);
+    setDraft(String(number));
+    commit(number);
+  };
+
+  return (
+    <section className="border-t border-border p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <label htmlFor="day-limit-on" className="min-w-0 cursor-pointer">
+          <h2 className="text-[15px] font-bold flex items-center gap-2"><CalendarCheck className="w-4 h-4 text-muted-foreground" /> Daily meeting limit</h2>
+          <span className="mt-1 block text-sm text-muted-foreground">Once you have this many meetings on a day, guests can’t book more that day. This covers all your events, and a group session counts as one meeting.</span>
+        </label>
+        <Switch id="day-limit-on" checked={on} onCheckedChange={toggle} className="mt-0.5" />
+      </div>
+      {on && (
+        <div className="mt-4 flex items-center gap-3">
+          <GlassLabel htmlFor="day-limit" className="mb-0">Meetings per day</GlassLabel>
+          <GlassInput
+            id="day-limit"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={LIMIT_MAX}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={settle}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+            className="w-20 tabular"
+          />
+        </div>
+      )}
+    </section>
   );
 }
 

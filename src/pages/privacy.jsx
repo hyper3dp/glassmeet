@@ -104,8 +104,8 @@ const sections = [
       <>
         <p>
           If you connect Google Calendar, {appName} asks Google for permission to view your list of calendars, check
-          when you are busy, and create events for the bookings you receive. We use this access only to provide
-          those features to you.
+          when you are busy, and create events for the bookings you receive, including Google Meet links for events
+          held on Google Meet. We use this access only to provide those features to you.
         </p>
         <p>
           {appName}&rsquo;s use and transfer of information received from Google APIs to any other app will adhere to
@@ -127,14 +127,34 @@ const sections = [
     ),
   },
   {
-    id: 'whatsapp-and-other-apps',
-    title: 'WhatsApp, Outlook and Apple Calendar',
+    id: 'microsoft',
+    title: 'Microsoft',
     body: (
       <>
         <p>
-          {appName} does not connect to your WhatsApp, Microsoft Outlook or Apple accounts. When you choose to message
-          someone on WhatsApp, add a meeting to Outlook or download a calendar file, {appName} opens that app or
-          downloads a file with the details filled in, and <em>you</em> decide whether to send or save it.
+          If you connect a Microsoft account, {appName} asks Microsoft for permission to read and edit your calendar,
+          so it can check when you are busy, add the bookings you receive, and create Microsoft Teams links for events
+          held on Teams. It also reads your account&rsquo;s email address, to show which account is connected.
+        </p>
+        <p>
+          We use this access only to provide those features to you. We do not use this data for advertising or sell it.
+          You can disconnect at any time from the Calendars page, which deletes the access we hold. Meetings and events
+          already created stay in your account. What happens in Microsoft&rsquo;s services is governed by its privacy
+          policy.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'whatsapp-and-other-apps',
+    title: 'WhatsApp and Apple Calendar',
+    body: (
+      <>
+        <p>
+          {appName} does not connect to your WhatsApp or Apple accounts. When you choose to message someone on WhatsApp
+          or download a calendar file, {appName} opens that app or downloads a file with the details filled in, and{' '}
+          <em>you</em> decide whether to send or save it. Guests adding a meeting to Outlook from their confirmation
+          page works the same way.
         </p>
         <p>
           What happens after that is governed by the privacy policies of WhatsApp (Meta), Microsoft or Apple.
