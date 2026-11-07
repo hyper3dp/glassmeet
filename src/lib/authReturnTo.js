@@ -25,10 +25,15 @@ export function authErrorMessage(err, fallback) {
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
     return 'Couldn’t reach GlassMeet. Check your connection and try again.';
   }
-  // Supabase's wording when an address it won't create an account for is used (a sign-up, or a
-  // Google / LinkedIn sign-in for a new email); guests are told plainly instead
+  // Supabase's wording when "Allow new users to sign up" is off (a sign-up, or a
+  // Google / LinkedIn sign-in for a new email). The address itself is fine, so don't blame it.
   if (err?.code === 'signup_disabled' || /signups? not allowed/i.test(message)) {
-    return 'This address is invalid.';
+    return 'GlassMeet isn’t accepting new accounts right now. If you already have one, log in with the address you signed up with.';
+  }
+  // Google or LinkedIn sent the person back but the sign-in couldn't be completed. Supabase's text
+  // is technical and includes the one-time code, so it isn't shown.
+  if (/unable to exchange external code/i.test(message)) {
+    return 'Sign-in didn’t finish. Try again.';
   }
   return message;
 }
